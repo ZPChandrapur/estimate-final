@@ -67,6 +67,9 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
     { label: string; type: string; value: number; amount: number }
   >([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [leadStatements, setLeadStatements] = useState<any[]>([]);
+  const [showLeadDropdown, setShowLeadDropdown] = useState(false);
+  const [searchingLeads, setSearchingLeads] = useState(false);
 
   // NEW STATE FOR INLINE ADDING + EDITING
   const [rowBeingAddedBelow, setRowBeingAddedBelow] = useState<number | null>(null);
@@ -237,6 +240,58 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
     } catch (error) {
       console.error('Error fetching rate analysis:', error);
     }
+  };
+
+  const searchLeadStatements = async (searchTerm: string) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setLeadStatements([]);
+      setShowLeadDropdown(false);
+      return;
+    }
+
+    try {
+      setSearchingLeads(true);
+
+      const { data: subworkData } = await supabase
+        .schema('estimate')
+        .from('subworks')
+        .select('works_id')
+        .eq('subworks_id', item.subwork_id)
+        .maybeSingle();
+
+      if (!subworkData) {
+        setLeadStatements([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('lead_statements')
+        .select('*')
+        .eq('works_id', subworkData.works_id)
+        .ilike('material', `%${searchTerm}%`)
+        .limit(10);
+
+      if (error) throw error;
+
+      setLeadStatements(data || []);
+      setShowLeadDropdown(true);
+    } catch (error) {
+      console.error('Error searching lead statements:', error);
+      setLeadStatements([]);
+    } finally {
+      setSearchingLeads(false);
+    }
+  };
+
+  const handleSelectLeadStatement = (lead: any) => {
+    setNewTax({
+      ...newTax,
+      label: lead.material,
+      value: lead.total_rate || '0'
+    });
+    setShowLeadDropdown(false);
+    setLeadStatements([]);
   };
 
   const saveRateAnalysis = async () => {
@@ -513,17 +568,64 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
               Add Rate Adjustment
             </h3>
             <div className="flex flex-row items-end gap-3 w-full">
-              <div className="flex-1">
+              <div className="flex-1 relative">
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">
                   Label <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={newTax.label}
-                  onChange={(e) => setNewTax({ ...newTax, label: e.target.value })}
+                  onChange={(e) => {
+                    setNewTax({ ...newTax, label: e.target.value });
+                    searchLeadStatements(e.target.value);
+                  }}
+                  onFocus={(e) => {
+                    if (e.target.value.length >= 2) {
+                      searchLeadStatements(e.target.value);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowLeadDropdown(false), 200);
+                  }}
                   className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., GST, Labour Welfare"
+                  placeholder="Search materials from Lead Statement or enter manually"
                 />
+                {searchingLeads && (
+                  <div className="absolute right-3 top-9 text-gray-400">
+                    <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                  </div>
+                )}
+                {showLeadDropdown && leadStatements.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {leadStatements.map((lead, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleSelectLeadStatement(lead)}
+                        className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-900">{lead.material}</div>
+                            {lead.reference && (
+                              <div className="text-xs text-gray-500 mt-0.5">Ref: {lead.reference}</div>
+                            )}
+                            {lead.lead_in_km && (
+                              <div className="text-xs text-gray-500">Lead: {lead.lead_in_km} km</div>
+                            )}
+                          </div>
+                          <div className="ml-3 text-right">
+                            <div className="text-sm font-semibold text-blue-600">
+                              ₹{Number(lead.total_rate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </div>
+                            {lead.unit && (
+                              <div className="text-xs text-gray-500">per {lead.unit}</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="w-40">
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">
