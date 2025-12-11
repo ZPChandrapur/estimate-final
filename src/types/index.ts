@@ -1,12 +1,3 @@
-export interface Role {
-  id: string;
-  name: string;
-  display_name: string;
-  description?: string;
-  level: number;
-  created_at: string;
-}
-
 export interface User {
   id: string;
   email: string;
@@ -14,7 +5,6 @@ export interface User {
     full_name?: string;
     avatar_url?: string;
   };
-  role?: Role;
 }
 
 export interface UserRole {
@@ -186,7 +176,6 @@ export interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
-  userRole: Role | null;
 }
 
 export interface LanguageContextType {

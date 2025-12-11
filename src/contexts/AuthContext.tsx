@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { User, AuthContextType, Role } from '../types';
+import { User, AuthContextType } from '../types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -18,59 +18,23 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [userRole, setUserRole] = useState<Role | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserRole = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select(`
-          role_id,
-          roles:role_id (
-            id,
-            name,
-            display_name,
-            description,
-            level,
-            created_at
-          )
-        `)
-        .eq('user_id', userId)
-        .order('assigned_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching user role:', error);
-        return null;
-      }
-
-      if (data && data.roles) {
-        const roleData = Array.isArray(data.roles) ? data.roles[0] : data.roles;
-        return roleData as Role;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error in fetchUserRole:', error);
-      return null;
-    }
-  };
-
   useEffect(() => {
+    // Get initial session
     const getInitialSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) {
           console.error('Error getting session:', error);
+          // Clear invalid session data
           await supabase.auth.signOut();
         } else if (session?.user) {
           setUser(session.user as User);
-          const role = await fetchUserRole(session.user.id);
-          setUserRole(role);
         }
       } catch (error) {
         console.error('Error in getInitialSession:', error);
+        // Clear any stale session data on catch
         try {
           await supabase.auth.signOut();
         } catch (signOutError) {
@@ -83,16 +47,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     getInitialSession();
 
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         try {
           if (session?.user) {
             setUser(session.user as User);
-            const role = await fetchUserRole(session.user.id);
-            setUserRole(role);
           } else {
             setUser(null);
-            setUserRole(null);
           }
         } catch (error) {
           console.error('Error in auth state change:', error);
@@ -135,7 +97,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const value = {
     user,
-    userRole,
     loading,
     signIn,
     signOut,
