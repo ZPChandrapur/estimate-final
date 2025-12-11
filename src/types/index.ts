@@ -5,6 +5,13 @@ export interface User {
     full_name?: string;
     avatar_url?: string;
   };
+  role?: {
+    id: string;
+    name: string;
+    display_name: string;
+    description?: string;
+    level: number;
+  };
 }
 
 export interface UserRole {
