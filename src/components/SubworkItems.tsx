@@ -878,6 +878,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
           onClose={() => {
             setShowRateAnalysisModal(false);
             setRateAnalysisItem(null);
+            fetchSubworkItems();
           }}
           item={rateAnalysisItem}
         />

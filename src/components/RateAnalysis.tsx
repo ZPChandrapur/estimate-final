@@ -349,6 +349,21 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
         if (error) throw error;
       }
 
+      const updatedRate = totalRate;
+      const updatedTotalAmount = item.ssr_quantity * updatedRate;
+
+      const { error: itemUpdateError } = await supabase
+        .schema('estimate')
+        .from('subwork_items')
+        .update({
+          ssr_rate: updatedRate,
+          total_item_amount: updatedTotalAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('sr_no', item.sr_no);
+
+      if (itemUpdateError) throw itemUpdateError;
+
       onClose();
     } catch (error) {
       console.error('Error saving rate analysis:', error);
