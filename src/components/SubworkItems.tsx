@@ -826,13 +826,16 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                             >
                               <Calculator className="w-4 h-4" />
                             </button>
-                            {/* <button
-                              onClick={() => handleEditItem(item)}
-                              className="text-green-600 hover:text-green-900 p-1 rounded"
-                              title="Edit Item"
+                            <button
+                              onClick={() => {
+                                setRateAnalysisItem(item);
+                                setShowRateAnalysisModal(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                              title="Rate Analysis"
                             >
                               <Edit2 className="w-4 h-4" />
-                            </button> */}
+                            </button>
                             <button
                               onClick={() => handleDeleteItem(item)}
                               className="text-red-600 hover:text-red-900 p-1 rounded"
