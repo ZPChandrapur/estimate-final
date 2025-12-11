@@ -220,20 +220,49 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     }, 500);
   };
 
-  const selectCSRItem = (item: any) => {
-    setSelectedCSRItem(item);
+  const selectCSRItem = async (item: any) => {
     setCsrSearchQuery(`${item['Item No']} - ${item['Item']}`);
-    setNewItem({
-      ...newItem,
-      description_of_item: item['Item'] || ''
-    });
 
     const baseRate = parseFloat(item['Completed Item']) || 0;
     const unit = item['Unit'] || '';
     const labour = parseFloat(item['Labour']) || 0;
 
+    let fullDescription = item['Item'] || '';
+    let parentDescription = '';
+
+    const itemNo = item['Item No'];
+    if (itemNo && /^\d+-[A-Za-z]/.test(itemNo)) {
+      const parentItemNo = itemNo.split('-')[0];
+
+      try {
+        const { data: parentData, error } = await supabase
+          .schema('estimate')
+          .from('CSR-2022-2023')
+          .select('Item')
+          .eq('Item No', parentItemNo)
+          .maybeSingle();
+
+        if (!error && parentData) {
+          parentDescription = parentData['Item'] || '';
+          fullDescription = `${parentDescription}\n\n${item['Item']}`;
+        }
+      } catch (error) {
+        console.error('Error fetching parent item:', error);
+      }
+    }
+
+    setNewItem({
+      ...newItem,
+      description_of_item: fullDescription
+    });
+
+    setSelectedCSRItem({
+      ...item,
+      parentDescription: parentDescription
+    });
+
     setItemRates([{
-      description: item['Item'] || '',
+      description: fullDescription,
       rate: baseRate,
       unit: unit
     }]);
@@ -1035,6 +1064,14 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                           <div className="col-span-2">
                             <span className="text-gray-600">Reference:</span>
                             <span className="ml-1 font-medium">{selectedCSRItem['Reference']}</span>
+                          </div>
+                        )}
+                        {selectedCSRItem.parentDescription && (
+                          <div className="col-span-2 mt-2 pt-2 border-t border-blue-300">
+                            <div className="text-gray-600 font-medium mb-1">Main Item Description:</div>
+                            <div className="text-gray-700 text-xs leading-relaxed bg-white p-2 rounded">
+                              {selectedCSRItem.parentDescription}
+                            </div>
                           </div>
                         )}
                       </div>
