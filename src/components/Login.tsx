@@ -89,7 +89,7 @@ const Login: React.FC = () => {
                 className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               >
                 <option value="A">Public Works Department (PWD)</option>
-                <option value="B">B</option>
+                <option value="B">Irrigation</option>
               </select>
             </div>
 
