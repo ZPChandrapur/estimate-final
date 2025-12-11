@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { Work, SubWork } from '../types';
 import LoadingSpinner from './common/LoadingSpinner';
 import SubworkItems from './SubworkItems';
+import LeadStatement from './LeadStatement';
 import {
   Plus,
   Search,
@@ -61,6 +62,10 @@ const Subworks: React.FC = () => {
   const [csrData, setCSRData] = useState<any[]>([]);
   const [loadingLeadCharges, setLoadingLeadCharges] = useState(false);
   const [loadingCSR, setLoadingCSR] = useState(false);
+
+  // Add state for Lead Statement modal
+  const [showLeadStatementModal, setShowLeadStatementModal] = useState(false);
+  const [selectedWorkForLeadStatement, setSelectedWorkForLeadStatement] = useState<{ id: string; name: string } | null>(null);
 
 useEffect(() => {
   // Always fetch all works on selectedWorkId change, not just filtered
@@ -352,6 +357,21 @@ const fetchSubworkTotals = async () => {
   const handleOpenCSR = () => {
     setShowCSRModal(true);
     fetchCSRData();
+  };
+
+  const handleOpenLeadStatement = () => {
+    if (!selectedWorkId) {
+      alert('Please select a work first.');
+      return;
+    }
+    const selectedWork = works.find(w => w.works_id === selectedWorkId);
+    if (selectedWork) {
+      setSelectedWorkForLeadStatement({
+        id: selectedWork.works_id,
+        name: selectedWork.work_name
+      });
+      setShowLeadStatementModal(true);
+    }
   };
 
   const handleDesignUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -682,6 +702,13 @@ const fetchSubworkTotals = async () => {
                     className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105">
                     <FileText className="w-3 h-3 mr-1" />
                     CSR 22-23
+                  </button>
+                  <button
+                    onClick={handleOpenLeadStatement}
+                    disabled={!selectedWorkId}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 disabled:opacity-50 hover:scale-105">
+                    <FileText className="w-3 h-3 mr-1" />
+                    Lead Statement
                   </button>
                   <button
                     onClick={() => setShowAddModal(true)}
@@ -1309,6 +1336,19 @@ const fetchSubworkTotals = async () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Lead Statement Modal */}
+      {showLeadStatementModal && selectedWorkForLeadStatement && (
+        <LeadStatement
+          worksId={selectedWorkForLeadStatement.id}
+          workName={selectedWorkForLeadStatement.name}
+          isOpen={showLeadStatementModal}
+          onClose={() => {
+            setShowLeadStatementModal(false);
+            setSelectedWorkForLeadStatement(null);
+          }}
+        />
       )}
     </div>
   );
