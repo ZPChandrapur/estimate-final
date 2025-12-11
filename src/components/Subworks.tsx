@@ -289,16 +289,27 @@ const fetchSubworkTotals = async () => {
   const fetchLeadCharges = async () => {
     try {
       setLoadingLeadCharges(true);
+
       const { data, error } = await supabase
         .schema('estimate')
         .from('Lead_Charges_Materials_22-23')
-        .select('*')
-        .order('sr no', { ascending: true });
+        .select('*');
 
-      if (error) throw error;
-      setLeadChargesData(data || []);
+      if (error) {
+        console.error('Supabase Error:', error);
+        throw error;
+      }
+
+      const sortedData = (data || []).sort((a, b) => {
+        const aNum = parseInt(a['sr no']);
+        const bNum = parseInt(b['sr no']);
+        return aNum - bNum;
+      });
+
+      setLeadChargesData(sortedData);
     } catch (error) {
       console.error('Error fetching lead charges:', error);
+      alert('Error loading Lead Charges data. Please check the console for details.');
     } finally {
       setLoadingLeadCharges(false);
     }
@@ -307,16 +318,27 @@ const fetchSubworkTotals = async () => {
   const fetchCSRData = async () => {
     try {
       setLoadingCSR(true);
+
       const { data, error } = await supabase
         .schema('estimate')
         .from('CSR-2022-2023')
-        .select('*')
-        .order('Sr No', { ascending: true });
+        .select('*');
 
-      if (error) throw error;
-      setCSRData(data || []);
+      if (error) {
+        console.error('Supabase Error:', error);
+        throw error;
+      }
+
+      const sortedData = (data || []).sort((a, b) => {
+        const aNum = parseInt(a['Sr No']);
+        const bNum = parseInt(b['Sr No']);
+        return aNum - bNum;
+      });
+
+      setCSRData(sortedData);
     } catch (error) {
       console.error('Error fetching CSR data:', error);
+      alert('Error loading CSR data. Please check the console for details.');
     } finally {
       setLoadingCSR(false);
     }
