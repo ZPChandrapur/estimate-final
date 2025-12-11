@@ -62,9 +62,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const setUserWithRole = async (authUser: any) => {
     const role = await fetchUserRole(authUser.id);
+    const hasFullAccess = role?.name === 'developer' || role?.name === 'super_admin';
     setUser({
       ...authUser,
-      role
+      role,
+      hasFullAccess
     } as User);
   };
 
@@ -141,8 +143,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const hasPermission = (permission: string): boolean => {
-    // Simplified permission check - can be enhanced later
+    if (user?.hasFullAccess) {
+      return true;
+    }
     return true;
+  };
+
+  const hasFullAccess = (): boolean => {
+    return user?.hasFullAccess || false;
   };
 
   const value = {
@@ -151,6 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signIn,
     signOut,
     hasPermission,
+    hasFullAccess,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

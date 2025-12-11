@@ -12,6 +12,7 @@ export interface User {
     description?: string;
     level: number;
   };
+  hasFullAccess?: boolean;
 }
 
 export interface UserRole {
@@ -183,6 +184,7 @@ export interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
+  hasFullAccess: () => boolean;
 }
 
 export interface LanguageContextType {
