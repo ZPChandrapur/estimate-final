@@ -88,6 +88,10 @@ export interface SubworkItem {
   created_at: string;
   updated_at: string;
   created_by: string;
+  csr_item_no?: string;
+  csr_reference?: string;
+  csr_labour_cost?: number;
+  csr_unit?: string;
 }
 
 export interface ItemMeasurement {

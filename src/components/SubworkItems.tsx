@@ -404,10 +404,12 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
           category: newItem.category,
           subwork_id: subworkId,
           item_number: itemNumber,
-          // ssr_quantity: newItem.ssr_quantity,
-          // rate_total_amount: totalAmount,
-          // ssr_unit: mainUnit,
-          // total_item_amount: totalAmount,
+          ssr_rate: validRates[0]?.rate || 0,
+          ssr_unit: mainUnit,
+          csr_item_no: selectedCSRItem ? selectedCSRItem['Item No'] : null,
+          csr_reference: selectedCSRItem ? selectedCSRItem['Reference'] : null,
+          csr_labour_cost: selectedCSRItem ? parseFloat(selectedCSRItem['Labour']) || 0 : 0,
+          csr_unit: selectedCSRItem ? selectedCSRItem['Unit'] : null,
           created_by: user.id
         })
         .select()

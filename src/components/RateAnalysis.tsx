@@ -23,8 +23,6 @@ interface RateAnalysisProps {
   item: SubworkItem;
 }
 
-const HARDCODED_RATE = 1000;
-
 const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) => {
   const { user } = useAuth();
   const location = useLocation();
@@ -98,16 +96,16 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
     let additions = 0;
     let deletions = 0;
     let taxes = 0;
-    let finalRate = HARDCODED_RATE;
+    const baseRate = item?.ssr_rate || 0;
+    let finalRate = baseRate;
     entries.forEach((entry) => {
       if (entry.type === 'Addition') additions += entry.value;
       if (entry.type === 'Deletion') deletions += entry.value;
       if (entry.type === 'Tax') taxes += entry.amount;
     });
-    // Final Rate Calculation
-    finalRate = HARDCODED_RATE + additions - deletions + taxes;
-    return { additions, deletions, taxes, finalRate };
-  }, [entries]);
+    finalRate = baseRate + additions - deletions + taxes;
+    return { additions, deletions, taxes, finalRate, baseRate };
+  }, [entries, item?.ssr_rate]);
 
   // Keep previous logic and API untouched
   const getSelectedRate = () => {
@@ -230,7 +228,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
   // Add entry handler
   const handleAddEntry = () => {
     if (newTax.label && newTax.type && Number(newTax.value) > 0) {
-      const amount = calculateAmount(newTax.type, HARDCODED_RATE, Number(newTax.value));
+      const baseRate = item?.ssr_rate || 0;
+      const amount = calculateAmount(newTax.type, baseRate, Number(newTax.value));
       setEntries(prev => [...prev, {
         label: newTax.label,
         type: newTax.type,
@@ -252,7 +251,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
   // Update handler
   const handleUpdate = () => {
     if (editIndex !== null && newTax.label && newTax.type && Number(newTax.value) > 0) {
-      const amount = calculateAmount(newTax.type, HARDCODED_RATE, Number(newTax.value));
+      const baseRate = item?.ssr_rate || 0;
+      const amount = calculateAmount(newTax.type, baseRate, Number(newTax.value));
       setEntries(entries.map((ent, idx) =>
         idx === editIndex
           ? { label: newTax.label, type: newTax.type, value: Number(newTax.value), amount }
@@ -272,7 +272,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
 
   // INLINE SAVE FOR NEW ROW (Option A behavior)
   const saveNewRow = (index: number) => {
-    const amount = calculateAmount(tempRow.type, HARDCODED_RATE, Number(tempRow.value));
+    const baseRate = item?.ssr_rate || 0;
+    const amount = calculateAmount(tempRow.type, baseRate, Number(tempRow.value));
     const newEntry = {
       label: tempRow.label,
       type: tempRow.type,
@@ -290,7 +291,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
 
   // INLINE SAVE FOR EDITED ROW
   const saveEditedRow = (index: number) => {
-    const amount = calculateAmount(tempRow.type, HARDCODED_RATE, Number(tempRow.value));
+    const baseRate = item?.ssr_rate || 0;
+    const amount = calculateAmount(tempRow.type, baseRate, Number(tempRow.value));
 
     const updated = entries.map((row, idx) =>
       idx === index ? { label: tempRow.label, type: tempRow.type, value: Number(tempRow.value), amount } : row
@@ -362,12 +364,53 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
         </div>
 
         <div className="px-6 py-6">
+          {/* CSR Item Details Section */}
+          {item?.csr_item_no && (
+            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="text-sm font-medium text-blue-800 mb-3">Selected CSR Item:</div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-600">Item No:</span>
+                  <span className="ml-2 font-medium text-gray-900">{item.csr_item_no}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Unit:</span>
+                  <span className="ml-2 font-medium text-gray-900">{item.csr_unit || item.ssr_unit}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Base Rate:</span>
+                  <span className="ml-2 font-medium text-gray-900">₹{item.ssr_rate?.toFixed(2)}</span>
+                </div>
+                {item.csr_labour_cost > 0 && (
+                  <div>
+                    <span className="text-gray-600">Labour:</span>
+                    <span className="ml-2 font-medium text-gray-900">₹{item.csr_labour_cost.toFixed(2)}</span>
+                  </div>
+                )}
+                {item.csr_reference && (
+                  <div className="col-span-2 mt-1 pt-3 border-t border-blue-300">
+                    <span className="text-gray-600">Reference:</span>
+                    <span className="ml-2 font-medium text-gray-900">{item.csr_reference}</span>
+                  </div>
+                )}
+              </div>
+              {item.description_of_item && (
+                <div className="mt-3 pt-3 border-t border-blue-300">
+                  <div className="text-gray-600 font-medium mb-1">Main Item Description:</div>
+                  <div className="text-gray-700 text-xs leading-relaxed bg-white p-2 rounded">
+                    {item.description_of_item}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Base Rate Section */}
           <div className="mb-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
             <div className="flex items-center gap-2">
               <Calculator className="w-5 h-5 text-blue-600" />
               <span className="text-sm font-medium text-blue-900">Base Rate:</span>
-              <span className="text-2xl font-bold text-blue-900">₹{HARDCODED_RATE.toLocaleString()}</span>
+              <span className="text-2xl font-bold text-blue-900">₹{summary.baseRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
 
@@ -491,7 +534,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
                               </td>
                               <td className="px-4 py-3 text-right text-sm font-medium">
                                 {formatCurrency(
-                                  calculateAmount(tempRow.type, HARDCODED_RATE, Number(tempRow.value))
+                                  calculateAmount(tempRow.type, summary.baseRate, Number(tempRow.value))
                                 )}
                               </td>
                               <td className="px-4 py-3">
@@ -601,7 +644,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
                             </td>
                             <td className="px-4 py-3 text-right text-sm font-medium">
                               {formatCurrency(
-                                calculateAmount(tempRow.type, HARDCODED_RATE, Number(tempRow.value))
+                                calculateAmount(tempRow.type, summary.baseRate, Number(tempRow.value))
                               )}
                             </td>
                             <td className="px-4 py-3">
