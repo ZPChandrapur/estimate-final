@@ -54,6 +54,14 @@ const Subworks: React.FC = () => {
   const [subworkTotals, setSubworkTotals] = useState<Record<string, number>>({});
   const totalSubworkEstimate = Object.values(subworkTotals || {}).reduce((acc, val) => acc + val, 0);
 
+  // Add states for Lead Charges and CSR tables
+  const [showLeadChargesModal, setShowLeadChargesModal] = useState(false);
+  const [showCSRModal, setShowCSRModal] = useState(false);
+  const [leadChargesData, setLeadChargesData] = useState<any[]>([]);
+  const [csrData, setCSRData] = useState<any[]>([]);
+  const [loadingLeadCharges, setLoadingLeadCharges] = useState(false);
+  const [loadingCSR, setLoadingCSR] = useState(false);
+
 useEffect(() => {
   // Always fetch all works on selectedWorkId change, not just filtered
   fetchWorks();
@@ -276,6 +284,52 @@ const fetchSubworkTotals = async () => {
     } catch (error) {
       console.error('Error fetching design photos:', error);
     }
+  };
+
+  const fetchLeadCharges = async () => {
+    try {
+      setLoadingLeadCharges(true);
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('Lead_Charges_Materials_22-23')
+        .select('*')
+        .order('sr no', { ascending: true });
+
+      if (error) throw error;
+      setLeadChargesData(data || []);
+    } catch (error) {
+      console.error('Error fetching lead charges:', error);
+    } finally {
+      setLoadingLeadCharges(false);
+    }
+  };
+
+  const fetchCSRData = async () => {
+    try {
+      setLoadingCSR(true);
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('CSR-2022-2023')
+        .select('*')
+        .order('Sr No', { ascending: true });
+
+      if (error) throw error;
+      setCSRData(data || []);
+    } catch (error) {
+      console.error('Error fetching CSR data:', error);
+    } finally {
+      setLoadingCSR(false);
+    }
+  };
+
+  const handleOpenLeadCharges = () => {
+    setShowLeadChargesModal(true);
+    fetchLeadCharges();
+  };
+
+  const handleOpenCSR = () => {
+    setShowCSRModal(true);
+    fetchCSRData();
   };
 
   const handleDesignUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -595,6 +649,18 @@ const fetchSubworkTotals = async () => {
                   <h3 className="text-lg font-semibold text-white">Sub Works</h3>
                 </div>
                 <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleOpenLeadCharges}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105">
+                    <FileText className="w-3 h-3 mr-1" />
+                    Lead Charges
+                  </button>
+                  <button
+                    onClick={handleOpenCSR}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105">
+                    <FileText className="w-3 h-3 mr-1" />
+                    CSR 22-23
+                  </button>
                   <button
                     onClick={() => setShowAddModal(true)}
                     disabled={!selectedWorkId}
@@ -1076,6 +1142,148 @@ const fetchSubworkTotals = async () => {
                   Update Sub Work
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lead Charges Modal */}
+      {showLeadChargesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-7xl bg-white rounded-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">Lead Charges & Materials (2022-2023)</h2>
+                <button
+                  onClick={() => setShowLeadChargesModal(false)}
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-6">
+              {loadingLeadCharges ? (
+                <div className="flex justify-center items-center py-12">
+                  <LoadingSpinner />
+                </div>
+              ) : leadChargesData.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Sr No</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Lead in KM</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Cost per Trip</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Murrum, Building Rubish, Earth</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Manure Sludge</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Excavated Rock</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Sand, Stone</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Stone Aggregate 40mm+</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {leadChargesData.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['sr no']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Lead in KM']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Cost per Trip Lead Charges']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Murrum, Building Rubish, Earth']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Manure  Sludge']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Excavated Rock soling stone']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Sand, Stone below 40 mm, Normal Brick sider aggre. Timber']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{row['Stone aggregate 40mm Normal size and above']}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  No lead charges data available
+                </div>
+              )}
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => setShowLeadChargesModal(false)}
+                className="px-6 py-2.5 bg-gray-600 text-white text-sm font-medium rounded-md hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSR Modal */}
+      {showCSRModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-6xl bg-white rounded-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">CSR 2022-2023</h2>
+                <button
+                  onClick={() => setShowCSRModal(false)}
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-6">
+              {loadingCSR ? (
+                <div className="flex justify-center items-center py-12">
+                  <LoadingSpinner />
+                </div>
+              ) : csrData.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Sr No</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Item No</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Item</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Unit</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Completed Item</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Labour</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Page No</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Reference</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {csrData.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Sr No']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Item No']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Item']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Unit']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Completed Item']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Labour']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Page No']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{row['Reference']}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  No CSR data available
+                </div>
+              )}
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => setShowCSRModal(false)}
+                className="px-6 py-2.5 bg-gray-600 text-white text-sm font-medium rounded-md hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
