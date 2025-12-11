@@ -76,7 +76,8 @@ export interface SubWork {
 }
 
 export interface SubworkItem {
-  id: string;
+  sr_no?: number;
+  id?: string;
   subwork_id: string;
   item_number: string;
   category?: string;
