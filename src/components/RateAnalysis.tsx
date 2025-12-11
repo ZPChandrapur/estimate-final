@@ -119,6 +119,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
   useEffect(() => {
     if (isOpen && item?.sr_no) {
       fetchData();
+      fetchRateAnalysis();
     }
   }, [isOpen, item?.sr_no, activeTab]);
 
@@ -206,6 +207,97 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
       }
     } catch (error) {
       console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchRateAnalysis = async () => {
+    try {
+      if (!item?.sr_no) return;
+
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('item_rate_analysis')
+        .select('*')
+        .eq('subwork_item_id', item.sr_no)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setEntries(data.entries || []);
+        if (data.final_tax_percent && data.final_tax_amount) {
+          setFinalTaxApplied({
+            percent: data.final_tax_percent,
+            amount: data.final_tax_amount
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching rate analysis:', error);
+    }
+  };
+
+  const saveRateAnalysis = async () => {
+    try {
+      if (!item?.sr_no) {
+        alert('Invalid item. Please close and try again.');
+        return;
+      }
+
+      setLoading(true);
+      const baseRate = item?.ssr_rate || 0;
+      const { additions, deletions, taxes, finalRate } = summary;
+
+      let totalRate = finalRate;
+      if (finalTaxApplied) {
+        totalRate = finalRate + finalTaxApplied.amount;
+      }
+
+      const analysisData = {
+        subwork_item_id: item.sr_no,
+        base_rate: baseRate,
+        entries: entries,
+        final_tax_percent: finalTaxApplied?.percent || null,
+        final_tax_amount: finalTaxApplied?.amount || null,
+        total_additions: additions,
+        total_deletions: deletions,
+        total_taxes: taxes,
+        final_rate: finalRate,
+        total_rate: totalRate,
+        created_by: user?.id,
+        updated_at: new Date().toISOString()
+      };
+
+      const { data: existing } = await supabase
+        .schema('estimate')
+        .from('item_rate_analysis')
+        .select('sr_no')
+        .eq('subwork_item_id', item.sr_no)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .schema('estimate')
+          .from('item_rate_analysis')
+          .update(analysisData)
+          .eq('sr_no', existing.sr_no);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .schema('estimate')
+          .from('item_rate_analysis')
+          .insert([{ ...analysisData, created_at: new Date().toISOString() }]);
+
+        if (error) throw error;
+      }
+
+      onClose();
+    } catch (error) {
+      console.error('Error saving rate analysis:', error);
+      alert('Failed to save rate analysis. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -812,10 +904,11 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
             </button>
             <button
               type="button"
-              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-blue-700 transition-colors"
-              onClick={onClose}
+              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={saveRateAnalysis}
+              disabled={loading}
             >
-              Save Analysis
+              {loading ? 'Saving...' : 'Save Analysis'}
             </button>
           </div>
         </div>
