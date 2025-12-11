@@ -45,6 +45,10 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
     unit: ''
   });
 
+  const [materialOptions, setMaterialOptions] = useState<{ name: string; rate: string; unit: string }[]>([]);
+  const [showMaterialOptions, setShowMaterialOptions] = useState(false);
+  const [searchingLeadCharges, setSearchingLeadCharges] = useState(false);
+
   useEffect(() => {
     if (isOpen && worksId) {
       fetchLeadStatements();
@@ -86,6 +90,101 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
       console.error('Error getting next sr_no:', error);
       return 1;
     }
+  };
+
+  const searchLeadCharges = async (leadKm: number) => {
+    if (leadKm <= 0) {
+      setMaterialOptions([]);
+      setShowMaterialOptions(false);
+      return;
+    }
+
+    try {
+      setSearchingLeadCharges(true);
+
+      let data = null;
+      let error = null;
+
+      const result1 = await supabase
+        .schema('estimate')
+        .from('Lead_Charges_Materials_22-23')
+        .select('*')
+        .eq('Lead in KM', leadKm.toFixed(2))
+        .maybeSingle();
+
+      if (result1.data) {
+        data = result1.data;
+      } else {
+        const result2 = await supabase
+          .schema('estimate')
+          .from('Lead_Charges_Materials_22-23')
+          .select('*')
+          .eq('Lead in KM', leadKm.toString())
+          .maybeSingle();
+
+        data = result2.data;
+        error = result2.error;
+      }
+
+      if (error) throw error;
+
+      if (data) {
+        const options: { name: string; rate: string; unit: string }[] = [];
+
+        const materialColumns = [
+          { key: 'Murrum, Building Rubish, Earth', unit: 'Cu. M' },
+          { key: 'Manure  Sludge', unit: 'Cu. M' },
+          { key: 'Excavated Rock soling stone', unit: 'Cu. M' },
+          { key: 'Sand, Stone below 40 mm, Normal Brick sider aggre. Timber', unit: 'Cu. M' },
+          { key: 'Stone aggregate 40mm Normal size and above', unit: 'Cu. M' },
+          { key: 'ConcreteBlock (FORM)', unit: 'Cu. M' },
+          { key: 'Cement, Lime, Stone Block, GI, CI, CC & AC Pipes / Sheet& Plate', unit: 'M.T.' },
+          { key: 'Bricks', unit: '1000 Nos' },
+          { key: 'Tiles Half Round Tiles /Roofing Tiles/Manlore Tiles', unit: '1000 Nos' },
+          { key: 'Steel (MS, TMT, H.Y.S.D.) Structural Steel', unit: 'M.T.' },
+          { key: 'Flooring Tiles Ceramic/ Marbonate', unit: 'Sq. M' },
+          { key: 'Asphalt in Drum', unit: 'M.T.' }
+        ];
+
+        materialColumns.forEach(col => {
+          const rate = data[col.key];
+          if (rate && rate !== '' && !isNaN(parseFloat(rate))) {
+            options.push({
+              name: col.key,
+              rate: rate,
+              unit: col.unit
+            });
+          }
+        });
+
+        setMaterialOptions(options);
+        setShowMaterialOptions(options.length > 0);
+      } else {
+        setMaterialOptions([]);
+        setShowMaterialOptions(false);
+      }
+    } catch (error) {
+      console.error('Error searching lead charges:', error);
+      setMaterialOptions([]);
+      setShowMaterialOptions(false);
+    } finally {
+      setSearchingLeadCharges(false);
+    }
+  };
+
+  const handleLeadKmChange = (value: number) => {
+    setFormData({ ...formData, lead_in_km: value });
+    searchLeadCharges(value);
+  };
+
+  const selectMaterialOption = (option: { name: string; rate: string; unit: string }) => {
+    setFormData({
+      ...formData,
+      material: option.name,
+      lead_charges: parseFloat(option.rate),
+      unit: option.unit
+    });
+    setShowMaterialOptions(false);
   };
 
   const handleAdd = async () => {
@@ -189,6 +288,8 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
       total_rate: 0,
       unit: ''
     });
+    setMaterialOptions([]);
+    setShowMaterialOptions(false);
   };
 
   if (!isOpen) return null;
@@ -359,15 +460,16 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Material *
+                    Material * {showMaterialOptions && <span className="text-xs text-blue-600">(Select from options below)</span>}
                   </label>
                   <input
                     type="text"
                     value={formData.material}
                     onChange={(e) => setFormData({ ...formData, material: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g., Cement, Steel, Sand, 80mm Metal"
+                    placeholder={showMaterialOptions ? "Select a material type below" : "e.g., Cement, Steel, Sand, 80mm Metal"}
                     required
+                    readOnly={showMaterialOptions}
                   />
                 </div>
 
@@ -387,17 +489,20 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Lead in Km.
+                      Lead in Km. *
                     </label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={formData.lead_in_km}
-                      onChange={(e) => setFormData({ ...formData, lead_in_km: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => handleLeadKmChange(parseFloat(e.target.value) || 0)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="0.00"
+                      placeholder="e.g., 0.50, 1.00, 1.50"
                     />
+                    {searchingLeadCharges && (
+                      <p className="text-xs text-gray-500 mt-1">Searching lead charges...</p>
+                    )}
                   </div>
 
                   <div>
@@ -412,9 +517,37 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                       onChange={(e) => setFormData({ ...formData, lead_charges: parseFloat(e.target.value) || 0 })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                       placeholder="0.00"
+                      readOnly={showMaterialOptions}
                     />
                   </div>
                 </div>
+
+                {showMaterialOptions && materialOptions.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                    <label className="block text-sm font-medium text-blue-800 mb-2">
+                      Select Material Type (Lead Charges for {formData.lead_in_km.toFixed(2)} KM):
+                    </label>
+                    <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto">
+                      {materialOptions.map((option, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => selectMaterialOption(option)}
+                          className="text-left px-3 py-2 bg-white border border-blue-300 rounded-md hover:bg-blue-100 hover:border-blue-400 transition-colors"
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-gray-900">{option.name}</span>
+                            <div className="text-right">
+                              <span className="text-sm font-bold text-green-600">₹{parseFloat(option.rate).toFixed(2)}</span>
+                              <span className="text-xs text-gray-500 ml-2">/{option.unit}</span>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2">Click on a material to auto-fill Material, Lead Charges, and Unit</p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
