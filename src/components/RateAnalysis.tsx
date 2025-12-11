@@ -327,77 +327,115 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
 
   const totalRateWithFinalTax = summary.finalRate + (finalTaxApplied ? finalTaxApplied.amount : 0);
 
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'Addition':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'Deletion':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'Tax':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
   return (
-    <div className="fixed inset-0 justify-center bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[60]">
-      <div className="relative top-5 mx-auto p-5 border w-11/12 max-w-3xl shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">
-                Item {item?.item_number} - Detailed Analysis
-              </h3>
-              <p className="text-sm text-gray-500">{item?.description_of_item}</p>
+    <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-[60] flex items-center justify-center p-4">
+      <div className="relative w-full max-w-4xl bg-white rounded-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                Rate Analysis - Item {item?.item_number}
+              </h2>
+              <p className="text-sm text-gray-600 leading-relaxed">{item?.description_of_item}</p>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="ml-4 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
+        </div>
 
-          {/* Rate & Form */}
-          <div className="mb-4">
-            <div className="font-semibold text-base mb-2">Rate: ₹{HARDCODED_RATE}</div>
-            <div className="flex flex-row items-end gap-2 w-full mb-2">
-              <div className="w-1/4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Label</label>
+        <div className="px-6 py-6">
+          {/* Base Rate Section */}
+          <div className="mb-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+            <div className="flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-medium text-blue-900">Base Rate:</span>
+              <span className="text-2xl font-bold text-blue-900">₹{HARDCODED_RATE.toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Add New Entry Form */}
+          <div className="mb-6 bg-gray-50 rounded-lg p-5 border border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Add Rate Adjustment
+            </h3>
+            <div className="flex flex-row items-end gap-3 w-full">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  Label <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={newTax.label}
                   onChange={(e) => setNewTax({ ...newTax, label: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="GST, Labour welfare"
+                  className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., GST, Labour Welfare"
                 />
               </div>
-              <div className="w-1/4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+              <div className="w-40">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  Type <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={newTax.type}
                   onChange={(e) => setNewTax({ ...newTax, type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="Addition">Addition</option>
                   <option value="Deletion">Deletion</option>
-                  <option value="Tax">Tax</option>
+                  <option value="Tax">Tax (%)</option>
                 </select>
               </div>
-              <div className="w-1/4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
+              <div className="w-32">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  Value <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="number"
+                  step="0.01"
                   value={newTax.value}
-                  onChange={(e) => setNewTax({ ...newTax, value: parseFloat(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g. 10"
+                  onChange={(e) => setNewTax({ ...newTax, value: e.target.value })}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
                 />
               </div>
-              <div className="w-1/4 flex items-center pt-5">
+              <div>
                 {editIndex === null ? (
                   <button
                     type="button"
                     onClick={handleAddEntry}
-                    className="inline-flex items-center px-2 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    disabled={!newTax.label || !newTax.value}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
                     <Plus className="h-4 w-4" />
+                    Add
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={handleUpdate}
-                    className="inline-flex items-center px-2 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
                   >
-                    <Edit2 className="h-4 w-4" />
+                    <Check className="h-4 w-4" />
+                    Update
                   </button>
                 )}
               </div>
@@ -406,33 +444,144 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
 
           {/* Entries Table */}
           {entries.length > 0 && (
-            <div className="mb-4">
-              <table className="min-w-full text-sm border">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-3 py-2 border">Label</th>
-                    <th className="px-3 py-2 border">Type</th>
-                    <th className="px-3 py-2 border">Value</th>
-                    <th className="px-3 py-2 border">Calculated Amount</th>
-                    <th className="px-3 py-2 border">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((entry, idx) => (
-                    <React.Fragment key={idx}>
-                      <tr>
-                        {rowBeingEdited === idx ? (
-                          <>
-                            <td className="border px-3 py-2">
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Rate Adjustments</h3>
+              <div className="overflow-hidden border border-gray-200 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Label</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Type</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Value</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Calculated Amount</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {entries.map((entry, idx) => (
+                      <React.Fragment key={idx}>
+                        <tr className="hover:bg-gray-50 transition-colors">
+                          {rowBeingEdited === idx ? (
+                            <>
+                              <td className="px-4 py-3">
+                                <input
+                                  className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                                  value={tempRow.label}
+                                  onChange={(e) => setTempRow({ ...tempRow, label: e.target.value })}
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <select
+                                  className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                                  value={tempRow.type}
+                                  onChange={(e) => setTempRow({ ...tempRow, type: e.target.value })}
+                                >
+                                  <option value="Addition">Addition</option>
+                                  <option value="Deletion">Deletion</option>
+                                  <option value="Tax">Tax</option>
+                                </select>
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="number"
+                                  className="border border-gray-300 rounded px-2 py-1 w-full text-sm text-right"
+                                  value={tempRow.value}
+                                  onChange={(e) => setTempRow({ ...tempRow, value: Number(e.target.value) })}
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-right text-sm font-medium">
+                                {formatCurrency(
+                                  calculateAmount(tempRow.type, HARDCODED_RATE, Number(tempRow.value))
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-2 justify-center">
+                                  <button
+                                    onClick={() => saveEditedRow(idx)}
+                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                    title="Save"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => setRowBeingEdited(null)}
+                                    className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                    title="Cancel"
+                                  >
+                                    <CancelIcon className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-4 py-3 text-sm text-gray-900">{entry.label}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border ${getTypeColor(entry.type)}`}>
+                                  {entry.type}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right text-sm text-gray-900 font-medium">
+                                {entry.type === 'Tax' ? `${entry.value}%` : formatCurrency(entry.value)}
+                              </td>
+                              <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+                                {formatCurrency(entry.amount)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-2 justify-center">
+                                  <button
+                                    onClick={() => {
+                                      setRowBeingAddedBelow(idx);
+                                      setTempRow({ label: '', type: 'Addition', value: 0 });
+                                    }}
+                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                    title="Add row below"
+                                  >
+                                    <Plus className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setRowBeingEdited(idx);
+                                      setTempRow({
+                                        label: entry.label,
+                                        type: entry.type,
+                                        value: entry.value,
+                                      });
+                                    }}
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                    title="Edit"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEntries(entries.filter((_, i) => i !== idx));
+                                    }}
+                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+
+                        {/* INLINE NEW ROW BELOW */}
+                        {rowBeingAddedBelow === idx && (
+                          <tr className="bg-blue-50">
+                            <td className="px-4 py-3">
                               <input
-                                className="border p-1 w-full"
+                                className="border border-blue-300 rounded px-2 py-1 w-full text-sm"
+                                placeholder="Label"
                                 value={tempRow.label}
                                 onChange={(e) => setTempRow({ ...tempRow, label: e.target.value })}
                               />
                             </td>
-                            <td className="border px-3 py-2">
+                            <td className="px-4 py-3">
                               <select
-                                className="border p-1 w-full"
+                                className="border border-blue-300 rounded px-2 py-1 w-full text-sm"
                                 value={tempRow.type}
                                 onChange={(e) => setTempRow({ ...tempRow, type: e.target.value })}
                               >
@@ -441,210 +590,189 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
                                 <option value="Tax">Tax</option>
                               </select>
                             </td>
-                            <td className="border px-3 py-2">
+                            <td className="px-4 py-3">
                               <input
                                 type="number"
-                                className="border p-1 w-full"
+                                className="border border-blue-300 rounded px-2 py-1 w-full text-sm text-right"
+                                placeholder="0.00"
                                 value={tempRow.value}
                                 onChange={(e) => setTempRow({ ...tempRow, value: Number(e.target.value) })}
                               />
                             </td>
-                            <td className="border px-3 py-2">
+                            <td className="px-4 py-3 text-right text-sm font-medium">
                               {formatCurrency(
                                 calculateAmount(tempRow.type, HARDCODED_RATE, Number(tempRow.value))
                               )}
                             </td>
-                            <td className="border px-3 py-2 flex gap-2">
-                              <button onClick={() => saveEditedRow(idx)} className="text-green-600">
-                                <Check className="w-4 h-4" />
-                              </button>
-                              <button onClick={() => setRowBeingEdited(null)} className="text-gray-600">
-                                <CancelIcon className="w-4 h-4" />
-                              </button>
+                            <td className="px-4 py-3">
+                              <div className="flex gap-2 justify-center">
+                                <button
+                                  onClick={() => saveNewRow(idx)}
+                                  className="p-1.5 text-green-700 hover:bg-green-100 rounded transition-colors"
+                                  title="Save"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setRowBeingAddedBelow(null)}
+                                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                  title="Cancel"
+                                >
+                                  <CancelIcon className="w-4 h-4" />
+                                </button>
+                              </div>
                             </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="px-3 py-2 border">{entry.label}</td>
-                            <td className="px-3 py-2 border">{entry.type}</td>
-                            <td className="px-3 py-2 border">{entry.value}</td>
-                            <td className="px-3 py-2 border">{formatCurrency(entry.amount)}</td>
-                            <td className="px-3 py-2 border flex gap-3">
-                              
-                              {/* PLUS BUTTON (ADD ROW BELOW) */}
-                              <button
-                                onClick={() => {
-                                  setRowBeingAddedBelow(idx);
-                                  setTempRow({ label: '', type: 'Addition', value: 0 });
-                                }}
-                                className="text-green-600 hover:text-green-800"
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-
-                              {/* EDIT BUTTON */}
-                              <button
-                                onClick={() => {
-                                  setRowBeingEdited(idx);
-                                  setTempRow({
-                                    label: entry.label,
-                                    type: entry.type,
-                                    value: entry.value,
-                                  });
-                                }}
-                                className="text-blue-600 hover:text-blue-800"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-
-                              {/* DELETE BUTTON */}
-                              <button
-                                onClick={() => {
-                                  setEntries(entries.filter((_, i) => i !== idx));
-                                }}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </>
+                          </tr>
                         )}
-                      </tr>
-
-                      {/* INLINE NEW ROW BELOW */}
-                      {rowBeingAddedBelow === idx && (
-                        <tr className="bg-gray-50">
-                          <td className="border px-3 py-2">
-                            <input
-                              className="border p-1 w-full"
-                              value={tempRow.label}
-                              onChange={(e) => setTempRow({ ...tempRow, label: e.target.value })}
-                            />
-                          </td>
-                          <td className="border px-3 py-2">
-                            <select
-                              className="border p-1 w-full"
-                              value={tempRow.type}
-                              onChange={(e) => setTempRow({ ...tempRow, type: e.target.value })}
-                            >
-                              <option value="Addition">Addition</option>
-                              <option value="Deletion">Deletion</option>
-                              <option value="Tax">Tax</option>
-                            </select>
-                          </td>
-                          <td className="border px-3 py-2">
-                            <input
-                              type="number"
-                              className="border p-1 w-full"
-                              value={tempRow.value}
-                              onChange={(e) => setTempRow({ ...tempRow, value: Number(e.target.value) })}
-                            />
-                          </td>
-                          <td className="border px-3 py-2">
-                            {formatCurrency(
-                              calculateAmount(tempRow.type, HARDCODED_RATE, Number(tempRow.value))
-                            )}
-                          </td>
-                          <td className="border px-3 py-2 flex gap-2">
-                            <button onClick={() => saveNewRow(idx)} className="text-green-700">
-                              <Check className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => setRowBeingAddedBelow(null)}
-                              className="text-gray-600"
-                            >
-                              <CancelIcon className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
           {/* Summary Section */}
-          <div className="bg-gray-50 rounded-md p-4 mt-2 mb-4 flex flex-wrap gap-8">
-            <div>
-              <div className="font-medium text-gray-700 mb-1">Total Additions</div>
-              <div className="font-bold">{formatCurrency(summary.additions)}</div>
-            </div>
-            <div>
-              <div className="font-medium text-gray-700 mb-1">Total Deletions</div>
-              <div className="font-bold">{formatCurrency(summary.deletions)}</div>
-            </div>
-            <div>
-              <div className="font-medium text-gray-700 mb-1">Total Taxes</div>
-              <div className="font-bold">{formatCurrency(summary.taxes)}</div>
-            </div>
-            <div>
-              <div className="font-medium text-gray-700 mb-1">Final Rate</div>
-              <div className="font-bold text-blue-700">{formatCurrency(summary.finalRate)}</div>
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700">Summary</h3>
+
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="text-xs font-medium text-green-700 mb-1">Total Additions</div>
+                <div className="text-xl font-bold text-green-900">{formatCurrency(summary.additions)}</div>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="text-xs font-medium text-red-700 mb-1">Total Deletions</div>
+                <div className="text-xl font-bold text-red-900">{formatCurrency(summary.deletions)}</div>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="text-xs font-medium text-blue-700 mb-1">Total Taxes</div>
+                <div className="text-xl font-bold text-blue-900">{formatCurrency(summary.taxes)}</div>
+              </div>
+              <div className="bg-gray-100 border border-gray-300 rounded-lg p-4">
+                <div className="text-xs font-medium text-gray-700 mb-1">Calculated Rate</div>
+                <div className="text-xl font-bold text-gray-900">{formatCurrency(summary.finalRate)}</div>
+              </div>
             </div>
 
-            {/* New: Add Tax on Final Rate control */}
-            <div className="flex items-center gap-3">
-              {!finalTaxApplied && !showFinalTaxInput && (
-                <button
-                  type="button"
-                  onClick={openFinalTaxInput}
-                  className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
-                >
-                  Add Tax
-                </button>
-              )}
+            {/* Add Tax on Final Rate Section */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold text-blue-900 mb-1">Additional Tax on Final Rate</h4>
+                  <p className="text-xs text-blue-700">Apply additional tax percentage on the calculated rate</p>
+                </div>
+
+                {!finalTaxApplied && !showFinalTaxInput && (
+                  <button
+                    type="button"
+                    onClick={openFinalTaxInput}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Tax
+                  </button>
+                )}
+              </div>
 
               {showFinalTaxInput && (
-                <div className="flex items-center gap-2 bg-white p-2 rounded border">
-                  <label className="text-sm font-medium">Tax %</label>
+                <div className="mt-3 flex items-center gap-3 bg-white p-3 rounded-md border border-blue-300">
+                  <label className="text-sm font-medium text-gray-700">Tax Percentage:</label>
                   <input
                     type="number"
+                    step="0.01"
                     value={finalTaxPercentInput}
                     onChange={(e) => setFinalTaxPercentInput(Number(e.target.value))}
-                    className="w-20 px-2 py-1 border rounded"
+                    className="w-24 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.00"
                   />
-                  <button onClick={saveFinalTax} className="text-green-600">
-                    <Check className="w-4 h-4" />
+                  <span className="text-sm text-gray-600">%</span>
+                  <button
+                    onClick={saveFinalTax}
+                    className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                    title="Apply Tax"
+                  >
+                    <Check className="w-5 h-5" />
                   </button>
-                  <button onClick={cancelFinalTaxInput} className="text-gray-600">
-                    <CancelIcon className="w-4 h-4" />
+                  <button
+                    onClick={cancelFinalTaxInput}
+                    className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                    title="Cancel"
+                  >
+                    <CancelIcon className="w-5 h-5" />
                   </button>
                 </div>
               )}
 
               {finalTaxApplied && (
-                <div className="text-sm">
-                  <div>Tax on Final Rate: {finalTaxApplied.percent}% = {formatCurrency(finalTaxApplied.amount)}</div>
-                  <div className="font-semibold">Total Rate: {formatCurrency(totalRateWithFinalTax)}</div>
-                  <div className="flex gap-2 mt-1">
-                    <button
-                      onClick={openFinalTaxInput}
-                      className="px-2 py-1 bg-yellow-500 text-white rounded text-xs"
-                    >
-                      Edit Tax
-                    </button>
-                    <button
-                      onClick={clearFinalTax}
-                      className="px-2 py-1 bg-red-500 text-white rounded text-xs"
-                    >
-                      Remove Tax
-                    </button>
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between bg-white p-3 rounded-md border border-blue-300">
+                    <div>
+                      <div className="text-sm text-gray-600">
+                        Tax Applied: <span className="font-semibold text-blue-900">{finalTaxApplied.percent}%</span>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Tax Amount: <span className="font-semibold text-blue-900">{formatCurrency(finalTaxApplied.amount)}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={openFinalTaxInput}
+                        className="px-3 py-1.5 bg-yellow-500 text-white text-xs font-medium rounded hover:bg-yellow-600 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={clearFinalTax}
+                        className="px-3 py-1.5 bg-red-500 text-white text-xs font-medium rounded hover:bg-red-600 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Save Button */}
-          <div className="flex justify-end">
+            {/* Final Rate Display */}
+            <div className="bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-300 rounded-lg p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium text-green-800 mb-1">Final Rate</div>
+                  <div className="text-3xl font-bold text-green-900">
+                    {formatCurrency(totalRateWithFinalTax)}
+                  </div>
+                  {finalTaxApplied && (
+                    <div className="text-xs text-green-700 mt-1">
+                      (Including {finalTaxApplied.percent}% additional tax)
+                    </div>
+                  )}
+                </div>
+                <Calculator className="w-12 h-12 text-green-600 opacity-50" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer with Save Button */}
+        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            All changes will be saved when you click the Save button
+          </div>
+          <div className="flex gap-3">
             <button
               type="button"
-              className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
+              onClick={onClose}
+              className="px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-blue-700 transition-colors"
               onClick={onClose}
             >
-              Save
+              Save Analysis
             </button>
           </div>
         </div>
