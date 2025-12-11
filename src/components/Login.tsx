@@ -89,7 +89,15 @@ const Login: React.FC = () => {
                 className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               >
                 <option value="A">Public Works Department (PWD)</option>
-                <option value="B">B</option>
+                <option value="B">Irrigation
+- Marathi: सिंचन विभाग (sinchan vibhāg)
+- English: Irrigation Department
+- This department focuses on canals, dams, reservoirs, and water distribution for agriculture.
+✅ Key Difference
+- Water & Sanitation → Public health, urban/rural drinking water, sewage, cleanliness.
+- Irrigation → Agricultural water management, farming support, large-scale water projects.
+Ajinkya, since you’re working on bilingual government documentation, would you like me to prepare a ready-to-use glossary table of common Marathi department names with their English equivalents? That way you’ll have a quick reference for bandhkam, sinchan, pāṇī va svacchatā, and others.
+</option>
               </select>
             </div>
 
