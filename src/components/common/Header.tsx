@@ -17,8 +17,6 @@ const Header: React.FC = () => {
     { key: 'work-assignments', path: '/work-assignments', label: 'Work Assignments', gradient: 'from-cyan-500 to-blue-600', showIcon: true, icon: UserCog },
     { key: 'subworks', path: '/subworks', label: t('nav.subworks'), gradient: 'from-purple-500 to-pink-600' },
     { key: 'generate-estimate', path: '/generate-estimate', label: 'Generate E-Estimate', gradient: 'from-violet-500 to-purple-600' },
-    { key: 'measurement-book', path: '/measurement-book', label: 'Measurement Book (MB)', gradient: 'from-violet-500 to-purple-600' },
-    { key: 'compare', path: '/compare', label: t('nav.compare'), gradient: 'from-orange-500 to-red-600' },
   ];
 
   const handleSignOut = async () => {

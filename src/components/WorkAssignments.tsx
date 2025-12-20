@@ -45,7 +45,6 @@ const WorkAssignments: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWork, setSelectedWork] = useState<string>('');
   const [showModal, setShowModal] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [formData, setFormData] = useState({
     user_id: '',
     role_id: '',
@@ -64,18 +63,6 @@ const WorkAssignments: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-
-      // Check if user is admin
-      const { data: userRoleData } = await supabase
-        .from('user_roles')
-        .select('role_id, roles(name)')
-        .eq('user_id', user?.id)
-        .schema('public')
-        .maybeSingle();
-
-      const isUserAdmin = userRoleData?.roles?.name &&
-        ['admin', 'super_admin', 'developer'].includes(userRoleData.roles.name);
-      setIsAdmin(!!isUserAdmin);
 
       const [worksRes, usersRes, rolesRes] = await Promise.all([
         supabase.schema('estimate').from('works').select('works_id, work_name, division, status').order('sr_no', { ascending: false }),
@@ -223,23 +210,6 @@ const WorkAssignments: React.FC = () => {
 
   if (loading) {
     return <LoadingSpinner text="Loading work assignments..." />;
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <Shield className="mx-auto h-16 w-16 text-red-400 mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-4">
-            You need administrator privileges to manage work assignments.
-          </p>
-          <p className="text-sm text-gray-500">
-            Please contact your system administrator if you believe this is an error.
-          </p>
-        </div>
-      </div>
-    );
   }
 
   return (
