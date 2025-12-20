@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { User, LogOut, Home } from 'lucide-react';
+import { User, LogOut, Home, UserCog } from 'lucide-react';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -11,10 +11,11 @@ const Header: React.FC = () => {
   const { t } = useLanguage();
 
   const navigationItems = [
-    { key: 'home', path: '/', label: 'Home', gradient: 'from-slate-500 to-gray-600', showIcon: true },
+    { key: 'home', path: '/', label: 'Home', gradient: 'from-slate-500 to-gray-600', showIcon: true, icon: Home },
     { key: 'dashboard', path: '/dashboard', label: 'Dashboard', gradient: 'from-indigo-500 to-blue-600' },
     { key: 'works', path: '/works', label: t('nav.works'), gradient: 'from-emerald-500 to-teal-600' },
     { key: 'subworks', path: '/subworks', label: t('nav.subworks'), gradient: 'from-purple-500 to-pink-600' },
+    { key: 'work-assignments', path: '/work-assignments', label: 'Work Assignments', gradient: 'from-cyan-500 to-blue-600', showIcon: true, icon: UserCog },
     { key: 'generate-estimate', path: '/generate-estimate', label: 'Generate E-Estimate', gradient: 'from-violet-500 to-purple-600' },
     { key: 'measurement-book', path: '/measurement-book', label: 'Measurement Book (MB)', gradient: 'from-violet-500 to-purple-600' },
     { key: 'compare', path: '/compare', label: t('nav.compare'), gradient: 'from-orange-500 to-red-600' },
@@ -79,20 +80,23 @@ const Header: React.FC = () => {
       <div className="border-t border-slate-200 bg-gradient-to-r from-slate-100 to-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-2 py-2">
-            {navigationItems.map((item) => (
-              <button
-                key={item.key}
-                onClick={() => navigate(item.path)}
-                className={`px-6 py-3 rounded-xl text-base font-bold transition-all duration-300 flex items-center space-x-2 ${
-                  location.pathname === item.path
-                    ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg scale-105`
-                    : 'text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:scale-105 hover:shadow-md'
-                }`}
-              >
-                {item.showIcon && <Home className="w-4 h-4" />}
-                <span>{item.label}</span>
-              </button>
-            ))}
+            {navigationItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => navigate(item.path)}
+                  className={`px-6 py-3 rounded-xl text-base font-bold transition-all duration-300 flex items-center space-x-2 ${
+                    location.pathname === item.path
+                      ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg scale-105`
+                      : 'text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:scale-105 hover:shadow-md'
+                  }`}
+                >
+                  {item.showIcon && Icon && <Icon className="w-4 h-4" />}
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
       </div>
@@ -100,20 +104,23 @@ const Header: React.FC = () => {
       {/* Mobile Navigation */}
       <div className="md:hidden border-t border-slate-200 bg-gradient-to-r from-slate-100 to-gray-200">
         <div className="px-2 py-3 space-y-2">
-          {navigationItems.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => navigate(item.path)}
-              className={`block w-full text-left px-6 py-3 rounded-xl text-base font-bold transition-all duration-300 flex items-center space-x-2 ${
-                location.pathname === item.path
-                  ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg`
-                  : 'text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:shadow-md'
-              }`}
-            >
-              {item.showIcon && <Home className="w-4 h-4" />}
-              <span>{item.label}</span>
-            </button>
-          ))}
+          {navigationItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.key}
+                onClick={() => navigate(item.path)}
+                className={`block w-full text-left px-6 py-3 rounded-xl text-base font-bold transition-all duration-300 flex items-center space-x-2 ${
+                  location.pathname === item.path
+                    ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg`
+                    : 'text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:shadow-md'
+                }`}
+              >
+                {item.showIcon && Icon && <Icon className="w-4 h-4" />}
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </header>
