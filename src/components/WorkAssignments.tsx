@@ -90,23 +90,15 @@ const WorkAssignments: React.FC = () => {
       setWorks(worksRes.data || []);
       setRoles(rolesRes.data || []);
 
-      const userIds = usersRes.data?.map((ur: any) => ur.user_id) || [];
-      if (userIds.length > 0) {
-        const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-        if (!authError && authUsers) {
-          const mappedUsers = authUsers.users
-            .filter((u: any) => userIds.includes(u.id))
-            .map((u: any) => {
-              const userRole = usersRes.data?.find((ur: any) => ur.user_id === u.id);
-              return {
-                id: u.id,
-                email: u.email || '',
-                name: userRole?.name || u.email,
-              };
-            });
-          setUsers(mappedUsers);
-        }
-      }
+      const userRolesData = usersRes.data || [];
+      const mappedUsers = userRolesData.map((ur: any) => ({
+        id: ur.user_id,
+        email: '',
+        name: ur.name || 'Unknown User',
+      }));
+      setUsers(mappedUsers);
+
+      console.log('Mapped users:', mappedUsers.length);
     } catch (error: any) {
       console.error('Error fetching data:', error);
       alert('Failed to load data. Please check console for details.');
@@ -393,7 +385,7 @@ const WorkAssignments: React.FC = () => {
                   <option value="">Select User...</option>
                   {users.map(user => (
                     <option key={user.id} value={user.id}>
-                      {user.name} ({user.email})
+                      {user.name}
                     </option>
                   ))}
                 </select>
