@@ -30,7 +30,7 @@ interface HistoryEntry {
 }
 
 const ApprovalDashboard: React.FC = () => {
-  const { user, hasFullAccess } = useAuth();
+  const { user } = useAuth();
   const [pendingApprovals, setPendingApprovals] = useState<Workflow[]>([]);
   const [mySubmissions, setMySubmissions] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +42,7 @@ const ApprovalDashboard: React.FC = () => {
     comments: '',
   });
   const [expandedHistory, setExpandedHistory] = useState<{ [key: string]: boolean }>({});
-  const [canTakeActions, setCanTakeActions] = useState(false);
+  const [hasFullAccess, setHasFullAccess] = useState(false);
 
   useEffect(() => {
     fetchApprovals();
@@ -61,7 +61,7 @@ const ApprovalDashboard: React.FC = () => {
 
     if (userRole && userRole.roles) {
       const roleName = Array.isArray(userRole.roles) ? userRole.roles[0]?.name : userRole.roles.name;
-      setCanTakeActions(roleName === 'super_admin' || roleName === 'developer');
+      setHasFullAccess(roleName === 'super_admin' || roleName === 'developer');
     }
   };
 
@@ -71,13 +71,32 @@ const ApprovalDashboard: React.FC = () => {
     try {
       setLoading(true);
 
+      // Check if user has admin access
+      const { data: userRole } = await supabase
+        .schema('public')
+        .from('user_roles')
+        .select('role_id, roles(name)')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const isAdmin = userRole && userRole.roles &&
+        (Array.isArray(userRole.roles)
+          ? userRole.roles[0]?.name === 'super_admin' || userRole.roles[0]?.name === 'developer'
+          : userRole.roles.name === 'super_admin' || userRole.roles.name === 'developer');
+
+      // Fetch pending approvals - if admin, get all; otherwise only current user's
+      let pendingQuery = supabase
+        .schema('estimate')
+        .from('approval_workflows')
+        .select('*')
+        .eq('status', 'pending_approval');
+
+      if (!isAdmin) {
+        pendingQuery = pendingQuery.eq('current_approver_id', user.id);
+      }
+
       const [pendingRes, submissionsRes] = await Promise.all([
-        supabase
-          .schema('estimate')
-          .from('approval_workflows')
-          .select('*')
-          .eq('current_approver_id', user.id)
-          .eq('status', 'pending_approval'),
+        pendingQuery,
         supabase
           .schema('estimate')
           .from('approval_workflows')
@@ -164,11 +183,6 @@ const ApprovalDashboard: React.FC = () => {
   };
 
   const handleAction = async () => {
-    if (!canTakeActions) {
-      alert('You do not have permission to take approval actions');
-      return;
-    }
-
     if (!actionForm.action || !selectedWorkflow) {
       alert('Please select an action');
       return;
@@ -192,6 +206,10 @@ const ApprovalDashboard: React.FC = () => {
       console.error('Error processing action:', error);
       alert('Failed to process action: ' + error.message);
     }
+  };
+
+  const canTakeAction = (workflow: Workflow) => {
+    return hasFullAccess || workflow.current_approver_id === user?.id;
   };
 
   const getLevelName = (level: number) => {
@@ -296,7 +314,7 @@ const ApprovalDashboard: React.FC = () => {
                         </div>
                         <div className="flex flex-col items-end space-y-2">
                           {getStatusBadge(workflow.status)}
-                          {canTakeActions ? (
+                          {canTakeAction(workflow) ? (
                             <button
                               onClick={() => {
                                 setSelectedWorkflow(workflow.id);
