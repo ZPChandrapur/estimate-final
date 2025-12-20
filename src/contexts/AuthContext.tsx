@@ -29,9 +29,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           roles (
             id,
             name,
-            display_name,
-            description,
-            level
+            description
           )
         `)
         .eq('user_id', userId)
@@ -47,9 +45,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return {
           id: roleData.id,
           name: roleData.name,
-          display_name: roleData.display_name,
-          description: roleData.description,
-          level: roleData.level
+          description: roleData.description
         };
       }
 

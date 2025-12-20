@@ -8,9 +8,7 @@ export interface User {
   role?: {
     id: string;
     name: string;
-    display_name: string;
     description?: string;
-    level: number;
   };
   hasFullAccess?: boolean;
 }
