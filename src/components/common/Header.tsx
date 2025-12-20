@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { User, LogOut, Home, UserCog, FileCheck } from 'lucide-react';
+import { User, LogOut, Home, UserCog, FileCheck, FileSpreadsheet } from 'lucide-react';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -18,6 +18,7 @@ const Header: React.FC = () => {
     { key: 'subworks', path: '/subworks', label: t('nav.subworks'), gradient: 'from-purple-500 to-pink-600' },
     { key: 'generate-estimate', path: '/generate-estimate', label: 'Generate E-Estimate', gradient: 'from-violet-500 to-purple-600' },
     { key: 'approvals', path: '/approvals', label: 'Approvals', gradient: 'from-green-500 to-teal-600', showIcon: true, icon: FileCheck },
+    { key: 'boq-generation', path: '/boq-generation', label: 'BOQ Generation', gradient: 'from-orange-500 to-amber-600', showIcon: true, icon: FileSpreadsheet },
   ];
 
   const handleSignOut = async () => {

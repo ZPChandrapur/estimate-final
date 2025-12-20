@@ -17,6 +17,7 @@ import GenerateEstimate from './components/generate-estimate/GenerateEstimate';
 import MeasurementBook from './components/MeasurementBook';
 import WorkAssignments from './components/WorkAssignments';
 import ApprovalDashboard from './components/ApprovalDashboard';
+import BOQGeneration from './components/BOQGeneration';
 
 // Protected Route Wrapper
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -153,6 +154,19 @@ function App() {
                       <Header />
                       <main className="flex-1 max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 w-full">
                         <ApprovalDashboard />
+                      </main>
+                    </div>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/boq-generation"
+                element={
+                  <ProtectedRoute>
+                    <div className="flex flex-col min-h-screen">
+                      <Header />
+                      <main className="flex-1 max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 w-full">
+                        <BOQGeneration />
                       </main>
                     </div>
                   </ProtectedRoute>
