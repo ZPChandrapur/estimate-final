@@ -34,7 +34,7 @@ const ApprovalDashboard: React.FC = () => {
   const [pendingApprovals, setPendingApprovals] = useState<Workflow[]>([]);
   const [mySubmissions, setMySubmissions] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null);
+  const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionForm, setActionForm] = useState({
@@ -190,7 +190,7 @@ const ApprovalDashboard: React.FC = () => {
 
     try {
       const { error } = await supabase.rpc('process_approval_action', {
-        p_workflow_id: selectedWorkflow,
+        p_workflow_id: selectedWorkflow.id,
         p_action: actionForm.action,
         p_comments: actionForm.comments || null,
       });
@@ -317,7 +317,7 @@ const ApprovalDashboard: React.FC = () => {
                           {canTakeAction(workflow) ? (
                             <button
                               onClick={() => {
-                                setSelectedWorkflow(workflow.id);
+                                setSelectedWorkflow(workflow);
                                 setShowActionModal(true);
                               }}
                               className="px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 transition-all duration-200 shadow-md text-sm"
@@ -482,9 +482,18 @@ const ApprovalDashboard: React.FC = () => {
                 >
                   <option value="">Select Action...</option>
                   <option value="approved">Approve & Forward</option>
+                  {(hasFullAccess || selectedWorkflow?.current_level === 4) &&
+                    <option value="approved_final">Final Approve</option>
+                  }
                   <option value="rejected">Reject</option>
                   <option value="sent_back">Send Back for Changes</option>
                 </select>
+                {(hasFullAccess || selectedWorkflow?.current_level === 4) && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    <strong>Approve & Forward:</strong> Send to next level.
+                    <strong className="ml-2">Final Approve:</strong> Complete approval workflow.
+                  </p>
+                )}
               </div>
 
               <div>
