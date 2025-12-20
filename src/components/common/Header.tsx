@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { User, LogOut } from 'lucide-react';
+import { User, LogOut, Home } from 'lucide-react';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -11,6 +11,7 @@ const Header: React.FC = () => {
   const { t } = useLanguage();
 
   const navigationItems = [
+    { key: 'home', path: '/', label: 'Home', gradient: 'from-slate-500 to-gray-600', showIcon: true },
     { key: 'dashboard', path: '/dashboard', label: 'Dashboard', gradient: 'from-indigo-500 to-blue-600' },
     { key: 'works', path: '/works', label: t('nav.works'), gradient: 'from-emerald-500 to-teal-600' },
     { key: 'subworks', path: '/subworks', label: t('nav.subworks'), gradient: 'from-purple-500 to-pink-600' },
@@ -34,7 +35,10 @@ const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-12">
           {/* Logo and Title */}
-          <div className="flex items-center space-x-4">
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center space-x-4 hover:opacity-80 transition-opacity cursor-pointer"
+          >
             <div className="flex-shrink-0">
               <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-xl shadow-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">E</span>
@@ -46,7 +50,7 @@ const Header: React.FC = () => {
               </h1>
               <p className="text-xs text-gray-500">ZP Chandrapur</p>
             </div>
-          </div>
+          </button>
 
           {/* User Actions */}
           <div className="flex items-center space-x-4">
@@ -79,13 +83,14 @@ const Header: React.FC = () => {
               <button
                 key={item.key}
                 onClick={() => navigate(item.path)}
-                className={`px-6 py-3 rounded-xl text-base font-bold transition-all duration-300 ${
+                className={`px-6 py-3 rounded-xl text-base font-bold transition-all duration-300 flex items-center space-x-2 ${
                   location.pathname === item.path
                     ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg scale-105`
                     : 'text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:scale-105 hover:shadow-md'
                 }`}
               >
-                {item.label}
+                {item.showIcon && <Home className="w-4 h-4" />}
+                <span>{item.label}</span>
               </button>
             ))}
           </nav>
@@ -99,13 +104,14 @@ const Header: React.FC = () => {
             <button
               key={item.key}
               onClick={() => navigate(item.path)}
-              className={`block w-full text-left px-6 py-3 rounded-xl text-base font-bold transition-all duration-300 ${
+              className={`block w-full text-left px-6 py-3 rounded-xl text-base font-bold transition-all duration-300 flex items-center space-x-2 ${
                 location.pathname === item.path
                   ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg`
                   : 'text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:shadow-md'
               }`}
             >
-              {item.label}
+              {item.showIcon && <Home className="w-4 h-4" />}
+              <span>{item.label}</span>
             </button>
           ))}
         </div>
