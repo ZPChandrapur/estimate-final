@@ -61,18 +61,34 @@ const EstimateApprovalActions: React.FC<EstimateApprovalActionsProps> = ({ workI
 
     try {
       setSubmitting(true);
-      const { error } = await supabase.rpc('initiate_approval_workflow', {
-        p_work_id: workId,
-      });
 
-      if (error) throw error;
+      const { data, error } = await supabase
+        .schema('estimate')
+        .rpc('initiate_approval_workflow', {
+          p_work_id: workId,
+        });
+
+      if (error) {
+        console.error('RPC Error:', error);
+        throw error;
+      }
 
       alert('Estimate submitted for approval successfully');
       onStatusUpdate();
       checkWorkflow();
     } catch (error: any) {
       console.error('Error submitting for approval:', error);
-      alert('Failed to submit for approval: ' + error.message);
+
+      let errorMessage = 'Failed to submit for approval: ';
+      if (error.message) {
+        errorMessage += error.message;
+      } else if (error.hint) {
+        errorMessage += error.hint;
+      } else {
+        errorMessage += JSON.stringify(error);
+      }
+
+      alert(errorMessage);
     } finally {
       setSubmitting(false);
     }
