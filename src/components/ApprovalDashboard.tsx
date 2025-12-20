@@ -30,7 +30,7 @@ interface HistoryEntry {
 }
 
 const ApprovalDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, hasFullAccess } = useAuth();
   const [pendingApprovals, setPendingApprovals] = useState<Workflow[]>([]);
   const [mySubmissions, setMySubmissions] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,10 +42,28 @@ const ApprovalDashboard: React.FC = () => {
     comments: '',
   });
   const [expandedHistory, setExpandedHistory] = useState<{ [key: string]: boolean }>({});
+  const [canTakeActions, setCanTakeActions] = useState(false);
 
   useEffect(() => {
     fetchApprovals();
+    checkPermissions();
   }, [user]);
+
+  const checkPermissions = async () => {
+    if (!user) return;
+
+    const { data: userRole } = await supabase
+      .schema('public')
+      .from('user_roles')
+      .select('role_id, roles(name)')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (userRole && userRole.roles) {
+      const roleName = Array.isArray(userRole.roles) ? userRole.roles[0]?.name : userRole.roles.name;
+      setCanTakeActions(roleName === 'super_admin' || roleName === 'developer');
+    }
+  };
 
   const fetchApprovals = async () => {
     if (!user) return;
@@ -146,6 +164,11 @@ const ApprovalDashboard: React.FC = () => {
   };
 
   const handleAction = async () => {
+    if (!canTakeActions) {
+      alert('You do not have permission to take approval actions');
+      return;
+    }
+
     if (!actionForm.action || !selectedWorkflow) {
       alert('Please select an action');
       return;
@@ -273,15 +296,21 @@ const ApprovalDashboard: React.FC = () => {
                         </div>
                         <div className="flex flex-col items-end space-y-2">
                           {getStatusBadge(workflow.status)}
-                          <button
-                            onClick={() => {
-                              setSelectedWorkflow(workflow.id);
-                              setShowActionModal(true);
-                            }}
-                            className="px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 transition-all duration-200 shadow-md text-sm"
-                          >
-                            Take Action
-                          </button>
+                          {canTakeActions ? (
+                            <button
+                              onClick={() => {
+                                setSelectedWorkflow(workflow.id);
+                                setShowActionModal(true);
+                              }}
+                              className="px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 transition-all duration-200 shadow-md text-sm"
+                            >
+                              Take Action
+                            </button>
+                          ) : (
+                            <span className="px-4 py-2 bg-gray-200 text-gray-500 rounded-lg text-sm cursor-not-allowed">
+                              No Permission
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

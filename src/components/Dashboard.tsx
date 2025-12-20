@@ -16,6 +16,7 @@ import {
 interface DashboardStats {
   totalWorks: number;
   pendingApprovals: number;
+  mySubmissions: number;
   totalAmount: number;
   recentWorks: Work[];
   grandTotalAmount: number;
@@ -35,19 +36,33 @@ const Dashboard: React.FC = () => {
     try {
       setLoading(true);
 
-      // Fetch works with subworks and measurements to determine activity
+      // Fetch works (RLS will filter based on assignments automatically)
       const { data: works } = await supabase
         .schema('estimate')
         .from('works')
         .select('*')
         .order('sr_no', { ascending: false });
 
+      // Fetch pending approvals where user is current approver
+      const { data: pendingApprovalsData } = await supabase
+        .schema('estimate')
+        .from('approval_workflows')
+        .select('*')
+        .eq('current_approver_id', user?.id)
+        .eq('status', 'pending_approval');
+
+      // Fetch my submissions
+      const { data: mySubmissionsData } = await supabase
+        .schema('estimate')
+        .from('approval_workflows')
+        .select('*')
+        .eq('initiated_by', user?.id);
+
       if (works) {
         // Get works that have actual estimate/measurement activity
         const recentWorksWithActivity = [];
 
-        for (const work of works.slice(0, 10)) { // Check latest 10 works
-          // Check if work has subworks
+        for (const work of works.slice(0, 10)) {
           const { data: subworks } = await supabase
             .schema('estimate')
             .from('subworks')
@@ -56,7 +71,6 @@ const Dashboard: React.FC = () => {
             .limit(1);
 
           if (subworks && subworks.length > 0) {
-            // Check if any subwork has items
             const { data: items } = await supabase
               .schema('estimate')
               .from('subwork_items')
@@ -65,7 +79,6 @@ const Dashboard: React.FC = () => {
               .limit(1);
 
             if (items && items.length > 0) {
-              // Check if any item has measurements
               const { data: measurements } = await supabase
                 .schema('estimate')
                 .from('item_measurements')
@@ -73,25 +86,22 @@ const Dashboard: React.FC = () => {
                 .eq('subwork_item_id', items[0].sr_no)
                 .limit(1);
 
-              // Include work if it has estimates (items) or measurements
               if (measurements && measurements.length > 0) {
                 recentWorksWithActivity.push(work);
               } else if (items.length > 0) {
-                // Has estimate but no measurements yet
                 recentWorksWithActivity.push(work);
               }
             }
           }
 
-          // Limit to 5 recent activities
           if (recentWorksWithActivity.length >= 5) break;
         }
 
         const totalWorks = works.length;
-        const pendingApprovals = works.filter(work => work.status === 'pending').length;
+        const pendingApprovals = pendingApprovalsData?.length || 0;
+        const mySubmissions = mySubmissionsData?.length || 0;
         const totalAmount = works.reduce((sum, work) => sum + work.total_estimated_cost, 0);
 
-        // Calculate grandTotal from recap_json for all works
         const grandTotalAmount = works.reduce((sum, work) => {
           try {
             if (work.recap_json) {
@@ -107,6 +117,7 @@ const Dashboard: React.FC = () => {
         setStats({
           totalWorks,
           pendingApprovals,
+          mySubmissions,
           totalAmount,
           recentWorks: recentWorksWithActivity,
           grandTotalAmount,
@@ -228,10 +239,10 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-violet-700">
-                Technical Sanction
+                My Submissions
               </p>
               <p className="text-2xl font-bold text-violet-900">
-                {stats?.recentWorks.filter(w => w.type === 'Technical Sanction').length || 0}
+                {stats?.mySubmissions || 0}
               </p>
             </div>
           </div>
