@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { FileText, Plus, Trash2, Save, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface BOQItem {
   item_no: number;
@@ -244,6 +245,114 @@ const BOQGeneration: React.FC = () => {
     }
   };
 
+  const downloadExcel = async () => {
+    if (!selectedWork) {
+      alert('Please select a work first');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('boq')
+        .select('boq_data, work_id')
+        .eq('work_id', selectedWork)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data || !data.boq_data) {
+        alert('No saved BOQ found for this work. Please generate and save the BOQ first.');
+        return;
+      }
+
+      const boqDataToExport = data.boq_data as BOQData;
+
+      const workbook = XLSX.utils.book_new();
+
+      const excelData: any[] = [];
+
+      excelData.push(['BOQ (Bill of Quantities) - Schedule B']);
+      excelData.push([]);
+      excelData.push([boqDataToExport.project_title]);
+      excelData.push([]);
+
+      excelData.push([
+        'Item No.',
+        'Estimated Quantity (may be more or less)',
+        'Item of Work',
+        'Estimated Rate (in figure)',
+        'Estimated Rate (in words)',
+        'Unit',
+        'Total Amount'
+      ]);
+
+      boqDataToExport.sections.forEach((section) => {
+        excelData.push([]);
+        excelData.push([section.name]);
+        excelData.push([]);
+
+        section.subsections.forEach((subsection) => {
+          if (subsection.name !== 'Items') {
+            excelData.push([subsection.name]);
+          }
+
+          subsection.items.forEach((item) => {
+            excelData.push([
+              item.item_no,
+              item.quantity,
+              item.description,
+              item.rate_figure,
+              item.rate_words,
+              item.unit,
+              item.total_amount
+            ]);
+          });
+
+          const subsectionTotal = subsection.items.reduce((sum, item) => sum + item.total_amount, 0);
+          excelData.push(['', '', '', '', '', 'Subtotal:', subsectionTotal]);
+          excelData.push([]);
+        });
+      });
+
+      const grandTotal = boqDataToExport.sections.reduce((total, section) => {
+        return total + section.subsections.reduce((sectionTotal, subsection) => {
+          return sectionTotal + subsection.items.reduce((sum, item) => sum + item.total_amount, 0);
+        }, 0);
+      }, 0);
+
+      excelData.push(['', '', '', '', '', 'Grand Total:', grandTotal]);
+
+      const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+
+      worksheet['!cols'] = [
+        { wch: 10 },
+        { wch: 15 },
+        { wch: 50 },
+        { wch: 15 },
+        { wch: 30 },
+        { wch: 10 },
+        { wch: 15 }
+      ];
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'BOQ');
+
+      const work = works.find(w => w.works_id === selectedWork);
+      const fileName = `BOQ_${work?.work_name || 'Export'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      XLSX.writeFile(workbook, fileName);
+
+      alert('BOQ exported to Excel successfully');
+    } catch (error: any) {
+      console.error('Error downloading BOQ:', error);
+      alert('Failed to download BOQ: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const addSection = () => {
     if (!boqData) return;
 
@@ -400,14 +509,24 @@ const BOQGeneration: React.FC = () => {
                   <span>Add Section</span>
                 </button>
               </div>
-              <button
-                onClick={saveBOQ}
-                disabled={saving}
-                className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                <span>{saving ? 'Saving...' : 'Save BOQ'}</span>
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={saveBOQ}
+                  disabled={saving}
+                  className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{saving ? 'Saving...' : 'Save BOQ'}</span>
+                </button>
+                <button
+                  onClick={downloadExcel}
+                  disabled={loading}
+                  className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>{loading ? 'Downloading...' : 'Download Excel'}</span>
+                </button>
+              </div>
             </div>
 
             <div className="border border-gray-300 rounded-lg overflow-hidden">
