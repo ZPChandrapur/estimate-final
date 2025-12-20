@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { User, LogOut, Home, UserCog } from 'lucide-react';
+import { User, LogOut, Home, UserCog, FileCheck } from 'lucide-react';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +15,7 @@ const Header: React.FC = () => {
     { key: 'dashboard', path: '/dashboard', label: 'Dashboard', gradient: 'from-indigo-500 to-blue-600' },
     { key: 'works', path: '/works', label: t('nav.works'), gradient: 'from-emerald-500 to-teal-600' },
     { key: 'work-assignments', path: '/work-assignments', label: 'Work Assignments', gradient: 'from-cyan-500 to-blue-600', showIcon: true, icon: UserCog },
+    { key: 'approvals', path: '/approvals', label: 'Approvals', gradient: 'from-green-500 to-teal-600', showIcon: true, icon: FileCheck },
     { key: 'subworks', path: '/subworks', label: t('nav.subworks'), gradient: 'from-purple-500 to-pink-600' },
     { key: 'generate-estimate', path: '/generate-estimate', label: 'Generate E-Estimate', gradient: 'from-violet-500 to-purple-600' },
   ];

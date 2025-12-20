@@ -16,6 +16,7 @@ import Compare from './components/Compare';
 import GenerateEstimate from './components/generate-estimate/GenerateEstimate';
 import MeasurementBook from './components/MeasurementBook';
 import WorkAssignments from './components/WorkAssignments';
+import ApprovalDashboard from './components/ApprovalDashboard';
 
 // Protected Route Wrapper
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -139,6 +140,19 @@ function App() {
                       <Header />
                       <main className="flex-1 max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 w-full">
                         <WorkAssignments />
+                      </main>
+                    </div>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/approvals"
+                element={
+                  <ProtectedRoute>
+                    <div className="flex flex-col min-h-screen">
+                      <Header />
+                      <main className="flex-1 max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 w-full">
+                        <ApprovalDashboard />
                       </main>
                     </div>
                   </ProtectedRoute>
