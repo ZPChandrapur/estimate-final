@@ -45,6 +45,7 @@ const WorkAssignments: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWork, setSelectedWork] = useState<string>('');
   const [showModal, setShowModal] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [formData, setFormData] = useState({
     user_id: '',
     role_id: '',
@@ -64,15 +65,40 @@ const WorkAssignments: React.FC = () => {
     try {
       setLoading(true);
 
+      // Check if user is admin
+      const { data: userRoleData } = await supabase
+        .from('user_roles')
+        .select('role_id, roles(name)')
+        .eq('user_id', user?.id)
+        .schema('public')
+        .maybeSingle();
+
+      const isUserAdmin = userRoleData?.roles?.name &&
+        ['admin', 'super_admin', 'developer'].includes(userRoleData.roles.name);
+      setIsAdmin(!!isUserAdmin);
+
       const [worksRes, usersRes, rolesRes] = await Promise.all([
         supabase.schema('estimate').from('works').select('works_id, work_name, division, status').order('sr_no', { ascending: false }),
         supabase.from('user_roles').select('user_id, name').schema('public'),
-        supabase.from('roles').select('*').eq('application', 'estimate').schema('public'),
+        supabase.from('roles').select('*').or('application.eq.estimate,name.in.(Junior Engineer (JE),Sub Division Engineer,Divisional Engineer,Executive Engineer)').schema('public'),
       ]);
 
-      if (worksRes.error) throw worksRes.error;
-      if (usersRes.error) throw usersRes.error;
-      if (rolesRes.error) throw rolesRes.error;
+      if (worksRes.error) {
+        console.error('Works fetch error:', worksRes.error);
+        alert('Error loading works: ' + worksRes.error.message);
+        throw worksRes.error;
+      }
+      if (usersRes.error) {
+        console.error('Users fetch error:', usersRes.error);
+        throw usersRes.error;
+      }
+      if (rolesRes.error) {
+        console.error('Roles fetch error:', rolesRes.error);
+        throw rolesRes.error;
+      }
+
+      console.log('Fetched works:', worksRes.data?.length);
+      console.log('Fetched roles:', rolesRes.data);
 
       setWorks(worksRes.data || []);
       setRoles(rolesRes.data || []);
@@ -94,8 +120,9 @@ const WorkAssignments: React.FC = () => {
           setUsers(mappedUsers);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching data:', error);
+      alert('Failed to load data. Please check console for details.');
     } finally {
       setLoading(false);
     }
@@ -196,6 +223,23 @@ const WorkAssignments: React.FC = () => {
 
   if (loading) {
     return <LoadingSpinner text="Loading work assignments..." />;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <Shield className="mx-auto h-16 w-16 text-red-400 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-gray-600 mb-4">
+            You need administrator privileges to manage work assignments.
+          </p>
+          <p className="text-sm text-gray-500">
+            Please contact your system administrator if you believe this is an error.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
