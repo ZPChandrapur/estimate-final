@@ -100,10 +100,14 @@ const BOQGeneration: React.FC = () => {
   };
 
   const generateBOQFromWork = async () => {
-    if (!selectedWork) return;
+    if (!selectedWork) {
+      alert('Please select a work first');
+      return;
+    }
 
     try {
       setLoading(true);
+      console.log('Generating BOQ for work:', selectedWork);
 
       const { data: subworks, error: subworksError } = await supabase
         .schema('estimate')
@@ -112,10 +116,13 @@ const BOQGeneration: React.FC = () => {
         .eq('works_id', selectedWork)
         .order('sr_no');
 
+      console.log('Subworks fetched:', subworks, 'Error:', subworksError);
+
       if (subworksError) throw subworksError;
 
       if (!subworks || subworks.length === 0) {
-        alert('No subworks found for this work');
+        alert('No subworks found for this work. Please add subworks first.');
+        setLoading(false);
         return;
       }
 
@@ -123,12 +130,16 @@ const BOQGeneration: React.FC = () => {
       let itemCounter = 1;
 
       for (const subwork of subworks) {
+        console.log('Processing subwork:', subwork.subworks_id);
+
         const { data: items, error: itemsError } = await supabase
           .schema('estimate')
           .from('subwork_items')
           .select('item_number, description_of_item, ssr_quantity, ssr_rate, ssr_unit, total_item_amount')
           .eq('subwork_id', subwork.subworks_id)
           .order('item_number');
+
+        console.log('Items for subwork', subwork.subworks_id, ':', items, 'Error:', itemsError);
 
         if (itemsError) throw itemsError;
 
@@ -155,13 +166,24 @@ const BOQGeneration: React.FC = () => {
         }
       }
 
+      console.log('Total sections created:', sections.length);
+
+      if (sections.length === 0) {
+        alert('No items found in any subwork. Please add items to subworks first.');
+        setLoading(false);
+        return;
+      }
+
       const work = works.find(w => w.works_id === selectedWork);
-      setBOQData({
+      const newBOQData = {
         project_title: work?.work_name || '',
         sections
-      });
+      };
 
-      alert('BOQ generated successfully from work data');
+      console.log('Setting BOQ data:', newBOQData);
+      setBOQData(newBOQData);
+
+      alert(`BOQ generated successfully with ${sections.length} sections and ${itemCounter - 1} items`);
     } catch (error: any) {
       console.error('Error generating BOQ:', error);
       alert('Failed to generate BOQ: ' + error.message);
