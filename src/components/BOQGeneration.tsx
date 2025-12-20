@@ -99,6 +99,77 @@ const BOQGeneration: React.FC = () => {
     }
   };
 
+  const generateBOQFromWork = async () => {
+    if (!selectedWork) return;
+
+    try {
+      setLoading(true);
+
+      const { data: subworks, error: subworksError } = await supabase
+        .schema('estimate')
+        .from('subworks')
+        .select('subworks_id, subworks_name, subwork_amount')
+        .eq('works_id', selectedWork)
+        .order('sr_no');
+
+      if (subworksError) throw subworksError;
+
+      if (!subworks || subworks.length === 0) {
+        alert('No subworks found for this work');
+        return;
+      }
+
+      const sections: BOQSection[] = [];
+      let itemCounter = 1;
+
+      for (const subwork of subworks) {
+        const { data: items, error: itemsError } = await supabase
+          .schema('estimate')
+          .from('subwork_items')
+          .select('item_number, description_of_item, ssr_quantity, ssr_rate, ssr_unit, total_item_amount')
+          .eq('subwork_id', subwork.subworks_id)
+          .order('item_number');
+
+        if (itemsError) throw itemsError;
+
+        const boqItems: BOQItem[] = (items || []).map((item, idx) => ({
+          item_no: itemCounter++,
+          quantity: Number(item.ssr_quantity) || 0,
+          description: item.description_of_item || '',
+          rate_figure: Number(item.ssr_rate) || 0,
+          rate_words: '',
+          unit: item.ssr_unit || '',
+          total_amount: Number(item.total_item_amount) || 0
+        }));
+
+        if (boqItems.length > 0) {
+          sections.push({
+            name: subwork.subworks_name,
+            subsections: [
+              {
+                name: 'Items',
+                items: boqItems
+              }
+            ]
+          });
+        }
+      }
+
+      const work = works.find(w => w.works_id === selectedWork);
+      setBOQData({
+        project_title: work?.work_name || '',
+        sections
+      });
+
+      alert('BOQ generated successfully from work data');
+    } catch (error: any) {
+      console.error('Error generating BOQ:', error);
+      alert('Failed to generate BOQ: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleWorkSelect = (workId: string) => {
     setSelectedWork(workId);
     loadBOQ(workId);
@@ -291,13 +362,22 @@ const BOQGeneration: React.FC = () => {
         {selectedWork && boqData && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <button
-                onClick={addSection}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Section</span>
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={generateBOQFromWork}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 shadow-md"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Generate from Work</span>
+                </button>
+                <button
+                  onClick={addSection}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Section</span>
+                </button>
+              </div>
               <button
                 onClick={saveBOQ}
                 disabled={saving}
