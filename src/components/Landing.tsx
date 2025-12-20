@@ -1,0 +1,92 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FileText, BookOpen } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+
+const Landing: React.FC = () => {
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+
+  const tiles = [
+    {
+      id: 'estimate',
+      title: 'E-Estimate',
+      description: 'Create and manage project estimates with detailed cost analysis',
+      icon: FileText,
+      route: '/dashboard',
+      gradient: 'from-blue-500 to-blue-600',
+      hoverGradient: 'hover:from-blue-600 hover:to-blue-700',
+    },
+    {
+      id: 'measurement',
+      title: 'Measurement Book',
+      description: 'Track and record project measurements and progress',
+      icon: BookOpen,
+      route: '/measurement-book',
+      gradient: 'from-green-500 to-green-600',
+      hoverGradient: 'hover:from-green-600 hover:to-green-700',
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center mb-16">
+          <h1 className="text-5xl font-bold text-gray-900 mb-4">
+            Welcome to Project Management
+          </h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Choose your module to get started with efficient project management
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          {tiles.map((tile) => {
+            const Icon = tile.icon;
+            return (
+              <button
+                key={tile.id}
+                onClick={() => navigate(tile.route)}
+                className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${tile.gradient} ${tile.hoverGradient} p-8 shadow-xl transition-all duration-300 transform hover:scale-105 hover:shadow-2xl`}
+              >
+                <div className="relative z-10">
+                  <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 bg-white/20 rounded-full backdrop-blur-sm group-hover:bg-white/30 transition-all duration-300">
+                    <Icon className="w-10 h-10 text-white" />
+                  </div>
+
+                  <h2 className="text-3xl font-bold text-white mb-4">
+                    {tile.title}
+                  </h2>
+
+                  <p className="text-white/90 text-lg leading-relaxed">
+                    {tile.description}
+                  </p>
+                </div>
+
+                <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12 group-hover:scale-150 transition-transform duration-500" />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-16 text-center">
+          <div className="inline-flex items-center space-x-4 px-6 py-4 bg-white rounded-full shadow-md">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-sm text-gray-600">System Active</span>
+            </div>
+            <div className="w-px h-6 bg-gray-300" />
+            <span className="text-sm text-gray-600">
+              Select a module to continue
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Landing;

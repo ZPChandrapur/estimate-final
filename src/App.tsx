@@ -8,6 +8,7 @@ import './lib/i18n';
 import Header from './components/common/Header';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import Login from './components/Login';
+import Landing from './components/Landing';
 import Dashboard from './components/Dashboard';
 import Works from './components/Works';
 import Subworks from './components/Subworks';
@@ -28,9 +29,16 @@ function App() {
             <Routes>
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
-              
+
               {/* Protected Routes */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Landing />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/dashboard"
                 element={
