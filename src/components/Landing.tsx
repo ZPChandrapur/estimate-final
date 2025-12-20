@@ -1,11 +1,23 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, BookOpen } from 'lucide-react';
+import { FileText, BookOpen, User, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../contexts/AuthContext';
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      alert('Failed to sign out. Please try again.');
+    }
+  };
 
   const tiles = [
     {
@@ -31,6 +43,25 @@ const Landing: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex justify-end mb-8">
+          <div className="flex items-center space-x-4 bg-white rounded-full shadow-md px-6 py-3">
+            <div className="flex items-center space-x-2">
+              <User className="w-5 h-5 text-gray-400" />
+              <span className="text-sm text-gray-700">
+                {user?.user_metadata?.full_name || user?.email}
+              </span>
+            </div>
+            <div className="w-px h-6 bg-gray-300" />
+            <button
+              onClick={handleSignOut}
+              className="flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 transition-all duration-200"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </div>
+
         <div className="text-center mb-16">
           <h1 className="text-5xl font-bold text-gray-900 mb-4">
             Welcome to Project Management
