@@ -56,6 +56,7 @@ export interface Work {
   departmental_head?: string;
   sanctioning_authority?: string;
   status: 'draft' | 'pending' | 'approved' | 'rejected' | 'in_progress' | 'completed';
+  estimate_status?: 'draft' | 'ready_for_approval' | 'in_approval' | 'approved' | 'rejected' | 'sent_back';
   total_estimated_cost: number;
   created_at: string;
   updated_at: string;

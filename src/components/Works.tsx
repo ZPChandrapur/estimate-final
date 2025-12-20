@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import LoadingSpinner from './common/LoadingSpinner';
 import { Work, RecapCalculations, TaxEntry } from '../types';
 import WorksRecapSheet from './WorksRecapSheet';
+import EstimateApprovalActions from './EstimateApprovalActions';
 import { Plus, Search, Filter, CreditCard as Edit2, Trash2, Eye, FileText, IndianRupee, Calendar, Building } from 'lucide-react';
 
 const Works: React.FC = () => {
@@ -340,6 +341,9 @@ const Works: React.FC = () => {
                     Created
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                    Approval
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     {t('works.actions')}
                   </th>
                 </tr>
@@ -405,6 +409,13 @@ const Works: React.FC = () => {
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
                       {new Date(work.created_at).toLocaleDateString('hi-IN')}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <EstimateApprovalActions
+                        workId={work.works_id}
+                        currentStatus={work.estimate_status || 'draft'}
+                        onStatusUpdate={fetchWorks}
+                      />
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center space-x-2">
