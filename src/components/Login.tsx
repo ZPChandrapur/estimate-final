@@ -37,18 +37,31 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div
+      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8"
+      style={{
+        backgroundImage: 'url(/background.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+      <div className="max-w-md w-full space-y-8 relative z-10">
         {/* Header */}
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-2xl">E</span>
+          <div className="mx-auto h-32 w-32 flex items-center justify-center">
+            <img
+              src="/headerlogo.png"
+              alt="ZP Chandrapur Logo"
+              className="h-full w-full object-contain"
+            />
           </div>
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            {t('dashboard.title')}
+          <h2 className="mt-6 text-3xl font-extrabold text-white drop-shadow-lg">
+            e-Estimate and e-MB Management
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Government of Maharashtra
+          <p className="mt-2 text-sm text-white font-medium drop-shadow-md">
+            Zilla Parishad Chandrapur
           </p>
         </div>
 
@@ -134,8 +147,9 @@ const Login: React.FC = () => {
           </form>
         </div>
 
-        <div className="text-center text-xs text-gray-500">
-          <p>© 2025 Government of Maharashtra. All rights reserved.</p>
+        <div className="text-center text-xs text-white drop-shadow-md">
+          <p>© 2025 ZP Chandrapur, Govt of Maharashtra. All rights reserved.</p>
+          <p className="mt-1">Developed by Dpulse AI</p>
         </div>
       </div>
     </div>
