@@ -26,8 +26,8 @@ const Landing: React.FC = () => {
       description: 'Create and manage project estimates with detailed cost analysis',
       icon: FileText,
       route: '/dashboard',
-      gradient: 'from-blue-500 to-blue-600',
-      hoverGradient: 'hover:from-blue-600 hover:to-blue-700',
+      gradient: 'from-blue-600 via-blue-500 to-cyan-500',
+      hoverGradient: 'hover:from-blue-700 hover:via-blue-600 hover:to-cyan-600',
     },
     {
       id: 'measurement',
@@ -35,15 +35,27 @@ const Landing: React.FC = () => {
       description: 'Track and record project measurements and progress',
       icon: BookOpen,
       route: '/mb',
-      gradient: 'from-green-500 to-green-600',
-      hoverGradient: 'hover:from-green-600 hover:to-green-700',
+      gradient: 'from-emerald-600 via-green-500 to-teal-500',
+      hoverGradient: 'hover:from-emerald-700 hover:via-green-600 hover:to-teal-600',
     },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex justify-end mb-8">
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center space-x-4">
+            <img
+              src="/headerlogo.png"
+              alt="ZP Chandrapur Logo"
+              className="h-20 w-20 object-contain"
+            />
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Zilla Parishad Chandrapur</h1>
+              <p className="text-sm text-gray-600">Government of Maharashtra</p>
+            </div>
+          </div>
+
           <div className="flex items-center space-x-4 bg-white rounded-full shadow-md px-6 py-3">
             <div className="flex items-center space-x-2">
               <User className="w-5 h-5 text-gray-400" />
@@ -63,9 +75,9 @@ const Landing: React.FC = () => {
         </div>
 
         <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-gray-900 mb-4">
-            Welcome to Project Management
-          </h1>
+          <h2 className="text-5xl font-bold text-gray-900 mb-4">
+            Welcome to the e-Estimate and e-MB Management
+          </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Choose your module to get started with efficient project management
           </p>
