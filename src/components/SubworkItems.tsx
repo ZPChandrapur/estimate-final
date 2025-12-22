@@ -1752,8 +1752,16 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                                     return;
                                   }
 
-                                  setRateAnalysisItem(selectedItem ?? (newItem as SubworkItem));
-                                  setRateAnalysisItemSrNo(undefined); // not needed
+                                  // ✅ ENSURE item has sr_no (same as Edit2 flow)
+                                  const itemWithSrNo: SubworkItem = {
+                                    ...(selectedItem ?? (newItem as SubworkItem)),
+                                    sr_no:
+                                      selectedItem?.sr_no ??
+                                      parentSrNo // ✅ fallback ONLY for newly-added modal items
+                                  };
+
+                                  setRateAnalysisItem(itemWithSrNo);
+
                                   setRateAnalysisBaseRate(itemRates[index]?.rate || 0);
 
                                   setRateAnalysisContext({
@@ -1767,6 +1775,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                               >
                                 Rate Analysis
                               </button>
+
                               {itemRates.length > 1 && (
                                 <button
                                   type="button"
