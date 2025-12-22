@@ -82,6 +82,11 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const [ssrSearchQuery, setSsrSearchQuery] = useState('');
   const [selectedSSRItem, setSelectedSSRItem] = useState<any>(null);
   const [searchSource, setSearchSource] = useState<'CSR' | 'SSR'>('CSR');
+  const [rateSearchQueries, setRateSearchQueries] = useState<{ [key: number]: string }>({});
+  const [rateSuggestions, setRateSuggestions] = useState<{ [key: number]: any[] }>({});
+  const [showRateSuggestions, setShowRateSuggestions] = useState<{ [key: number]: boolean }>({});
+  const [searchingRate, setSearchingRate] = useState<{ [key: number]: boolean }>({});
+  const rateSearchTimeoutRefs = useRef<{ [key: number]: NodeJS.Timeout }>({});
 
   useEffect(() => {
     if (isOpen && subworkId) {
@@ -830,6 +835,110 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     });
   };
 
+  const searchRateItems = async (index: number, query: string) => {
+    if (!query || query.trim().length < 2) {
+      setRateSuggestions(prev => ({ ...prev, [index]: [] }));
+      setShowRateSuggestions(prev => ({ ...prev, [index]: false }));
+      return;
+    }
+
+    try {
+      setSearchingRate(prev => ({ ...prev, [index]: true }));
+
+      if (searchSource === 'CSR') {
+        const { data, error } = await supabase
+          .schema('estimate')
+          .from('CSR-2022-2023')
+          .select('*')
+          .or(`"Item No".ilike.%${query}%,"Item".ilike.%${query}%,"Reference".ilike.%${query}%`)
+          .limit(20);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          setRateSuggestions(prev => ({ ...prev, [index]: data }));
+          setShowRateSuggestions(prev => ({ ...prev, [index]: true }));
+        } else {
+          setRateSuggestions(prev => ({ ...prev, [index]: [] }));
+          setShowRateSuggestions(prev => ({ ...prev, [index]: false }));
+        }
+      } else {
+        const { data, error } = await supabase
+          .schema('estimate')
+          .from('SSR_2022_23')
+          .select('*')
+          .or(`"SSR Item No.".ilike.%${query}%,"Reference No.".ilike.%${query}%,"Description of the item".ilike.%${query}%`)
+          .limit(20);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          setRateSuggestions(prev => ({ ...prev, [index]: data }));
+          setShowRateSuggestions(prev => ({ ...prev, [index]: true }));
+        } else {
+          setRateSuggestions(prev => ({ ...prev, [index]: [] }));
+          setShowRateSuggestions(prev => ({ ...prev, [index]: false }));
+        }
+      }
+    } catch (error) {
+      console.error('Error searching rate items:', error);
+      setRateSuggestions(prev => ({ ...prev, [index]: [] }));
+      setShowRateSuggestions(prev => ({ ...prev, [index]: false }));
+    } finally {
+      setSearchingRate(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
+  const handleRateSearchChange = (index: number, value: string) => {
+    setRateSearchQueries(prev => ({ ...prev, [index]: value }));
+    updateRateEntry(index, 'description', value);
+
+    if (rateSearchTimeoutRefs.current[index]) {
+      clearTimeout(rateSearchTimeoutRefs.current[index]);
+    }
+
+    if (!value || value.trim().length < 2) {
+      setRateSuggestions(prev => ({ ...prev, [index]: [] }));
+      setShowRateSuggestions(prev => ({ ...prev, [index]: false }));
+      return;
+    }
+
+    rateSearchTimeoutRefs.current[index] = setTimeout(() => {
+      searchRateItems(index, value);
+    }, 500);
+  };
+
+  const selectRateItem = (index: number, item: any) => {
+    if (searchSource === 'CSR') {
+      const baseRate = parseFloat(item['Completed Item']) || 0;
+      const unit = item['Unit'] || '';
+      const description = item['Item'] || '';
+
+      updateRateEntry(index, 'description', description);
+      updateRateEntry(index, 'rate', baseRate);
+      updateRateEntry(index, 'unit', unit);
+
+      setRateSearchQueries(prev => ({ ...prev, [index]: description }));
+    } else {
+      const completedRate = parseInt(item['Proposed Completed Rate for 2022-23\nexcluding GST\nIn Rs.']) || 0;
+      const unit = item['Unit'] || '';
+      const description = item['Description of the item'] || '';
+
+      updateRateEntry(index, 'description', description);
+      updateRateEntry(index, 'rate', completedRate);
+      updateRateEntry(index, 'unit', unit);
+
+      setRateSearchQueries(prev => ({ ...prev, [index]: description }));
+    }
+
+    setShowRateSuggestions(prev => ({ ...prev, [index]: false }));
+    setRateSuggestions(prev => ({ ...prev, [index]: [] }));
+
+    if (rateSearchTimeoutRefs.current[index]) {
+      clearTimeout(rateSearchTimeoutRefs.current[index]);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -1492,7 +1601,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                     </button>
                   </div>
 
-                  <div className="border border-gray-300 rounded-md overflow-hidden">
+                  <div className="border border-gray-300 rounded-md overflow-visible">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
@@ -1505,14 +1614,92 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                       <tbody className="bg-white divide-y divide-gray-200">
                         {itemRates.map((rate, index) => (
                           <tr key={index}>
-                            <td className="px-3 py-2">
-                              <input
-                                type="text"
-                                value={rate.description}
-                                onChange={(e) => updateRateEntry(index, 'description', e.target.value)}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Material/work description"
-                              />
+                            <td className="px-3 py-2 relative">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={rate.description}
+                                  onChange={(e) => handleRateSearchChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                  placeholder={`Search ${searchSource} items...`}
+                                />
+                                {searchingRate[index] && (
+                                  <div className="absolute right-2 top-2">
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                                  </div>
+                                )}
+
+                                {showRateSuggestions[index] && rateSuggestions[index] && rateSuggestions[index].length > 0 && (
+                                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                    <div className="p-2 text-xs text-gray-500 border-b bg-gray-50">
+                                      <Search className="w-3 h-3 inline mr-1" />
+                                      {searchSource === 'CSR' ? 'CSR 2022-2023 Items' : 'SSR 2022-2023 Items'}
+                                    </div>
+                                    {rateSuggestions[index].map((item, itemIdx) => (
+                                      <div
+                                        key={itemIdx}
+                                        onClick={() => selectRateItem(index, item)}
+                                        className="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                      >
+                                        {searchSource === 'CSR' ? (
+                                          <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                              {item['Item No'] && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                  {item['Item No']}
+                                                </span>
+                                              )}
+                                              {item['Unit'] && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                  {item['Unit']}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="text-xs font-medium text-gray-900 mb-1">
+                                              {item['Item']}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs">
+                                              {item['Completed Item'] && (
+                                                <span className="text-green-600">
+                                                  Rate: ₹{parseFloat(item['Completed Item']).toFixed(2)}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                              {item['SSR Item No.'] && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                  {item['SSR Item No.']}
+                                                </span>
+                                              )}
+                                              {item['Unit'] && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                  {item['Unit']}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="text-xs font-medium text-gray-900 mb-1">
+                                              {item['Description of the item']}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs">
+                                              {item['Proposed Completed Rate for 2022-23\nexcluding GST\nIn Rs.'] && (
+                                                <span className="text-green-600">
+                                                  Rate: ₹{parseInt(item['Proposed Completed Rate for 2022-23\nexcluding GST\nIn Rs.']).toFixed(2)}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                    <div className="p-1 text-xs text-gray-400 text-center border-t bg-gray-50">
+                                      Click to select
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-2">
                               <input
@@ -1754,7 +1941,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                     </button>
                   </div>
 
-                  <div className="border border-gray-300 rounded-md overflow-hidden">
+                  <div className="border border-gray-300 rounded-md overflow-visible">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
@@ -1767,14 +1954,92 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                       <tbody className="bg-white divide-y divide-gray-200">
                         {itemRates.map((rate, index) => (
                           <tr key={index}>
-                            <td className="px-3 py-2">
-                              <input
-                                type="text"
-                                value={rate.description}
-                                onChange={(e) => updateRateEntry(index, 'description', e.target.value)}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Material/work description"
-                              />
+                            <td className="px-3 py-2 relative">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={rate.description}
+                                  onChange={(e) => handleRateSearchChange(index, e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                  placeholder={`Search ${searchSource} items...`}
+                                />
+                                {searchingRate[index] && (
+                                  <div className="absolute right-2 top-2">
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                                  </div>
+                                )}
+
+                                {showRateSuggestions[index] && rateSuggestions[index] && rateSuggestions[index].length > 0 && (
+                                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                    <div className="p-2 text-xs text-gray-500 border-b bg-gray-50">
+                                      <Search className="w-3 h-3 inline mr-1" />
+                                      {searchSource === 'CSR' ? 'CSR 2022-2023 Items' : 'SSR 2022-2023 Items'}
+                                    </div>
+                                    {rateSuggestions[index].map((item, itemIdx) => (
+                                      <div
+                                        key={itemIdx}
+                                        onClick={() => selectRateItem(index, item)}
+                                        className="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                      >
+                                        {searchSource === 'CSR' ? (
+                                          <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                              {item['Item No'] && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                  {item['Item No']}
+                                                </span>
+                                              )}
+                                              {item['Unit'] && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                  {item['Unit']}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="text-xs font-medium text-gray-900 mb-1">
+                                              {item['Item']}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs">
+                                              {item['Completed Item'] && (
+                                                <span className="text-green-600">
+                                                  Rate: ₹{parseFloat(item['Completed Item']).toFixed(2)}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                              {item['SSR Item No.'] && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                                  {item['SSR Item No.']}
+                                                </span>
+                                              )}
+                                              {item['Unit'] && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                  {item['Unit']}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="text-xs font-medium text-gray-900 mb-1">
+                                              {item['Description of the item']}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs">
+                                              {item['Proposed Completed Rate for 2022-23\nexcluding GST\nIn Rs.'] && (
+                                                <span className="text-green-600">
+                                                  Rate: ₹{parseInt(item['Proposed Completed Rate for 2022-23\nexcluding GST\nIn Rs.']).toFixed(2)}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                    <div className="p-1 text-xs text-gray-400 text-center border-t bg-gray-50">
+                                      Click to select
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-2">
                               <input
