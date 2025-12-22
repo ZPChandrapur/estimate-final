@@ -297,55 +297,55 @@ const BillProgressChart: React.FC<BillProgressChartProps> = ({ billId, onBack })
             </div>
 
             <div className="bg-white border border-gray-300 rounded-lg overflow-hidden mt-6">
+              <div className="bg-blue-50 px-6 py-3 border-b border-gray-300">
+                <h3 className="text-lg font-semibold text-gray-900 text-center">
+                  Bill Checks
+                </h3>
+              </div>
               <table className="min-w-full divide-y divide-gray-300">
-                <thead className="bg-blue-50">
+                <thead className="bg-blue-100">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-300">
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 border-r border-gray-300">
                       No Of Entries Check
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 border-r border-gray-300">
                       Amount
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700">
                       % Check
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-200 bg-white">
                   <tr>
                     <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
                       Accepted By Contractor
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-900 border-r border-gray-200">
+                    <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200">
                       {billDetails.no_of_mb_entries}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-900">
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 border-r border-gray-200">
                       ₹{totalAmount.toFixed(2)}
                     </td>
+                    <td className="px-4 py-3 text-sm text-center text-gray-900">
+                      100
+                    </td>
                   </tr>
-                  {approvedStages.filter(s => s.approval_level > 1).map((stage) => (
-                    <tr key={stage.id}>
-                      <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
-                        Measured and checked By {stage.approver_role}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900 border-r border-gray-200">
-                        {billDetails.no_of_mb_entries}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        ₹{totalAmount.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
                   {approvedStages.length > 0 && (
                     <tr>
                       <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
                         Physically verified and checked By EE
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900 border-r border-gray-200">
+                      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200">
                         {billDetails.no_of_mb_entries}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
+                      <td className="px-4 py-3 text-sm text-right text-gray-900 border-r border-gray-200">
                         ₹{totalAmount.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-center text-gray-900">
+                        100
                       </td>
                     </tr>
                   )}
