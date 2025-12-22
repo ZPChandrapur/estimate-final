@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import MBDashboard from './MBDashboard';
 import WorkManagement from './WorkManagement';
 import BOQManagement from './BOQManagement';
-import MeasurementEntry from './MeasurementEntry';
-import MBStatus from './MBStatus';
+import Measurements from './Measurements';
 import MBReports from './MBReports';
 import MBAuditLogs from './MBAuditLogs';
 
@@ -19,9 +18,9 @@ const MeasurementBookApp: React.FC = () => {
       case 'boq':
         return <BOQManagement onNavigate={setCurrentPage} />;
       case 'measurements':
-        return <MeasurementEntry onNavigate={setCurrentPage} />;
+        return <Measurements onNavigate={setCurrentPage} />;
       case 'status':
-        return <MBStatus onNavigate={setCurrentPage} />;
+        return <Measurements onNavigate={setCurrentPage} />;
       case 'reports':
         return <MBReports onNavigate={setCurrentPage} />;
       case 'audit':
