@@ -274,7 +274,8 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
           current_bill_amount: totalAmount,
           no_of_mb_entries: boqData.length,
           wdmm_amount: 0,
-          current_approval_level: 0
+          current_approval_level: 0,
+          created_by: user?.id
         })
         .select()
         .single();
