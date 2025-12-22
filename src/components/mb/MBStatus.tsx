@@ -133,11 +133,15 @@ const MBStatus: React.FC<MBStatusProps> = ({ onNavigate }) => {
   };
 
   const canApprove = (measurement: Measurement) => {
-    if (userRoles.includes('admin')) return true;
+    if (userRoles.includes('admin') || userRoles.includes('super_admin') || userRoles.includes('developer')) return true;
 
-    if (measurement.status === 'submitted' && userRoles.includes('Junior Engineer')) return true;
-    if (measurement.status === 'je_approved' && userRoles.includes('Deputy Engineer')) return true;
-    if (measurement.status === 'de_approved' && userRoles.includes('Executive Engineer')) return true;
+    const isJE = userRoles.some(role => role.includes('Junior Engineer'));
+    const isDE = userRoles.some(role => role.includes('Deputy Engineer'));
+    const isEE = userRoles.some(role => role.includes('Executive Engineer'));
+
+    if (measurement.status === 'submitted' && isJE) return true;
+    if (measurement.status === 'je_approved' && isDE) return true;
+    if (measurement.status === 'de_approved' && isEE) return true;
 
     return false;
   };
@@ -155,13 +159,18 @@ const MBStatus: React.FC<MBStatusProps> = ({ onNavigate }) => {
       let newStatus = selectedMeasurement.status;
       let approverRole = '';
 
-      if (userRoles.includes('Junior Engineer') || userRoles.includes('admin')) {
+      const isJE = userRoles.some(role => role.includes('Junior Engineer'));
+      const isDE = userRoles.some(role => role.includes('Deputy Engineer'));
+      const isEE = userRoles.some(role => role.includes('Executive Engineer'));
+      const isAdmin = userRoles.includes('admin') || userRoles.includes('super_admin') || userRoles.includes('developer');
+
+      if (isJE || (isAdmin && selectedMeasurement.status === 'submitted')) {
         approverRole = 'Junior Engineer';
         newStatus = approvalAction === 'approved' ? 'je_approved' : 'rejected';
-      } else if (userRoles.includes('Deputy Engineer')) {
+      } else if (isDE || (isAdmin && selectedMeasurement.status === 'je_approved')) {
         approverRole = 'Deputy Engineer';
         newStatus = approvalAction === 'approved' ? 'de_approved' : 'rejected';
-      } else if (userRoles.includes('Executive Engineer')) {
+      } else if (isEE || (isAdmin && selectedMeasurement.status === 'de_approved')) {
         approverRole = 'Executive Engineer';
         newStatus = approvalAction === 'approved' ? 'ee_approved' : 'rejected';
       }
