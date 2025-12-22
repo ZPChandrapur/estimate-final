@@ -38,9 +38,6 @@ interface Measurement {
     description: string;
     unit: string;
   };
-  created_by_user: {
-    email: string;
-  };
 }
 
 const MBStatus: React.FC<MBStatusProps> = ({ onNavigate }) => {
@@ -105,13 +102,15 @@ const MBStatus: React.FC<MBStatusProps> = ({ onNavigate }) => {
         .from('mb_measurements')
         .select(`
           *,
-          boq_item:mb_boq_items(item_number, description, unit),
-          created_by_user:auth.users(email)
+          boq_item:mb_boq_items(item_number, description, unit)
         `)
         .eq('project_id', selectedProject)
         .order('measurement_date', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching measurements:', error);
+        throw error;
+      }
       setMeasurements(data as any || []);
     } catch (error) {
       console.error('Error fetching measurements:', error);
