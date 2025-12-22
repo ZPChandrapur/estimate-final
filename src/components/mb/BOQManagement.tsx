@@ -809,14 +809,14 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sl. No.</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">SL.<br/>NO.</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Rate</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Executed</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Balance</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">QTY</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">UNIT</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">RATE</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">AMOUNT</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">EXECUTED</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">BALANCE</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -825,16 +825,28 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
                       ? `${item.subwork_name}\n${item.description}`
                       : item.description;
 
+                    const executedQty = item.executed_quantity || 0;
+                    const executedAmt = item.executed_amount || (executedQty * item.rate);
+                    const balanceQty = item.boq_quantity - executedQty;
+                    const balanceAmt = balanceQty * item.rate;
+                    const boqAmount = item.amount_with_taxes || item.amount || (item.boq_quantity * item.rate);
+
                     return (
                       <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm text-gray-900">{item.item_number}</td>
+                        <td className="px-3 py-3 text-sm text-gray-900 font-medium">{item.item_number}</td>
                         <td className="px-4 py-3 text-sm text-gray-900 whitespace-pre-wrap max-w-2xl">{displayDescription}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{item.boq_quantity.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{item.unit}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">₹{item.rate.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">₹{item.amount.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-sm text-right text-green-600">{item.executed_quantity.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-sm text-right text-orange-600">{item.balance_quantity.toFixed(2)}</td>
+                        <td className="px-3 py-3 text-sm text-center text-gray-900">{item.boq_quantity.toFixed(3)}<br/><span className="text-xs text-gray-500">{item.unit}</span></td>
+                        <td className="px-3 py-3 text-sm text-center text-gray-900">{item.unit}</td>
+                        <td className="px-3 py-3 text-sm text-right text-gray-900">₹{item.rate.toFixed(2)}</td>
+                        <td className="px-3 py-3 text-sm text-right font-medium text-gray-900">₹{boqAmount.toFixed(2)}</td>
+                        <td className="px-3 py-3 text-sm text-right">
+                          <div className="text-green-600 font-medium">{executedQty.toFixed(2)}</div>
+                          <div className="text-xs text-green-700">₹{executedAmt.toFixed(2)}</div>
+                        </td>
+                        <td className="px-3 py-3 text-sm text-right">
+                          <div className="text-orange-600 font-medium">{balanceQty.toFixed(2)}</div>
+                          <div className="text-xs text-orange-700">₹{balanceAmt.toFixed(2)}</div>
+                        </td>
                       </tr>
                     );
                   })}
