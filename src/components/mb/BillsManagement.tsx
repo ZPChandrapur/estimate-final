@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { FileText, Plus, Eye, Download, ArrowLeft, Send, CheckCircle, XCircle, BarChart2 } from 'lucide-react';
+import { FileText, Plus, Eye, Download, ArrowLeft, Send, CheckCircle, XCircle, BarChart2, Trash2, Edit } from 'lucide-react';
 import BillProgressChart from './BillProgressChart';
 
 interface BillsManagementProps {
@@ -68,8 +68,14 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [billChecks, setBillChecks] = useState<BillCheckValue[]>([]);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState<'list' | 'create' | 'abstract' | 'progress'>('list');
+  const [view, setView] = useState<'list' | 'create' | 'abstract' | 'progress' | 'edit'>('list');
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [editingBill, setEditingBill] = useState<Bill | null>(null);
+  const [editForm, setEditForm] = useState({
+    bill_number: '',
+    bill_date: '',
+    remarks: ''
+  });
 
   useEffect(() => {
     fetchProjects();
@@ -254,6 +260,122 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
     return userLevel >= (bill.current_approval_level + 1) && bill.approval_status !== 'ee_approved';
   };
 
+  const handleDeleteBill = async (billId: string, billNumber: string) => {
+    const confirm = window.confirm(`Are you sure you want to delete Bill ${billNumber}? This action cannot be undone.`);
+    if (!confirm) return;
+
+    try {
+      setLoading(true);
+
+      // Delete bill items first (due to foreign key constraint)
+      const { error: itemsError } = await supabase
+        .schema('estimate')
+        .from('mb_bill_items')
+        .delete()
+        .eq('bill_id', billId);
+
+      if (itemsError) throw itemsError;
+
+      // Delete bill check values
+      const { error: checksError } = await supabase
+        .schema('estimate')
+        .from('mb_bill_check_values')
+        .delete()
+        .eq('bill_id', billId);
+
+      if (checksError) throw checksError;
+
+      // Delete bill approvals
+      const { error: approvalsError } = await supabase
+        .schema('estimate')
+        .from('mb_bill_approvals')
+        .delete()
+        .eq('bill_id', billId);
+
+      if (approvalsError) throw approvalsError;
+
+      // Delete bill approval history
+      const { error: historyError } = await supabase
+        .schema('estimate')
+        .from('mb_bill_approval_history')
+        .delete()
+        .eq('bill_id', billId);
+
+      if (historyError) throw historyError;
+
+      // Finally delete the bill
+      const { error: billError } = await supabase
+        .schema('estimate')
+        .from('mb_bills')
+        .delete()
+        .eq('id', billId);
+
+      if (billError) throw billError;
+
+      alert('Bill deleted successfully');
+      setSelectedBill('');
+      fetchBills();
+    } catch (error: any) {
+      console.error('Error deleting bill:', error);
+      alert('Error deleting bill: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const canDeleteBill = (bill: Bill) => {
+    // Only allow deletion if bill is in draft status or user is admin
+    const isAdmin = userRoles.some(role => ['admin', 'super_admin', 'developer'].includes(role));
+    return bill.approval_status === 'draft' || isAdmin;
+  };
+
+  const canEditBill = (bill: Bill) => {
+    // Only allow editing if bill is in draft status or user is admin
+    const isAdmin = userRoles.some(role => ['admin', 'super_admin', 'developer'].includes(role));
+    return bill.approval_status === 'draft' || isAdmin;
+  };
+
+  const handleEditBill = (bill: Bill) => {
+    setEditingBill(bill);
+    setEditForm({
+      bill_number: bill.bill_number,
+      bill_date: bill.bill_date,
+      remarks: bill.remarks || ''
+    });
+    setView('edit');
+  };
+
+  const handleUpdateBill = async () => {
+    if (!editingBill) return;
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .schema('estimate')
+        .from('mb_bills')
+        .update({
+          bill_number: editForm.bill_number,
+          bill_date: editForm.bill_date,
+          remarks: editForm.remarks,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingBill.id);
+
+      if (error) throw error;
+
+      alert('Bill updated successfully');
+      setView('list');
+      setEditingBill(null);
+      fetchBills();
+    } catch (error: any) {
+      console.error('Error updating bill:', error);
+      alert('Error updating bill: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCreateBill = async () => {
     if (!selectedProject) return;
 
@@ -262,22 +384,6 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
 
     try {
       setLoading(true);
-
-      // Get the latest bill number for the project
-      const { data: existingBills, error: billError } = await supabase
-        .schema('estimate')
-        .from('mb_bills')
-        .select('bill_number')
-        .eq('project_id', selectedProject)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (billError) throw billError;
-
-      const lastBillNumber = existingBills && existingBills.length > 0
-        ? parseInt(existingBills[0].bill_number.split('-').pop() || '0')
-        : 0;
-      const newBillNumber = `RABill-${lastBillNumber + 1}`;
 
       // Get all approved measurements (BOQ items with executed quantities > 0)
       const { data: boqData, error: boqError } = await supabase
@@ -294,6 +400,45 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
         alert('No approved measurements found for this project. Please approve measurements first.');
         return;
       }
+
+      // Check for duplicate bill by comparing executed quantities with existing bills
+      const { data: existingBills, error: existingError } = await supabase
+        .schema('estimate')
+        .from('mb_bills')
+        .select('id, bill_number, total_amount, no_of_mb_entries')
+        .eq('project_id', selectedProject)
+        .order('created_at', { ascending: false });
+
+      if (existingError) throw existingError;
+
+      // Calculate current total amount
+      const currentTotalAmount = boqData.reduce((sum, item) => {
+        const executedQty = item.executed_quantity || 0;
+        const rate = item.rate || 0;
+        return sum + (executedQty * rate);
+      }, 0);
+
+      // Check if a bill with the same amount and number of entries exists
+      const duplicateBill = existingBills?.find(bill =>
+        Math.abs(parseFloat(bill.total_amount) - currentTotalAmount) < 1 &&
+        bill.no_of_mb_entries === boqData.length
+      );
+
+      if (duplicateBill) {
+        const duplicate = window.confirm(
+          `A bill with similar measurements already exists (Bill: ${duplicateBill.bill_number}, Amount: ₹${parseFloat(duplicateBill.total_amount).toFixed(2)}). Do you still want to create a new bill?`
+        );
+        if (!duplicate) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Get the latest bill number for the project
+      const lastBillNumber = existingBills && existingBills.length > 0
+        ? parseInt(existingBills[0].bill_number.split('-').pop() || '0')
+        : 0;
+      const newBillNumber = `RABill-${lastBillNumber + 1}`;
 
       // Get previous bills total to calculate current bill amount
       const { data: prevBills, error: prevError } = await supabase
@@ -639,6 +784,87 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
     );
   };
 
+  const renderEditForm = () => (
+    <div className="space-y-6">
+      <div className="flex items-center space-x-4 mb-6">
+        <button
+          onClick={() => {
+            setView('list');
+            setEditingBill(null);
+          }}
+          className="flex items-center text-gray-600 hover:text-gray-900"
+        >
+          <ArrowLeft className="w-5 h-5 mr-2" />
+          Back to Bills
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h3 className="text-xl font-bold text-gray-900 mb-6">Edit Bill</h3>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Bill Number
+            </label>
+            <input
+              type="text"
+              value={editForm.bill_number}
+              onChange={(e) => setEditForm({ ...editForm, bill_number: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Bill Date
+            </label>
+            <input
+              type="date"
+              value={editForm.bill_date}
+              onChange={(e) => setEditForm({ ...editForm, bill_date: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Remarks
+            </label>
+            <textarea
+              value={editForm.remarks}
+              onChange={(e) => setEditForm({ ...editForm, remarks: e.target.value })}
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter any remarks..."
+            />
+          </div>
+
+          <div className="flex space-x-4 pt-4">
+            <button
+              onClick={handleUpdateBill}
+              disabled={loading}
+              className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              {loading ? 'Updating...' : 'Update Bill'}
+            </button>
+            <button
+              onClick={() => {
+                setView('list');
+                setEditingBill(null);
+              }}
+              className="flex items-center px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            >
+              <XCircle className="w-4 h-4 mr-2" />
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderBillsList = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -770,6 +996,24 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                         <Eye className="w-4 h-4 mr-2" />
                         View Abstract
                       </button>
+                      {canEditBill(bill) && (
+                        <button
+                          onClick={() => handleEditBill(bill)}
+                          className="flex items-center px-4 py-2 bg-yellow-600 text-white rounded-md text-sm hover:bg-yellow-700"
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </button>
+                      )}
+                      {canDeleteBill(bill) && (
+                        <button
+                          onClick={() => handleDeleteBill(bill.id, bill.bill_number)}
+                          className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -804,6 +1048,7 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
 
         {view === 'list' && renderBillsList()}
         {view === 'abstract' && renderAbstract()}
+        {view === 'edit' && renderEditForm()}
         {view === 'progress' && selectedBill && (
           <BillProgressChart
             billId={selectedBill}
