@@ -44,8 +44,10 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const [ratesArray, setRatesArray] = useState<ItemRate[]>([]);
   const [rateDescriptions, setRateDescriptions] = useState<string[]>([]);
   const [selectedSrNo, setSelectedSrNo] = useState();
+  const navigate = useNavigate();
   const [showRateAnalysisModal, setShowRateAnalysisModal] = useState(false);
   const [rateAnalysisItem, setRateAnalysisItem] = useState<SubworkItem | null>(null);
+  const [rateAnalysisItemSrNo, setRateAnalysisItemSrNo] = useState<number | undefined>(undefined);
   const [rateAnalysisBaseRate, setRateAnalysisBaseRate] = useState<number | undefined>(undefined);
   const [rateAnalysisContext, setRateAnalysisContext] = useState<{
     source: 'main' | 'modal';
@@ -665,6 +667,26 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     }
   };
 
+  const ensureParentSubworkSrNo = async (): Promise<number | undefined> => {
+    if (parentSubworkSrNo) return parentSubworkSrNo;
+
+    if (!subworkId) return undefined;
+
+    const { data, error } = await supabase
+      .schema('estimate')
+      .from('subworks')
+      .select('sr_no')
+      .eq('subworks_id', subworkId)
+      .maybeSingle();
+
+    if (!error && data?.sr_no) {
+      setParentSubworkSrNo(data.sr_no);
+      return data.sr_no;
+    }
+
+    return undefined;
+  };
+
   const handleViewMeasurements = (item: SubworkItem) => {
     setSelectedItem(item);
     const selectedItemSrno = item?.sr_no?.toString();
@@ -885,13 +907,33 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                             >
                               <Calculator className="w-4 h-4" />
                             </button>
-                            {/* <button
-                              onClick={() => handleEditItem(item)}
-                              className="text-green-600 hover:text-green-900 p-1 rounded"
-                              title="Edit Item"
+                            <button
+                              onClick={async () => {
+                                const parentSrNo = await ensureParentSubworkSrNo();
+
+                                if (!parentSrNo) {
+                                  alert('Unable to resolve parent subwork. Please try again.');
+                                  return;
+                                }
+
+                                setRateAnalysisItem(item);
+                                setRateAnalysisItemSrNo(undefined); // ❌ not needed anymore
+                                setRateAnalysisBaseRate(
+                                  (itemRatesMap[item.sr_no.toString()]?.[0]?.rate) ?? item.ssr_rate ?? 0
+                                );
+
+                                setRateAnalysisContext({
+                                  source: 'main',
+                                  itemSrNo: item.sr_no
+                                });
+
+                                setShowRateAnalysisModal(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                              title="Rate Analysis"
                             >
                               <Edit2 className="w-4 h-4" />
-                            </button> */}
+                            </button>
                             <button
                               onClick={() => handleDeleteItem(item)}
                               className="text-red-600 hover:text-red-900 p-1 rounded"
@@ -934,11 +976,14 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
           onClose={() => {
             setShowRateAnalysisModal(false);
             setRateAnalysisItem(null);
+            setRateAnalysisItemSrNo(undefined);
             setRateAnalysisContext(null);
             setRateAnalysisBaseRate(undefined);
           }}
           item={rateAnalysisItem}
           baseRate={rateAnalysisBaseRate}
+          parentSubworkId={subworkId}
+          subworkItemSrNo={rateAnalysisItemSrNo}
           parentSubworkSrNo={parentSubworkSrNo}
           onSaveRate={(newRate: number, analysisPayload?: any) => {
             // Update local state immediately without refetch
@@ -1234,9 +1279,18 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                             <td className="px-3 py-2">
                               <button
                                 type="button"
-                                onClick={async () => {                               
+                                onClick={async () => {
+                                  const parentSrNo = await ensureParentSubworkSrNo();
+
+                                  if (!parentSrNo) {
+                                    alert('Unable to resolve parent subwork. Please try again.');
+                                    return;
+                                  }
+
                                   setRateAnalysisItem(selectedItem ?? (newItem as SubworkItem));
+                                  setRateAnalysisItemSrNo(undefined); // not needed
                                   setRateAnalysisBaseRate(itemRates[index]?.rate || 0);
+
                                   setRateAnalysisContext({
                                     source: 'modal',
                                     modalIndex: index
@@ -1555,6 +1609,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
 
 // Import the ItemMeasurements component
 import ItemMeasurements from './ItemMeasurements';
+import { useNavigate } from 'react-router-dom';
 import RateAnalysis from './RateAnalysis';
 
 export default SubworkItems;
