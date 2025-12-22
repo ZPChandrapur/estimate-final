@@ -21,6 +21,7 @@ import BOQGeneration from './components/BOQGeneration';
 // Protected Route Wrapper
 import ProtectedRoute from './components/common/ProtectedRoute';
 import RateAnalysis from './components/RateAnalysis';
+import MeasurementBookApp from './components/mb/MeasurementBookApp';
 
 function App() {
   return (
@@ -155,6 +156,14 @@ function App() {
                         <BOQGeneration />
                       </main>
                     </div>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/mb"
+                element={
+                  <ProtectedRoute>
+                    <MeasurementBookApp />
                   </ProtectedRoute>
                 }
               />
