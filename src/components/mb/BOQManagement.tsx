@@ -45,6 +45,13 @@ interface BOQItem {
   remarks?: string;
 }
 
+interface Work {
+  works_id: string;
+  work_name: string;
+  division: string;
+  estimate_status: string;
+}
+
 const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -57,6 +64,9 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showEstimateImport, setShowEstimateImport] = useState(false);
+  const [availableWorks, setAvailableWorks] = useState<Work[]>([]);
+  const [selectedWork, setSelectedWork] = useState<string>('');
 
   useEffect(() => {
     fetchProjects();
@@ -247,6 +257,114 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
     XLSX.writeFile(wb, 'BOQ_Template.xlsx');
   };
 
+  const fetchAvailableWorks = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('works')
+        .select('works_id, work_name, division, estimate_status')
+        .eq('estimate_status', 'approved')
+        .order('work_name');
+
+      if (error) throw error;
+      setAvailableWorks(data || []);
+      setShowEstimateImport(true);
+    } catch (error) {
+      console.error('Error fetching works:', error);
+      setError('Failed to fetch approved works');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBOQFromEstimate = async () => {
+    if (!selectedWork || !selectedProject) {
+      setError('Please select both a project and a work');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      const { data: subworks, error: subworksError } = await supabase
+        .schema('estimate')
+        .from('subworks')
+        .select('subworks_id, subworks_name, sr_no')
+        .eq('works_id', selectedWork)
+        .order('sr_no');
+
+      if (subworksError) throw subworksError;
+
+      if (!subworks || subworks.length === 0) {
+        setError('No subworks found for this work');
+        setLoading(false);
+        return;
+      }
+
+      const allItems: BOQItem[] = [];
+      let itemCounter = 1;
+
+      for (const subwork of subworks) {
+        const { data: items, error: itemsError } = await supabase
+          .schema('estimate')
+          .from('subwork_items')
+          .select('item_number, description_of_item, ssr_quantity, ssr_rate, ssr_unit, total_item_amount')
+          .eq('subwork_id', subwork.subworks_id)
+          .order('item_number');
+
+        if (itemsError) throw itemsError;
+
+        if (items && items.length > 0) {
+          for (const item of items) {
+            const quantity = Number(item.ssr_quantity) || 0;
+            const rate = Number(item.ssr_rate) || 0;
+            const amountWithoutTaxes = Number(item.total_item_amount) || (quantity * rate);
+            const amountWithTaxes = amountWithoutTaxes;
+            const amountInWords = numberToWords(Math.round(amountWithTaxes));
+
+            const subworkDescription = `SUB WORK NO. ${subwork.sr_no} :- ${subwork.subworks_name}`;
+            const itemDescription = `${subworkDescription}\nItem No.${item.item_number}: ${item.description_of_item || ''}`;
+
+            allItems.push({
+              project_id: selectedProject,
+              item_number: String(itemCounter),
+              description: itemDescription,
+              unit: item.ssr_unit || '',
+              boq_quantity: quantity,
+              rate: rate,
+              amount: amountWithoutTaxes,
+              amount_with_taxes: amountWithTaxes,
+              amount_in_words: amountInWords,
+              executed_quantity: 0,
+              balance_quantity: quantity,
+              remarks: amountInWords
+            });
+
+            itemCounter++;
+          }
+        }
+      }
+
+      if (allItems.length === 0) {
+        setError('No items found in any subwork');
+        setLoading(false);
+        return;
+      }
+
+      setPreviewItems(allItems);
+      setShowPreview(true);
+      setShowEstimateImport(false);
+      setSuccess(`Loaded ${allItems.length} items from ${subworks.length} subworks`);
+    } catch (error) {
+      console.error('Error fetching BOQ from estimate:', error);
+      setError('Failed to fetch BOQ from estimate');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const exportToExcel = () => {
     const exportData: BOQTemplateRow[] = boqItems.map((item, index) => {
       const descriptionWithSubwork = item.subwork_name
@@ -376,6 +494,13 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
                 </label>
               </label>
               <button
+                onClick={fetchAvailableWorks}
+                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Import from Estimate
+              </button>
+              <button
                 onClick={downloadTemplate}
                 className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
               >
@@ -401,6 +526,68 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {showEstimateImport && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Import BOQ from Approved Estimate</h3>
+              <button
+                onClick={() => {
+                  setShowEstimateImport(false);
+                  setSelectedWork('');
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Approved Work
+              </label>
+              <select
+                value={selectedWork}
+                onChange={(e) => setSelectedWork(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Choose a work to import...</option>
+                {availableWorks.map((work) => (
+                  <option key={work.works_id} value={work.works_id}>
+                    {work.work_name} ({work.division})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {availableWorks.length === 0 && (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-700">
+                  No approved works found. Please ensure there are approved estimates with subworks and items.
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3 mt-4">
+              <button
+                onClick={() => {
+                  setShowEstimateImport(false);
+                  setSelectedWork('');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={fetchBOQFromEstimate}
+                disabled={!selectedWork || loading}
+                className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+              >
+                {loading ? 'Loading...' : 'Import BOQ'}
+              </button>
             </div>
           </div>
         )}
