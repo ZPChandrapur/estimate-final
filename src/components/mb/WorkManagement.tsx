@@ -21,8 +21,8 @@ interface WorkManagementProps {
 
 interface EstimateWork {
   works_id: string;
-  works_name: string;
-  amount: number;
+  work_name: string;
+  total_estimated_cost: number;
 }
 
 interface MBProject {
@@ -176,13 +176,14 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
       const { data, error } = await supabase
         .schema('estimate')
         .from('works')
-        .select('works_id, works_name, amount')
-        .order('works_name');
+        .select('works_id, work_name, total_estimated_cost')
+        .order('work_name');
 
       if (error) throw error;
       setEstimateWorks(data || []);
     } catch (error) {
       console.error('Error fetching estimate works:', error);
+      showMessage('error', 'Failed to fetch works from estimate system');
     }
   };
 
@@ -326,11 +327,12 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
     setWorkDetails(prev => ({
       ...prev,
       works_id: work.works_id,
-      project_name: work.works_name,
-      quoted_amount: work.amount.toString()
+      project_code: work.works_id,
+      project_name: work.work_name,
+      quoted_amount: work.total_estimated_cost.toString()
     }));
     setShowWorksList(false);
-    showMessage('success', `Work "${work.works_name}" loaded. Associated subworks will be available in Subworks tab.`);
+    showMessage('success', `Work "${work.work_name}" loaded. Associated subworks will be available in Subworks tab.`);
   };
 
   const saveWorkDetails = async () => {
@@ -635,7 +637,7 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
                 <option value="">Create New Project</option>
                 {projects.map(p => (
                   <option key={p.id} value={p.id}>
-                    {p.project_code} - {p.project_name}
+                    {p.project_code ? `${p.project_code} - ` : ''}{p.project_name}
                   </option>
                 ))}
               </select>
@@ -708,8 +710,8 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
                             onClick={() => handleFetchWork(work)}
                             className="w-full text-left px-4 py-3 bg-white border border-gray-200 rounded-lg hover:bg-blue-100 hover:border-blue-400 transition-colors"
                           >
-                            <div className="font-medium text-gray-900">{work.works_name}</div>
-                            <div className="text-sm text-gray-600">Work ID: {work.works_id} | Amount: ₹{work.amount.toLocaleString('en-IN')}</div>
+                            <div className="font-medium text-gray-900">{work.work_name}</div>
+                            <div className="text-sm text-gray-600">Estimate No: {work.works_id} | Amount: ₹{work.total_estimated_cost.toLocaleString('en-IN')}</div>
                           </button>
                         ))}
                       </div>
@@ -721,7 +723,7 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
                   <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center text-green-800">
                       <CheckCircle className="w-5 h-5 mr-2" />
-                      <span className="font-medium">Work loaded from Estimate (Work ID: {workDetails.works_id})</span>
+                      <span className="font-medium">Work loaded from Estimate (Estimate No: {workDetails.works_id})</span>
                     </div>
                   </div>
                 )}
@@ -729,13 +731,14 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Project Code <span className="text-red-500">*</span>
+                      Estimate Number <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={workDetails.project_code}
                       onChange={(e) => setWorkDetails({ ...workDetails, project_code: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="e.g., 2025-TS-121"
                       required
                     />
                   </div>
