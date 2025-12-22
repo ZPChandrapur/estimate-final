@@ -204,6 +204,119 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
     return userLevel >= (bill.current_approval_level + 1) && bill.approval_status !== 'ee_approved';
   };
 
+  const handleCreateBill = async () => {
+    if (!selectedProject) return;
+
+    const confirm = window.confirm('This will generate a new RA Bill from approved measurements. Continue?');
+    if (!confirm) return;
+
+    try {
+      setLoading(true);
+
+      // Get the latest bill number for the project
+      const { data: existingBills, error: billError } = await supabase
+        .schema('estimate')
+        .from('mb_bills')
+        .select('bill_number')
+        .eq('project_id', selectedProject)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (billError) throw billError;
+
+      const lastBillNumber = existingBills && existingBills.length > 0
+        ? parseInt(existingBills[0].bill_number.split('-').pop() || '0')
+        : 0;
+      const newBillNumber = `RABill-${lastBillNumber + 1}`;
+
+      // Get all approved measurements (BOQ items with executed quantities)
+      const { data: boqData, error: boqError } = await supabase
+        .schema('estimate')
+        .from('mb_boq')
+        .select('*')
+        .eq('project_id', selectedProject);
+
+      if (boqError) throw boqError;
+
+      if (!boqData || boqData.length === 0) {
+        alert('No BOQ items found for this project. Please add measurements first.');
+        return;
+      }
+
+      // Get previous bills total to calculate current bill amount
+      const { data: prevBills, error: prevError } = await supabase
+        .schema('estimate')
+        .from('mb_bills')
+        .select('id')
+        .eq('project_id', selectedProject);
+
+      if (prevError) throw prevError;
+
+      // Calculate total amount and create bill
+      const totalAmount = boqData.reduce((sum, item) => {
+        const executedQty = item.executed_qty || 0;
+        const rate = item.rate || 0;
+        return sum + (executedQty * rate);
+      }, 0);
+
+      // Create the bill
+      const { data: newBill, error: createError } = await supabase
+        .schema('estimate')
+        .from('mb_bills')
+        .insert({
+          project_id: selectedProject,
+          bill_number: newBillNumber,
+          bill_date: new Date().toISOString().split('T')[0],
+          bill_type: 'RA Bill',
+          status: 'draft',
+          approval_status: 'draft',
+          total_amount: totalAmount,
+          current_bill_amount: totalAmount,
+          no_of_mb_entries: boqData.length,
+          wdmm_amount: 0,
+          current_approval_level: 0
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      // Create bill items from BOQ
+      const billItems = boqData.map(item => {
+        const executedQty = item.executed_qty || 0;
+        const rate = item.rate || 0;
+        const amount = executedQty * rate;
+
+        return {
+          bill_id: newBill.id,
+          boq_item_id: item.id,
+          total_qty_till_now: executedQty,
+          prev_qty_upto_previous_bill: 0,
+          qty_now_to_be_paid: executedQty,
+          rate: rate,
+          bill_rate: rate,
+          amount: amount,
+          is_clause_38: item.is_clause_38 || false
+        };
+      });
+
+      const { error: itemsError } = await supabase
+        .schema('estimate')
+        .from('mb_bill_items')
+        .insert(billItems);
+
+      if (itemsError) throw itemsError;
+
+      alert('RA Bill generated successfully!');
+      fetchBills();
+    } catch (error: any) {
+      console.error('Error creating bill:', error);
+      alert('Error creating bill: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderAbstract = () => {
     const regularItems = billItems.filter(item => !item.is_clause_38);
     const clause38Items = billItems.filter(item => item.is_clause_38);
@@ -440,11 +553,12 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
 
         {selectedProject && (
           <button
-            onClick={() => setView('create')}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            onClick={handleCreateBill}
+            disabled={loading}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Create New Bill
+            Generate RA Bill
           </button>
         )}
       </div>
@@ -477,8 +591,19 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                         <span className="text-lg font-semibold text-gray-900">
                           {bill.bill_number}
                         </span>
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(bill.status)}`}>
-                          {bill.status}
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(bill.approval_status || bill.status)}`}>
+                          {bill.approval_status === 'draft' ? 'Draft' :
+                           bill.approval_status === 'submitted' ? 'Submitted' :
+                           bill.approval_status === 'je_checked' ? 'JE Checked' :
+                           bill.approval_status === 'de_checked' ? 'DE Checked' :
+                           bill.approval_status === 'auditor_checked' ? 'Auditor Checked' :
+                           bill.approval_status === 'jed_checked' ? 'JE(D) Checked' :
+                           bill.approval_status === 'account_checked' ? 'Account Checked' :
+                           bill.approval_status === 'dee_checked' ? 'DEE Checked' :
+                           bill.approval_status === 'ee_approved' ? 'EE Approved' :
+                           bill.approval_status === 'sent_back' ? 'Sent Back' :
+                           bill.approval_status === 'rejected' ? 'Rejected' :
+                           bill.status}
                         </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
@@ -547,11 +672,22 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Bills Management</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Manage and view bill abstracts for approved measurements
-          </p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => onNavigate('dashboard')}
+                className="flex items-center text-gray-600 hover:text-gray-900"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Back to Dashboard
+              </button>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mt-2">Bills Management</h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Manage and view RA Bill abstracts for approved measurements
+            </p>
+          </div>
         </div>
 
         {view === 'list' && renderBillsList()}
