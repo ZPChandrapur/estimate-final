@@ -335,28 +335,6 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
     return bill.approval_status === 'draft' || isAdmin;
   };
 
-  const handleToggleCheck = async (checkId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .schema('estimate')
-        .from('mb_bill_check_values')
-        .update({
-          is_checked: !currentStatus,
-          checked_by: !currentStatus ? user?.id : null,
-          checked_at: !currentStatus ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', checkId);
-
-      if (error) throw error;
-
-      fetchBillChecks();
-    } catch (error: any) {
-      console.error('Error toggling check:', error);
-      alert('Error updating check: ' + error.message);
-    }
-  };
-
   const handleEditBill = (bill: Bill) => {
     setEditingBill(bill);
     setEditForm({
@@ -772,9 +750,6 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
               <table className="min-w-full divide-y divide-gray-300">
                 <thead className="bg-blue-100">
                   <tr>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 border-r border-gray-300" style={{ width: '80px' }}>
-
-                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-300">
                       No Of Entries Check
                     </th>
@@ -782,21 +757,13 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                       Amount
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-700">
-                      Check %
+                      % Check
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {billChecks.map((check) => (
                     <tr key={check.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-center border-r border-gray-200">
-                        <input
-                          type="checkbox"
-                          checked={check.is_checked}
-                          onChange={() => handleToggleCheck(check.id, check.is_checked)}
-                          className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                        />
-                      </td>
                       <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
                         {check.check_type.check_name}
                       </td>
