@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import {
@@ -14,7 +15,8 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  TrendingUp
+  TrendingUp,
+  Home
 } from 'lucide-react';
 
 interface UserRole {
@@ -35,6 +37,7 @@ interface MBDashboardProps {
 }
 
 const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) => {
+  const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [summary, setSummary] = useState<ProjectSummary>({
@@ -153,9 +156,18 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Measurement Book System</h1>
-              <p className="text-sm text-gray-600 mt-1">e-MB Digital Platform</p>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate('/')}
+                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Back to Home"
+              >
+                <Home className="w-6 h-6" />
+              </button>
+              <div className="border-l border-gray-200 pl-4">
+                <h1 className="text-2xl font-bold text-gray-900">Measurement Book System</h1>
+                <p className="text-sm text-gray-600 mt-1">e-MB Digital Platform</p>
+              </div>
             </div>
             <div className="flex items-center space-x-4">
               <button
