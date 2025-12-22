@@ -15,7 +15,6 @@ import Subworks from './components/Subworks';
 import Compare from './components/Compare';
 import GenerateEstimate from './components/generate-estimate/GenerateEstimate';
 import MeasurementBook from './components/MeasurementBook';
-import WorkAssignments from './components/WorkAssignments';
 import ApprovalDashboard from './components/ApprovalDashboard';
 import BOQGeneration from './components/BOQGeneration';
 
@@ -128,19 +127,6 @@ function App() {
                       <Header />
                       <main className="flex-1 max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 w-full">
                         <MeasurementBook />
-                      </main>
-                    </div>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/work-assignments"
-                element={
-                  <ProtectedRoute>
-                    <div className="flex flex-col min-h-screen">
-                      <Header />
-                      <main className="flex-1 max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 w-full">
-                        <WorkAssignments />
                       </main>
                     </div>
                   </ProtectedRoute>

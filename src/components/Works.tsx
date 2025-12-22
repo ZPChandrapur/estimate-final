@@ -7,12 +7,14 @@ import LoadingSpinner from './common/LoadingSpinner';
 import { Work, RecapCalculations, TaxEntry } from '../types';
 import WorksRecapSheet from './WorksRecapSheet';
 import EstimateApprovalActions from './EstimateApprovalActions';
+import WorkAssignments from './WorkAssignments';
 import { Plus, Search, Filter, CreditCard as Edit2, Trash2, Eye, FileText, IndianRupee, Calendar, Building } from 'lucide-react';
 
 const Works: React.FC = () => {
   const { t } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'management' | 'assignments'>('management');
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -262,19 +264,54 @@ const Works: React.FC = () => {
             Manage and track all construction works and estimates
           </p>
         </div>
-        <div className="mt-4 sm:mt-0">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-6 py-3 border border-transparent rounded-2xl shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            {t('works.addNew')}
-          </button>
-        </div>
       </div>
 
-      {/* Filters and Search */}
-      <div className="bg-gradient-to-r from-slate-50 to-gray-100 rounded-2xl shadow-lg border border-slate-200 p-4">
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('management')}
+            className={`
+              whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
+              ${activeTab === 'management'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }
+            `}
+          >
+            Work Management
+          </button>
+          <button
+            onClick={() => setActiveTab('assignments')}
+            className={`
+              whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
+              ${activeTab === 'assignments'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }
+            `}
+          >
+            Work Assignments
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'management' ? (
+        <div className="space-y-6">
+          {/* Add Work Button */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center px-6 py-3 border border-transparent rounded-2xl shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {t('works.addNew')}
+            </button>
+          </div>
+
+          {/* Filters and Search */}
+          <div className="bg-gradient-to-r from-slate-50 to-gray-100 rounded-2xl shadow-lg border border-slate-200 p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search */}
           <div className="flex-1 relative max-w-md">
@@ -1105,7 +1142,10 @@ const Works: React.FC = () => {
     </div>
   </div>
 )}
-
+        </div>
+      ) : (
+        <WorkAssignments />
+      )}
     </div>
   );
 };
