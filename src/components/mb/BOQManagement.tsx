@@ -247,18 +247,17 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
 
       const cleanedItems = previewItems.map(item => ({
         project_id: item.project_id,
-        subwork_id: item.subwork_id || null,
         item_number: item.item_number,
         description: item.description,
         unit: item.unit,
         boq_quantity: item.boq_quantity,
         rate: item.rate,
-        amount: item.amount,
-        amount_with_taxes: item.amount_with_taxes || item.amount,
+        amount_with_taxes: item.amount_with_taxes || (item.boq_quantity * item.rate),
         amount_in_words: item.amount_in_words || '',
         executed_quantity: item.executed_quantity || 0,
-        balance_quantity: item.balance_quantity || item.boq_quantity,
-        remarks: item.remarks || null
+        executed_amount: 0,
+        remarks: item.remarks || null,
+        created_by: user?.id
       }));
 
       const BATCH_SIZE = 100;
