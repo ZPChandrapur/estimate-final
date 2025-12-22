@@ -44,6 +44,21 @@ interface BillItem {
   };
 }
 
+interface BillCheckValue {
+  id: string;
+  bill_id: string;
+  check_type_id: string;
+  is_checked: boolean;
+  checked_by: string | null;
+  checked_at: string | null;
+  calculated_amount: number;
+  check_type: {
+    check_name: string;
+    percentage: number;
+    display_order: number;
+  };
+}
+
 const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -51,6 +66,7 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
   const [bills, setBills] = useState<Bill[]>([]);
   const [selectedBill, setSelectedBill] = useState<string>('');
   const [billItems, setBillItems] = useState<BillItem[]>([]);
+  const [billChecks, setBillChecks] = useState<BillCheckValue[]>([]);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<'list' | 'create' | 'abstract' | 'progress'>('list');
   const [userRoles, setUserRoles] = useState<string[]>([]);
@@ -69,6 +85,7 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
   useEffect(() => {
     if (selectedBill) {
       fetchBillItems();
+      fetchBillChecks();
     }
   }, [selectedBill]);
 
@@ -150,6 +167,30 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
       setBillItems(sortedData);
     } catch (error) {
       console.error('Error fetching bill items:', error);
+    }
+  };
+
+  const fetchBillChecks = async () => {
+    try {
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('mb_bill_check_values')
+        .select(`
+          *,
+          check_type:check_type_id (
+            check_name,
+            percentage,
+            display_order
+          )
+        `)
+        .eq('bill_id', selectedBill)
+        .order('check_type(display_order)');
+
+      if (error) throw error;
+
+      setBillChecks(data || []);
+    } catch (error) {
+      console.error('Error fetching bill checks:', error);
     }
   };
 
@@ -546,6 +587,49 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                       ₹{clause38Items.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
                     </td>
                   </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {billChecks.length > 0 && (
+          <div className="bg-white rounded-lg border border-gray-300 overflow-hidden">
+            <div className="bg-blue-50 px-6 py-3 border-b border-gray-300">
+              <h3 className="text-lg font-semibold text-gray-900 text-center">
+                Bill Checks
+              </h3>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-300">
+                <thead className="bg-blue-100">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-300">
+                      No Of Entries Check
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 border-r border-gray-300">
+                      Amount
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700">
+                      % Check
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {billChecks.map((check) => (
+                    <tr key={check.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
+                        {check.check_type.check_name}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200">
+                        {billItems.length}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
+                        ₹{check.calculated_amount.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
