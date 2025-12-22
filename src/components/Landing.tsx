@@ -34,7 +34,7 @@ const Landing: React.FC = () => {
       title: 'Measurement Book',
       description: 'Track and record project measurements and progress',
       icon: BookOpen,
-      route: '/measurement-book',
+      route: '/mb',
       gradient: 'from-green-500 to-green-600',
       hoverGradient: 'hover:from-green-600 hover:to-green-700',
     },
