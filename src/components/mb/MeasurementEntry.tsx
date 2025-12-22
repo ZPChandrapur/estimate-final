@@ -71,7 +71,7 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
   const [success, setSuccess] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterOption, setFilterOption] = useState<'all' | 'with_measurements' | 'clause_38' | 'balance_positive'>('all');
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showItemSelector, setShowItemSelector] = useState(false);
 
@@ -366,8 +366,8 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
       item.item_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesFilter = (() => {
-      switch (filterOption) {
+    const matchesFilter = activeFilters.size === 0 || Array.from(activeFilters).every(filter => {
+      switch (filter) {
         case 'with_measurements':
           return (item.executed_quantity || 0) > 0;
         case 'clause_38':
@@ -377,12 +377,22 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
         default:
           return true;
       }
-    })();
+    });
 
     const matchesSelection = selectedItems.size === 0 || selectedItems.has(item.id);
 
     return matchesSearch && matchesFilter && matchesSelection;
   });
+
+  const toggleFilter = (filter: string) => {
+    const newFilters = new Set(activeFilters);
+    if (newFilters.has(filter)) {
+      newFilters.delete(filter);
+    } else {
+      newFilters.add(filter);
+    }
+    setActiveFilters(newFilters);
+  };
 
   const toggleSelectAll = () => {
     if (selectedItems.size === boqItems.length) {
@@ -443,7 +453,7 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
               setExpandedItems(new Set());
               setShowAddForm(false);
               setSearchQuery('');
-              setFilterOption('all');
+              setActiveFilters(new Set());
               setSelectedItems(new Set());
               setShowItemSelector(false);
             }}
@@ -474,7 +484,7 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="space-y-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Search Items
@@ -488,19 +498,54 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Filter By
-                  </label>
-                  <select
-                    value={filterOption}
-                    onChange={(e) => setFilterOption(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="all">All Items</option>
-                    <option value="with_measurements">With Measurements</option>
-                    <option value="clause_38">Clause 38 Applicable</option>
-                    <option value="balance_positive">Positive Balance Only</option>
-                  </select>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Filter By ({activeFilters.size} selected)
+                    </label>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setActiveFilters(new Set(['with_measurements', 'clause_38', 'balance_positive']))}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={() => setActiveFilters(new Set())}
+                        className="text-xs text-gray-600 hover:text-gray-800"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  </div>
+                  <div className="border border-gray-200 rounded-md p-3 space-y-2">
+                    <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={activeFilters.has('with_measurements')}
+                        onChange={() => toggleFilter('with_measurements')}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">With Measurements</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={activeFilters.has('clause_38')}
+                        onChange={() => toggleFilter('clause_38')}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">Clause 38 Applicable</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={activeFilters.has('balance_positive')}
+                        onChange={() => toggleFilter('balance_positive')}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">Positive Balance Only</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -553,7 +598,7 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                 <button
                   onClick={() => {
                     setSearchQuery('');
-                    setFilterOption('all');
+                    setActiveFilters(new Set());
                     setSelectedItems(new Set());
                   }}
                   className="text-blue-600 hover:text-blue-800 text-sm font-medium"
