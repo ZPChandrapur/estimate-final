@@ -71,9 +71,7 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
   const [success, setSuccess] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [showItemSelector, setShowItemSelector] = useState(false);
 
   const [formData, setFormData] = useState<MeasurementFormData>({
     project_id: '',
@@ -366,33 +364,10 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
       item.item_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesFilter = activeFilters.size === 0 || Array.from(activeFilters).every(filter => {
-      switch (filter) {
-        case 'with_measurements':
-          return (item.executed_quantity || 0) > 0;
-        case 'clause_38':
-          return item.is_clause_38_applicable === true;
-        case 'balance_positive':
-          return item.balance_quantity > 0;
-        default:
-          return true;
-      }
-    });
-
     const matchesSelection = selectedItems.size === 0 || selectedItems.has(item.id);
 
-    return matchesSearch && matchesFilter && matchesSelection;
+    return matchesSearch && matchesSelection;
   });
-
-  const toggleFilter = (filter: string) => {
-    const newFilters = new Set(activeFilters);
-    if (newFilters.has(filter)) {
-      newFilters.delete(filter);
-    } else {
-      newFilters.add(filter);
-    }
-    setActiveFilters(newFilters);
-  };
 
   const toggleSelectAll = () => {
     if (selectedItems.size === boqItems.length) {
@@ -453,9 +428,7 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
               setExpandedItems(new Set());
               setShowAddForm(false);
               setSearchQuery('');
-              setActiveFilters(new Set());
               setSelectedItems(new Set());
-              setShowItemSelector(false);
             }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
@@ -476,12 +449,6 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                 <h2 className="text-xl font-semibold text-gray-900">
                   BOQ Items ({filteredBoqItems.length} of {boqItems.length})
                 </h2>
-                <button
-                  onClick={() => setShowItemSelector(!showItemSelector)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 flex items-center"
-                >
-                  {showItemSelector ? 'Hide' : 'Show'} Item Selection
-                </button>
               </div>
 
               <div className="space-y-4 mb-4">
@@ -497,99 +464,47 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Filter By ({activeFilters.size} selected)
-                    </label>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => setActiveFilters(new Set(['with_measurements', 'clause_38', 'balance_positive']))}
-                        className="text-xs text-blue-600 hover:text-blue-800"
-                      >
-                        Select All
-                      </button>
-                      <button
-                        onClick={() => setActiveFilters(new Set())}
-                        className="text-xs text-gray-600 hover:text-gray-800"
-                      >
-                        Clear All
-                      </button>
-                    </div>
+              </div>
+
+              <div className="border border-gray-200 rounded-md mb-4 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700">
+                    Select Items to Display ({selectedItems.size} selected)
+                  </span>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={toggleSelectAll}
+                      className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                    >
+                      {selectedItems.size === boqItems.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                    <button
+                      onClick={() => setSelectedItems(new Set())}
+                      className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                    >
+                      Clear Selection
+                    </button>
                   </div>
-                  <div className="border border-gray-200 rounded-md p-3 space-y-2">
-                    <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={activeFilters.has('with_measurements')}
-                        onChange={() => toggleFilter('with_measurements')}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">With Measurements</span>
-                    </label>
-                    <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={activeFilters.has('clause_38')}
-                        onChange={() => toggleFilter('clause_38')}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">Clause 38 Applicable</span>
-                    </label>
-                    <label className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={activeFilters.has('balance_positive')}
-                        onChange={() => toggleFilter('balance_positive')}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">Positive Balance Only</span>
-                    </label>
+                </div>
+                <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {boqItems.map((item) => (
+                      <label
+                        key={item.id}
+                        className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(item.id)}
+                          onChange={() => toggleSelectItem(item.id)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">Item {item.item_number}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
               </div>
-
-              {showItemSelector && (
-                <div className="border-t border-gray-200 pt-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-gray-700">
-                      Select Items to Display ({selectedItems.size} selected)
-                    </span>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={toggleSelectAll}
-                        className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                      >
-                        {selectedItems.size === boqItems.length ? 'Deselect All' : 'Select All'}
-                      </button>
-                      <button
-                        onClick={() => setSelectedItems(new Set())}
-                        className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                      >
-                        Clear Selection
-                      </button>
-                    </div>
-                  </div>
-                  <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-2">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                      {boqItems.map((item) => (
-                        <label
-                          key={item.id}
-                          className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedItems.has(item.id)}
-                            onChange={() => toggleSelectItem(item.id)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-700">Item {item.item_number}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             {filteredBoqItems.length === 0 ? (
@@ -598,7 +513,6 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                 <button
                   onClick={() => {
                     setSearchQuery('');
-                    setActiveFilters(new Set());
                     setSelectedItems(new Set());
                   }}
                   className="text-blue-600 hover:text-blue-800 text-sm font-medium"
