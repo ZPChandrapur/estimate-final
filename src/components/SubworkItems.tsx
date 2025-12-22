@@ -39,13 +39,23 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchingSSR, setSearchingSSR] = useState(false);
   const [descriptionQuery, setDescriptionQuery] = useState('');
+  const [parentSubworkSrNo, setParentSubworkSrNo] = useState<number | undefined>(undefined);
   // Map the rates for the selected item to only include their descriptions
   const [ratesArray, setRatesArray] = useState<ItemRate[]>([]);
   const [rateDescriptions, setRateDescriptions] = useState<string[]>([]);
   const [selectedSrNo, setSelectedSrNo] = useState();
-  const navigate = useNavigate();
   const [showRateAnalysisModal, setShowRateAnalysisModal] = useState(false);
   const [rateAnalysisItem, setRateAnalysisItem] = useState<SubworkItem | null>(null);
+  const [rateAnalysisBaseRate, setRateAnalysisBaseRate] = useState<number | undefined>(undefined);
+  const [rateAnalysisContext, setRateAnalysisContext] = useState<{
+    source: 'main' | 'modal';
+    itemSrNo?: number;
+    modalIndex?: number;
+  } | null>(null);
+  // Store pending rate analysis payloads created from the Add/Edit Item modal
+  // keyed by the modal rate index so they can be persisted after the
+  // subwork item is created.
+  const [pendingRateAnalysisByModalIndex, setPendingRateAnalysisByModalIndex] = useState<{ [key: number]: any }>({});
 
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [newItem, setNewItem] = useState<Partial<SubworkItem>>({
@@ -376,6 +386,26 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     }
   };
 
+  useEffect(() => {
+    const fetchParentSubworkSrNo = async () => {
+      if (!subworkId) return;
+
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('subworks')
+        .select('sr_no')
+        .eq('subworks_id', subworkId)
+        .maybeSingle();
+
+      if (!error && data?.sr_no) {
+        setParentSubworkSrNo(data.sr_no);
+      }
+    };
+
+    fetchParentSubworkSrNo();
+  }, [subworkId]);
+
+
   const handleAddItem = async () => {
     if (!newItem.description_of_item || !user) return;
 
@@ -446,6 +476,35 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         .insert(ratesToInsert);
 
       if (ratesError) throw ratesError;
+
+      // If there are any pending rate analysis payloads created in the
+      // Add/Edit item modal (before the subwork item existed), persist
+      // them now that we have the `insertedItem.sr_no` value.
+      try {
+        const pendingKeys = Object.keys(pendingRateAnalysisByModalIndex);
+        for (const key of pendingKeys) {
+          const idx = parseInt(key, 10);
+          const payload = pendingRateAnalysisByModalIndex[idx];
+          if (payload) {
+            const analysisToInsert = {
+              ...payload,
+              subwork_item_id: insertedItem.sr_no,
+              created_by: user.id,
+              updated_at: new Date().toISOString()
+            };
+            const { error: analysisErr } = await supabase
+              .schema('estimate')
+              .from('item_rate_analysis')
+              .insert(analysisToInsert);
+            if (analysisErr) console.error('Error inserting pending rate analysis:', analysisErr);
+          }
+        }
+      } catch (err) {
+        console.error('Error while persisting pending rate analyses:', err);
+      }
+
+      // Clear pending payloads after attempting persistence
+      setPendingRateAnalysisByModalIndex({});
 
       setShowAddItemModal(false);
       setNewItem({
@@ -826,16 +885,13 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                             >
                               <Calculator className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => {
-                                setRateAnalysisItem(item);
-                                setShowRateAnalysisModal(true);
-                              }}
-                              className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                              title="Rate Analysis"
+                            {/* <button
+                              onClick={() => handleEditItem(item)}
+                              className="text-green-600 hover:text-green-900 p-1 rounded"
+                              title="Edit Item"
                             >
                               <Edit2 className="w-4 h-4" />
-                            </button>
+                            </button> */}
                             <button
                               onClick={() => handleDeleteItem(item)}
                               className="text-red-600 hover:text-red-900 p-1 rounded"
@@ -878,14 +934,46 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
           onClose={() => {
             setShowRateAnalysisModal(false);
             setRateAnalysisItem(null);
-            fetchSubworkItems();
+            setRateAnalysisContext(null);
+            setRateAnalysisBaseRate(undefined);
           }}
           item={rateAnalysisItem}
+          baseRate={rateAnalysisBaseRate}
+          parentSubworkSrNo={parentSubworkSrNo}
+          onSaveRate={(newRate: number, analysisPayload?: any) => {
+            // Update local state immediately without refetch
+            if (rateAnalysisContext?.source === 'main' && rateAnalysisContext.itemSrNo !== undefined) {
+              const key = rateAnalysisContext.itemSrNo.toString();
+              setItemRatesMap(prev => {
+                const updated = { ...prev };
+                const arr = (updated[key] || []).map(r => ({ ...r }));
+                if (arr.length > 0) {
+                  arr[0].rate = newRate;
+                }
+                updated[key] = arr;
+                return updated;
+              });
+            } else if (rateAnalysisContext?.source === 'modal' && rateAnalysisContext.modalIndex !== undefined) {
+              setItemRates(prev => {
+                const updated = [...prev];
+                const idx = rateAnalysisContext.modalIndex as number;
+                if (updated[idx]) {
+                  updated[idx] = { ...updated[idx], rate: newRate };
+                }
+                return updated;
+              });
+              // Persist analysis payload for later insertion when the new
+              // subwork item is actually created (see `handleAddItem`).
+              if (analysisPayload) {
+                setPendingRateAnalysisByModalIndex(prev => ({ ...prev, [rateAnalysisContext.modalIndex as number]: analysisPayload }));
+              }
+            }
+          }}
         />
       )}
 
       {/* Add Item Modal */}
-      
+
       {showAddItemModal && (
         <div
           className={`fixed inset-0 overflow-y-auto h-full w-full ${showRateAnalysisModal ? 'bg-gray-600 bg-opacity-50 blur-sm' : 'bg-gray-600 bg-opacity-50'
@@ -1146,9 +1234,14 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                             <td className="px-3 py-2">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  // Use the selectedItem when editing, otherwise use the newItem (cast to SubworkItem)
+                                onClick={async () => {                               
                                   setRateAnalysisItem(selectedItem ?? (newItem as SubworkItem));
+                                  setRateAnalysisBaseRate(itemRates[index]?.rate || 0);
+                                  setRateAnalysisContext({
+                                    source: 'modal',
+                                    modalIndex: index
+                                  });
+
                                   setShowRateAnalysisModal(true);
                                 }}
                                 className="text-blue-600 hover:text-blue-800 p-1 mr-2"
@@ -1444,7 +1537,6 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       )}
 
       {/* Measurements Modal */}
-      Then your JSX stays the same:
 
       {showMeasurementsModal && selectedItem && (
         <ItemMeasurements
@@ -1463,7 +1555,6 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
 
 // Import the ItemMeasurements component
 import ItemMeasurements from './ItemMeasurements';
-import { useNavigate } from 'react-router-dom';
 import RateAnalysis from './RateAnalysis';
 
 export default SubworkItems;
