@@ -220,15 +220,21 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
         measurementNumber = `MB-${String(lastNumber + 1).padStart(4, '0')}`;
       }
 
-      const amount = formData.quantity * formData.rate;
-
       const { error: insertError } = await supabase
         .schema('estimate')
         .from('mb_measurements')
         .insert({
-          ...formData,
+          project_id: formData.project_id,
+          boq_item_id: formData.boq_item_id,
           measurement_number: measurementNumber,
-          amount: amount,
+          measurement_date: formData.measurement_date,
+          description: formData.description,
+          length: formData.length || null,
+          breadth: formData.breadth || null,
+          height: formData.height || null,
+          quantity: formData.quantity,
+          rate: formData.rate,
+          remarks: formData.remarks || null,
           status,
           created_by: user.id,
           submitted_at: status === 'submitted' ? new Date().toISOString() : null
