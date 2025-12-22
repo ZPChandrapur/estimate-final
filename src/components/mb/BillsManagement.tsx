@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { FileText, Plus, Eye, Download, ArrowLeft } from 'lucide-react';
+import { FileText, Plus, Eye, Download, ArrowLeft, Send, CheckCircle, XCircle, BarChart2 } from 'lucide-react';
+import BillProgressChart from './BillProgressChart';
 
 interface BillsManagementProps {
   onNavigate: (page: string) => void;
@@ -19,8 +20,11 @@ interface Bill {
   bill_date: string;
   bill_type: string;
   status: string;
+  approval_status: string;
   total_amount: number;
   current_bill_amount: number;
+  project_id: string;
+  current_approval_level: number;
 }
 
 interface BillItem {
@@ -48,10 +52,12 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
   const [selectedBill, setSelectedBill] = useState<string>('');
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState<'list' | 'create' | 'abstract'>('list');
+  const [view, setView] = useState<'list' | 'create' | 'abstract' | 'progress'>('list');
+  const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
     fetchProjects();
+    fetchUserRoles();
   }, []);
 
   useEffect(() => {
@@ -78,6 +84,21 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
       setProjects(data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
+    }
+  };
+
+  const fetchUserRoles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role_id, roles(name)')
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      const roles = data?.map((ur: any) => ur.roles?.name).filter(Boolean) || [];
+      setUserRoles(roles);
+    } catch (error) {
+      console.error('Error fetching user roles:', error);
     }
   };
 
@@ -127,9 +148,60 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-800';
       case 'submitted': return 'bg-blue-100 text-blue-800';
-      case 'approved': return 'bg-green-100 text-green-800';
+      case 'je_checked': return 'bg-blue-200 text-blue-900';
+      case 'de_checked': return 'bg-blue-300 text-blue-900';
+      case 'auditor_checked': return 'bg-blue-400 text-blue-900';
+      case 'jed_checked': return 'bg-blue-500 text-white';
+      case 'account_checked': return 'bg-blue-600 text-white';
+      case 'dee_checked': return 'bg-blue-700 text-white';
+      case 'ee_approved': return 'bg-green-100 text-green-800';
+      case 'sent_back': return 'bg-orange-100 text-orange-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const handleSubmitForApproval = async (billId: string, projectId: string) => {
+    try {
+      const { data, error } = await supabase
+        .schema('estimate')
+        .rpc('initiate_bill_approval', {
+          p_bill_id: billId,
+          p_project_id: projectId
+        });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        alert('Bill submitted for approval successfully');
+        fetchBills();
+      } else {
+        alert('Error: ' + (data?.error || 'Unknown error'));
+      }
+    } catch (error: any) {
+      console.error('Error submitting bill:', error);
+      alert('Error submitting bill: ' + error.message);
+    }
+  };
+
+  const canApprove = (bill: Bill) => {
+    const roleApprovalMap: { [key: string]: number } = {
+      'Junior Engineer': 2,
+      'Junior Engineer (JE)': 2,
+      'Deputy Engineer': 3,
+      'Auditor': 4,
+      'JE(D)': 5,
+      'Accountant': 6,
+      'Account': 6,
+      'DEE': 7,
+      'Executive Engineer': 8,
+      'admin': 999,
+      'super_admin': 999,
+      'developer': 999
+    };
+
+    const userLevel = Math.max(...userRoles.map(role => roleApprovalMap[role] || 0));
+    return userLevel >= (bill.current_approval_level + 1) && bill.approval_status !== 'ee_approved';
   };
 
   const renderAbstract = () => {
@@ -429,16 +501,39 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        setSelectedBill(bill.id);
-                        setView('abstract');
-                      }}
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 ml-4"
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View Abstract
-                    </button>
+                    <div className="flex items-center space-x-2 ml-4">
+                      {bill.approval_status === 'draft' && (
+                        <button
+                          onClick={() => handleSubmitForApproval(bill.id, bill.project_id)}
+                          className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700"
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          Submit for Approval
+                        </button>
+                      )}
+                      {bill.approval_status !== 'draft' && (
+                        <button
+                          onClick={() => {
+                            setSelectedBill(bill.id);
+                            setView('progress');
+                          }}
+                          className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-md text-sm hover:bg-purple-700"
+                        >
+                          <BarChart2 className="w-4 h-4 mr-2" />
+                          Progress Chart
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedBill(bill.id);
+                          setView('abstract');
+                        }}
+                        className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Abstract
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -461,6 +556,15 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
 
         {view === 'list' && renderBillsList()}
         {view === 'abstract' && renderAbstract()}
+        {view === 'progress' && selectedBill && (
+          <BillProgressChart
+            billId={selectedBill}
+            onBack={() => {
+              setView('list');
+              setSelectedBill('');
+            }}
+          />
+        )}
       </div>
     </div>
   );
