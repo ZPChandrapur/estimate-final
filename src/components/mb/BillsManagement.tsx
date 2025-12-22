@@ -754,10 +754,10 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                       No Of Entries Check
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 border-r border-gray-300">
-                      Amount
+                      Check %
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-700">
-                      % Check
+                      Amount
                     </th>
                   </tr>
                 </thead>
@@ -768,7 +768,7 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                         {check.check_type.check_name}
                       </td>
                       <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200">
-                        {billItems.length}
+                        {check.check_type.percentage}%
                       </td>
                       <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
                         ₹{check.calculated_amount.toFixed(2)}
