@@ -13,6 +13,7 @@ import {
   ImageIcon,
   Package2
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface ItemMeasurementsProps {
   item: SubworkItem;
@@ -50,6 +51,7 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
   const [rateGroups, setRateGroups] = useState<{ [key: string]: { rate: number, quantity: number, description?: string } }>({});
   const [currentItem, setCurrentItem] = useState<SubworkItem>(item);
   const [selectedDescription, setSelectedDescription] = useState<string>('');
+  const [uploadingExcel, setUploadingExcel] = useState(false);
   const [newMeasurement, setNewMeasurement] = useState<Partial<ItemMeasurement>>({
     no_of_units: 0,
     length: 0,
@@ -144,6 +146,87 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
 
     setRateGroups(groups);
   };
+
+const handleMeasurementExcelUpload = async (
+  event: React.ChangeEvent<HTMLInputElement>
+) => {debugger
+  const file = event.target.files?.[0];
+  if (!file || !currentItem || !user) return;
+
+  try {
+    setUploadingExcel(true);
+
+    const fileExt = file.name.split('.').pop();
+    const storedFileName = `${currentItem.sr_no}_${Date.now()}.${fileExt}`;
+    const filePath = `measurements/${storedFileName}`; // ✅ FOLDER inside bucket
+
+    const { error: uploadError } = await supabase.storage
+      .from('estimate-designs') // ✅ BUCKET
+      .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from('estimate-designs')
+      .getPublicUrl(filePath);
+
+    const publicUrl = data.publicUrl;
+
+    /* ------------------ 2️⃣ Read Excel ------------------ */
+
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+
+    if (!rows.length) {
+      alert('Excel file is empty');
+      return;
+    }
+
+    /* ------------------ 3️⃣ Insert rows into item_measurements ------------------ */
+
+    const nextSrNo = await getNextMeasurementSrNo();
+
+    const insertRows = rows.map((row, index) => ({
+      // subwork_item_id: currentItem.sr_no,
+      // measurement_sr_no: nextSrNo + index,
+      // description_of_items: row.Description || null,
+      // unit: row.Unit || currentItem.ssr_unit,
+      // no_of_units: 1,
+      // length: 0,
+      // width_breadth: 0,
+      // height_depth: 0,
+      // is_manual_quantity: true,
+      // manual_quantity: Number(row.Quantity || 0),
+      // calculated_quantity: Number(row.Quantity || 0),
+      // is_deduction: false,
+      // line_amount: Number(row.Quantity || 0) * getSelectedRate(),
+      excel_url: publicUrl,   // ✅ stored
+      excel_name: file.name,  // ✅ stored
+      // created_by: user.id,
+    }));
+
+    const { error: insertError } = await supabase
+      .schema('estimate')
+      .from('item_measurements')
+      .insert(insertRows);
+
+    if (insertError) throw insertError;
+
+    fetchData();
+    await updateItemSSRQuantity();
+
+    alert('Measurement Excel uploaded successfully');
+    event.target.value = '';
+
+  } catch (error) {
+    console.error('Error uploading measurement Excel:', error);
+    alert('Error uploading measurement Excel');
+  } finally {
+    setUploadingExcel(false);
+  }
+};
 
   const fetchData = async () => {
     try {
@@ -508,7 +591,8 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
     }
   };
 
-  const handleAddLead = async () => {debugger;
+  const handleAddLead = async () => {
+    debugger;
     if (!newLead.material || !user) return;
 
     try {
@@ -538,7 +622,8 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
     }
   };
 
-  const handleAddMaterial = async () => {debugger
+  const handleAddMaterial = async () => {
+    debugger
     if (!newMaterial.material_name || !user) return;
 
     try {
@@ -672,7 +757,7 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
                 <Calculator className="w-4 h-4 inline mr-2" />
                 Measurements ({measurements.length})
               </button>
-              <button
+              {/* <button
                 onClick={() => setActiveTab('leads')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'leads'
                   ? 'border-blue-500 text-blue-600'
@@ -691,7 +776,7 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
               >
                 <Package2 className="w-4 h-4 inline mr-2" />
                 Materials ({materials.length})
-              </button>
+              </button> */}
             </nav>
           </div>
 
@@ -1045,6 +1130,35 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
+                </div>
+
+                {/* Excel Upload */}
+                <div className="ml-6 mt-3">
+                  <input
+                    type="file"
+                    id="measurement-excel-upload"
+                    accept=".xlsx,.xls"
+                    onChange={handleMeasurementExcelUpload}
+                    className="hidden"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      document.getElementById('measurement-excel-upload')?.click()
+                    }
+                    disabled={uploadingExcel}
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md
+               border border-blue-300 text-blue-700 bg-blue-50
+               hover:bg-blue-100 disabled:opacity-50"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {uploadingExcel ? 'Uploading...' : 'Upload Measurement Excel'}
+                  </button>
+
+                  <p className="text-xs text-gray-500 mt-1">
+                    Excel columns: <b>Description</b>, <b>Quantity</b>, <b>Unit</b>
+                  </p>
                 </div>
 
                 <div className="space-y-3">
