@@ -210,20 +210,32 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
       const newTotal = currentExecuted + formData.quantity;
       const excessPercentage = ((newTotal - selectedBoqItem.boq_quantity) / selectedBoqItem.boq_quantity) * 100;
 
+      console.log('Clause 38 Check:', {
+        boqQuantity: selectedBoqItem.boq_quantity,
+        currentExecuted,
+        newMeasurement: formData.quantity,
+        newTotal,
+        excessPercentage
+      });
+
       if (excessPercentage >= 25) {
         const confirmed = window.confirm(
-          `Warning: This measurement will exceed the BOQ quantity by ${excessPercentage.toFixed(2)}%.\n\n` +
+          `⚠️ CLAUSE 38 WARNING ⚠️\n\n` +
+          `This measurement will exceed the BOQ quantity by ${excessPercentage.toFixed(2)}%.\n\n` +
           `BOQ Quantity: ${selectedBoqItem.boq_quantity.toFixed(3)} ${selectedBoqItem.unit}\n` +
           `Current Executed: ${currentExecuted.toFixed(3)} ${selectedBoqItem.unit}\n` +
           `New Measurement: ${formData.quantity.toFixed(3)} ${selectedBoqItem.unit}\n` +
           `Total after this: ${newTotal.toFixed(3)} ${selectedBoqItem.unit}\n\n` +
-          `This will be applicable under Clause 38 (excess > 25%).\n\n` +
-          `Do you want to proceed?`
+          `⚠️ This will be marked as Clause 38 (excess > 25%).\n\n` +
+          `Do you want to proceed with this measurement?`
         );
 
         if (!confirmed) {
+          setLoading(false);
           return;
         }
+
+        console.log('User confirmed Clause 38 measurement, proceeding...');
       }
     }
 
@@ -268,6 +280,12 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
 
       if (insertError) throw insertError;
 
+      console.log('Measurement saved successfully:', measurementNumber);
+
+      const currentExecuted = (selectedBoqItem?.executed_quantity || 0) + formData.quantity;
+      const isClause38 = selectedBoqItem &&
+        ((currentExecuted - selectedBoqItem.boq_quantity) / selectedBoqItem.boq_quantity) * 100 >= 25;
+
       await supabase
         .schema('estimate')
         .from('mb_audit_logs')
@@ -279,15 +297,21 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
           details: {
             measurement_number: measurementNumber,
             boq_item: selectedBoqItem?.item_number,
-            quantity: formData.quantity
+            quantity: formData.quantity,
+            is_clause_38: isClause38
           }
         });
 
-      setSuccess(`Measurement ${status === 'submitted' ? 'submitted' : 'saved'} successfully`);
+      const successMsg = `Measurement ${status === 'submitted' ? 'submitted' : 'saved'} successfully` +
+        (isClause38 ? ' (Clause 38 applicable)' : '');
+      setSuccess(successMsg);
+      console.log('Success:', successMsg);
 
       if (selectedBoqItem) {
-        fetchMeasurements(selectedBoqItem.id);
-        fetchBOQItems(selectedProject);
+        console.log('Refreshing measurements and BOQ items...');
+        await fetchMeasurements(selectedBoqItem.id);
+        await fetchBOQItems(selectedProject);
+        console.log('Data refreshed');
       }
 
       resetForm();
@@ -406,7 +430,7 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                       </div>
                       <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{item.description}</p>
 
-                      {item.is_clause_38_applicable && (
+                      {item.is_clause_38_applicable === true && (
                         <div className="mt-3 px-4 py-3 bg-orange-50 border border-orange-300 rounded-lg">
                           <div className="flex items-start space-x-2">
                             <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -414,7 +438,7 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                             </svg>
                             <div className="flex-1">
                               <p className="text-sm font-semibold text-orange-900">
-                                Clause 38 Applicable - Quantity Exceeded by {item.excess_percentage.toFixed(2)}%
+                                Clause 38 Applicable - Quantity Exceeded by {(item.excess_percentage || 0).toFixed(2)}%
                               </p>
                               <p className="text-xs text-orange-700 mt-1">
                                 Executed quantity exceeds BOQ quantity by more than 25%. This requires approval under Clause 38.
