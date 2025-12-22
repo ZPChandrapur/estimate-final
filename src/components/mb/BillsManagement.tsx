@@ -135,10 +135,19 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
           )
         `)
         .eq('bill_id', selectedBill)
+        .gt('amount', 0)
         .order('boq_item_id');
 
       if (error) throw error;
-      setBillItems(data || []);
+
+      // Sort by item number
+      const sortedData = (data || []).sort((a, b) => {
+        const numA = parseFloat(a.boq_item.item_number) || 0;
+        const numB = parseFloat(b.boq_item.item_number) || 0;
+        return numA - numB;
+      });
+
+      setBillItems(sortedData);
     } catch (error) {
       console.error('Error fetching bill items:', error);
     }
@@ -229,17 +238,19 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
         : 0;
       const newBillNumber = `RABill-${lastBillNumber + 1}`;
 
-      // Get all approved measurements (BOQ items with executed quantities)
+      // Get all approved measurements (BOQ items with executed quantities > 0)
       const { data: boqData, error: boqError } = await supabase
         .schema('estimate')
         .from('mb_boq_items')
         .select('*')
-        .eq('project_id', selectedProject);
+        .eq('project_id', selectedProject)
+        .gt('executed_quantity', 0)
+        .order('item_number');
 
       if (boqError) throw boqError;
 
       if (!boqData || boqData.length === 0) {
-        alert('No BOQ items found for this project. Please add measurements first.');
+        alert('No approved measurements found for this project. Please approve measurements first.');
         return;
       }
 
@@ -319,8 +330,24 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
   };
 
   const renderAbstract = () => {
-    const regularItems = billItems.filter(item => !item.is_clause_38);
-    const clause38Items = billItems.filter(item => item.is_clause_38);
+    // Filter items with amount > 0 and sort by item number
+    const filteredItems = billItems.filter(item => item.amount > 0);
+
+    const regularItems = filteredItems
+      .filter(item => !item.is_clause_38)
+      .sort((a, b) => {
+        const numA = parseFloat(a.boq_item.item_number) || 0;
+        const numB = parseFloat(b.boq_item.item_number) || 0;
+        return numA - numB;
+      });
+
+    const clause38Items = filteredItems
+      .filter(item => item.is_clause_38)
+      .sort((a, b) => {
+        const numA = parseFloat(a.boq_item.item_number) || 0;
+        const numB = parseFloat(b.boq_item.item_number) || 0;
+        return numA - numB;
+      });
 
     const selectedBillData = bills.find(b => b.id === selectedBill);
 
