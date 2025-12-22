@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useLocation } from 'react-router-dom';
+// removed unused useLocation
 import { supabase } from '../lib/supabase';
 import { SubworkItem, ItemMeasurement, ItemLead, ItemMaterial, ItemRate } from '../types';
 import {
@@ -21,11 +21,13 @@ interface RateAnalysisProps {
   isOpen: boolean;
   onClose: () => void;
   item: SubworkItem;
+  baseRate?: number;
+  parentSubworkSrNo: number; // ✅ REQUIRED
+  onSaveRate?: (newRate: number, analysisPayload?: any) => void;
 }
 
-const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) => {
+const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, baseRate: baseRateProp, parentSubworkSrNo, onSaveRate }) => {
   const { user } = useAuth();
-  const location = useLocation();
   const [activeTab, setActiveTab] = useState<'measurements' | 'leads' | 'materials'>('measurements');
   const [measurements, setMeasurements] = useState<ItemMeasurement[]>([]);
   const [itemRates, setItemRates] = useState<ItemRate[]>([]);
@@ -99,7 +101,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
     let additions = 0;
     let deletions = 0;
     let taxes = 0;
-    const baseRate = item?.ssr_rate || 0;
+    const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
     let finalRate = baseRate;
     entries.forEach((entry) => {
       if (entry.type === 'Addition') additions += entry.value;
@@ -108,15 +110,15 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
     });
     finalRate = baseRate + additions - deletions + taxes;
     return { additions, deletions, taxes, finalRate, baseRate };
-  }, [entries, item?.ssr_rate]);
+  }, [entries, baseRateProp, item?.ssr_rate]);
 
   // Keep previous logic and API untouched
   const getSelectedRate = () => {
     if (newMeasurement.selected_rate_id) {
       const selectedRate = itemRates.find(rate => rate.sr_no === newMeasurement.selected_rate_id);
-      return selectedRate ? selectedRate.rate : item?.ssr_rate;
+      return selectedRate ? selectedRate.rate : (baseRateProp ?? item?.ssr_rate ?? 0);
     }
-    return item?.ssr_rate || 0;
+    return baseRateProp ?? item?.ssr_rate ?? 0;
   };
 
   useEffect(() => {
@@ -172,9 +174,9 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
   const getSelectedRateForMeasurement = (measurement: ItemMeasurement) => {
     if (measurement.selected_rate_id) {
       const selected = itemRates.find(r => r.sr_no === measurement.selected_rate_id);
-      return selected ? selected.rate : (measurement.rate || item?.ssr_rate || 0);
+      return selected ? selected.rate : (measurement.rate || (baseRateProp ?? item?.ssr_rate ?? 0));
     }
-    return measurement.rate || item?.ssr_rate || 0;
+    return measurement.rate || (baseRateProp ?? item?.ssr_rate ?? 0);
   };
 
   const fetchData = async () => {
@@ -294,84 +296,54 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
     setLeadStatements([]);
   };
 
-  const saveRateAnalysis = async () => {
-    try {
-      if (!item?.sr_no) {
-        alert('Invalid item. Please close and try again.');
-        return;
-      }
+const saveRateAnalysis = async () => {
+  try {
+    setLoading(true);
 
-      setLoading(true);
-      const baseRate = item?.ssr_rate || 0;
-      const { additions, deletions, taxes, finalRate } = summary;
+    // ✅ SINGLE SOURCE OF TRUTH → subworks.sr_no
+    const subworkSrNo = parentSubworkSrNo;
 
-      let totalRate = finalRate;
-      if (finalTaxApplied) {
-        totalRate = finalRate + finalTaxApplied.amount;
-      }
-
-      const analysisData = {
-        subwork_item_id: item.sr_no,
-        base_rate: baseRate,
-        entries: entries,
-        final_tax_percent: finalTaxApplied?.percent || null,
-        final_tax_amount: finalTaxApplied?.amount || null,
-        total_additions: additions,
-        total_deletions: deletions,
-        total_taxes: taxes,
-        final_rate: finalRate,
-        total_rate: totalRate,
-        created_by: user?.id,
-        updated_at: new Date().toISOString()
-      };
-
-      const { data: existing } = await supabase
-        .schema('estimate')
-        .from('item_rate_analysis')
-        .select('sr_no')
-        .eq('subwork_item_id', item.sr_no)
-        .maybeSingle();
-
-      if (existing) {
-        const { error } = await supabase
-          .schema('estimate')
-          .from('item_rate_analysis')
-          .update(analysisData)
-          .eq('sr_no', existing.sr_no);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .schema('estimate')
-          .from('item_rate_analysis')
-          .insert([{ ...analysisData, created_at: new Date().toISOString() }]);
-
-        if (error) throw error;
-      }
-
-      const updatedRate = totalRate;
-      const updatedTotalAmount = item.ssr_quantity * updatedRate;
-
-      const { error: itemUpdateError } = await supabase
-        .schema('estimate')
-        .from('subwork_items')
-        .update({
-          ssr_rate: updatedRate,
-          total_item_amount: updatedTotalAmount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('sr_no', item.sr_no);
-
-      if (itemUpdateError) throw itemUpdateError;
-
-      onClose();
-    } catch (error) {
-      console.error('Error saving rate analysis:', error);
-      alert('Failed to save rate analysis. Please try again.');
-    } finally {
-      setLoading(false);
+    if (!subworkSrNo) {
+      alert('Subwork not found. Please try again.');
+      return;
     }
-  };
+
+    const totalRate =
+      summary.finalRate + (finalTaxApplied?.amount ?? 0);
+
+    const payload = {
+      subwork_item_id: subworkSrNo,              
+      base_rate: summary.baseRate,
+      entries,
+      final_tax_percent: finalTaxApplied?.percent ?? null,
+      final_tax_amount: finalTaxApplied?.amount ?? null,
+      total_additions: summary.additions,
+      total_deletions: summary.deletions,
+      total_taxes: summary.taxes,
+      final_rate: summary.finalRate,
+      total_rate: totalRate,
+      created_by: user?.id ?? null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // ✅ ALWAYS INSERT (sr_no auto-incremented by DB)
+    const { error: insertError } = await supabase
+      .schema('estimate')
+      .from('item_rate_analysis')
+      .insert(payload);
+
+    if (insertError) throw insertError;
+
+    // ✅ Update UI immediately
+    onSaveRate?.(totalRate);
+    onClose();
+  } catch (err) {
+    console.error('Error saving rate analysis:', err);
+    alert('Failed to save rate analysis');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('hi-IN', {
@@ -390,7 +362,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
   // Add entry handler
   const handleAddEntry = () => {
     if (newTax.label && newTax.type && Number(newTax.value) > 0) {
-      const baseRate = item?.ssr_rate || 0;
+      const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
       const amount = calculateAmount(newTax.type, baseRate, Number(newTax.value));
       setEntries(prev => [...prev, {
         label: newTax.label,
@@ -413,7 +385,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
   // Update handler
   const handleUpdate = () => {
     if (editIndex !== null && newTax.label && newTax.type && Number(newTax.value) > 0) {
-      const baseRate = item?.ssr_rate || 0;
+      const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
       const amount = calculateAmount(newTax.type, baseRate, Number(newTax.value));
       setEntries(entries.map((ent, idx) =>
         idx === editIndex
@@ -434,7 +406,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
 
   // INLINE SAVE FOR NEW ROW (Option A behavior)
   const saveNewRow = (index: number) => {
-    const baseRate = item?.ssr_rate || 0;
+    const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
     const amount = calculateAmount(tempRow.type, baseRate, Number(tempRow.value));
     const newEntry = {
       label: tempRow.label,
@@ -453,7 +425,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
 
   // INLINE SAVE FOR EDITED ROW
   const saveEditedRow = (index: number) => {
-    const baseRate = item?.ssr_rate || 0;
+    const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
     const amount = calculateAmount(tempRow.type, baseRate, Number(tempRow.value));
 
     const updated = entries.map((row, idx) =>
@@ -541,7 +513,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
                 </div>
                 <div>
                   <span className="text-gray-600">Base Rate:</span>
-                  <span className="ml-2 font-medium text-gray-900">₹{item.ssr_rate?.toFixed(2)}</span>
+                  <span className="ml-2 font-medium text-gray-900">₹{summary.baseRate.toFixed(2)}</span>
                 </div>
                 {item.csr_labour_cost > 0 && (
                   <div>
@@ -653,7 +625,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
                 >
                   <option value="Addition">Addition</option>
                   <option value="Deletion">Deletion</option>
-                  <option value="Tax">Tax (%)</option>
+                  <option value="Tax">Percentage(%)</option>
                 </select>
               </div>
               <div className="w-32">
@@ -662,7 +634,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
                 </label>
                 <input
                   type="number"
-                  step="0.01"
+                  step=""
                   value={newTax.value}
                   onChange={(e) => setNewTax({ ...newTax, value: e.target.value })}
                   className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -922,17 +894,17 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item }) =>
                     className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
-                    Add Tax
+                    Add Tax/Percentage
                   </button>
                 )}
               </div>
 
               {showFinalTaxInput && (
                 <div className="mt-3 flex items-center gap-3 bg-white p-3 rounded-md border border-blue-300">
-                  <label className="text-sm font-medium text-gray-700">Tax Percentage:</label>
+                  <label className="text-sm font-medium text-gray-700">Tax/Percentage:</label>
                   <input
                     type="number"
-                    step="0.01"
+                    step=""
                     value={finalTaxPercentInput}
                     onChange={(e) => setFinalTaxPercentInput(Number(e.target.value))}
                     className="w-24 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
