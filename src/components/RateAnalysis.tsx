@@ -142,6 +142,12 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   }, [itemRates]);
 
   useEffect(() => {
+    if (selectedRateId && isOpen) {
+      fetchRateAnalysis();
+    }
+  }, [selectedRateId]);
+
+  useEffect(() => {
     if (!isOpen) {
       setSelectedRateId(null);
       setSelectedRateValue(0);
@@ -271,6 +277,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
         .from('item_rate_analysis')
         .select('*')
         .eq('subwork_item_id', item.sr_no)
+        .eq('item_rate_id', selectedRateId || 0)
         .maybeSingle();
 
       if (error) throw error;
@@ -283,6 +290,9 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
             amount: data.final_tax_amount
           });
         }
+      } else {
+        setEntries([]);
+        setFinalTaxApplied(null);
       }
     } catch (error) {
       console.error('Error fetching rate analysis:', error);
@@ -345,11 +355,8 @@ const saveRateAnalysis = async () => {
   try {
     setLoading(true);
 
-    // ✅ SINGLE SOURCE OF TRUTH → subworks.sr_no
-    const subworkSrNo = parentSubworkSrNo;
-
-    if (!subworkSrNo) {
-      alert('Subwork not found. Please try again.');
+    if (!item?.sr_no) {
+      alert('Item not found. Please try again.');
       return;
     }
 
@@ -357,7 +364,8 @@ const saveRateAnalysis = async () => {
       summary.finalRate + (finalTaxApplied?.amount ?? 0);
 
     const payload = {
-      subwork_item_id: subworkSrNo,              
+      subwork_item_id: item.sr_no,
+      item_rate_id: selectedRateId,
       base_rate: summary.baseRate,
       entries,
       final_tax_percent: finalTaxApplied?.percent ?? null,
@@ -371,13 +379,41 @@ const saveRateAnalysis = async () => {
       updated_at: new Date().toISOString(),
     };
 
-    // ✅ ALWAYS INSERT (sr_no auto-incremented by DB)
-    const { error: insertError } = await supabase
+    const { data: existingAnalysis } = await supabase
       .schema('estimate')
       .from('item_rate_analysis')
-      .insert(payload);
+      .select('sr_no')
+      .eq('subwork_item_id', item.sr_no)
+      .eq('item_rate_id', selectedRateId || 0)
+      .maybeSingle();
 
-    if (insertError) throw insertError;
+    if (existingAnalysis) {
+      const { error: updateError } = await supabase
+        .schema('estimate')
+        .from('item_rate_analysis')
+        .update(payload)
+        .eq('sr_no', existingAnalysis.sr_no);
+
+      if (updateError) throw updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .schema('estimate')
+        .from('item_rate_analysis')
+        .insert(payload);
+
+      if (insertError) throw insertError;
+    }
+
+    // Update the rate in item_rates table
+    if (selectedRateId) {
+      const { error: rateUpdateError } = await supabase
+        .schema('estimate')
+        .from('item_rates')
+        .update({ rate: totalRate })
+        .eq('sr_no', selectedRateId);
+
+      if (rateUpdateError) throw rateUpdateError;
+    }
 
     // ✅ Update UI immediately
     onSaveRate?.(totalRate);
