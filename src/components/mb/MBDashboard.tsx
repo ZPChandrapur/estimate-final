@@ -26,11 +26,14 @@ interface UserRole {
 }
 
 interface ProjectSummary {
-  total_projects: number;
-  active_projects: number;
-  completed_projects: number;
+  total_works: number;
+  active_works: number;
+  completed_works: number;
   total_boq_amount: number;
   total_executed_amount: number;
+  total_measurements: number;
+  total_bills: number;
+  pending_bills: number;
 }
 
 interface MBDashboardProps {
@@ -43,11 +46,14 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
   const { user, signOut } = useAuth();
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [summary, setSummary] = useState<ProjectSummary>({
-    total_projects: 0,
-    active_projects: 0,
-    completed_projects: 0,
+    total_works: 0,
+    active_works: 0,
+    completed_works: 0,
     total_boq_amount: 0,
-    total_executed_amount: 0
+    total_executed_amount: 0,
+    total_measurements: 0,
+    total_bills: 0,
+    pending_bills: 0
   });
   const [notifications, setNotifications] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -80,34 +86,56 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
     try {
       setLoading(true);
 
-      const { data: projects, error } = await supabase
-        .schema('estimate')
-        .from('mb_projects')
-        .select('status, total_boq_amount, total_executed_amount');
+      const [worksResponse, boqResponse, measurementsResponse, billsResponse] = await Promise.all([
+        supabase
+          .schema('estimate')
+          .from('mb_works')
+          .select('status'),
+        supabase
+          .schema('estimate')
+          .from('mb_boq')
+          .select('total_amount'),
+        supabase
+          .schema('estimate')
+          .from('mb_measurements')
+          .select('quantity, rate'),
+        supabase
+          .schema('estimate')
+          .from('mb_bills')
+          .select('current_bill_amount, approval_status')
+      ]);
 
-      if (error) throw error;
+      const works = worksResponse.data || [];
+      const boqs = boqResponse.data || [];
+      const measurements = measurementsResponse.data || [];
+      const bills = billsResponse.data || [];
 
-      const summary = projects?.reduce((acc, proj) => {
-        acc.total_projects++;
-        if (proj.status === 'active') acc.active_projects++;
-        if (proj.status === 'completed') acc.completed_projects++;
-        acc.total_boq_amount += Number(proj.total_boq_amount || 0);
-        acc.total_executed_amount += Number(proj.total_executed_amount || 0);
-        return acc;
-      }, {
-        total_projects: 0,
-        active_projects: 0,
-        completed_projects: 0,
-        total_boq_amount: 0,
-        total_executed_amount: 0
-      } as ProjectSummary);
+      const totalWorks = works.length;
+      const activeWorks = works.filter(w => w.status === 'active' || w.status === 'in_progress').length;
+      const completedWorks = works.filter(w => w.status === 'completed').length;
 
-      setSummary(summary || {
-        total_projects: 0,
-        active_projects: 0,
-        completed_projects: 0,
-        total_boq_amount: 0,
-        total_executed_amount: 0
+      const totalBoqAmount = boqs.reduce((sum, boq) => sum + Number(boq.total_amount || 0), 0);
+
+      const totalExecutedAmount = measurements.reduce((sum, m) => {
+        return sum + (Number(m.quantity || 0) * Number(m.rate || 0));
+      }, 0);
+
+      const totalBills = bills.length;
+      const pendingBills = bills.filter(b =>
+        b.approval_status === 'submitted' ||
+        b.approval_status === 'in_progress' ||
+        b.approval_status === 'pending'
+      ).length;
+
+      setSummary({
+        total_works: totalWorks,
+        active_works: activeWorks,
+        completed_works: completedWorks,
+        total_boq_amount: totalBoqAmount,
+        total_executed_amount: totalExecutedAmount,
+        total_measurements: measurements.length,
+        total_bills: totalBills,
+        pending_bills: pendingBills
       });
     } catch (error) {
       console.error('Error fetching dashboard summary:', error);
@@ -243,7 +271,7 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Total Projects</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{summary.total_projects}</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{summary.total_works}</p>
                   </div>
                   <div className="p-3 bg-blue-100 rounded-lg">
                     <LayoutDashboard className="w-8 h-8 text-blue-600" />
@@ -255,7 +283,7 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Active Projects</p>
-                    <p className="text-3xl font-bold text-green-600 mt-2">{summary.active_projects}</p>
+                    <p className="text-3xl font-bold text-green-600 mt-2">{summary.active_works}</p>
                   </div>
                   <div className="p-3 bg-green-100 rounded-lg">
                     <Clock className="w-8 h-8 text-green-600" />
@@ -267,7 +295,7 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Completed</p>
-                    <p className="text-3xl font-bold text-purple-600 mt-2">{summary.completed_projects}</p>
+                    <p className="text-3xl font-bold text-purple-600 mt-2">{summary.completed_works}</p>
                   </div>
                   <div className="p-3 bg-purple-100 rounded-lg">
                     <CheckCircle className="w-8 h-8 text-purple-600" />
@@ -288,8 +316,8 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
               </div>
             </div>
 
-            {/* Financial Summary */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Statistics Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">BOQ Financial Summary</h3>
                 <div className="space-y-4">
@@ -329,53 +357,73 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
               </div>
 
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Measurements Overview</h3>
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <p className="text-4xl font-bold text-blue-600">{summary.total_measurements}</p>
+                    <p className="text-sm text-gray-600 mt-2">Total Measurements</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-green-50 rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-green-600">{summary.total_bills}</p>
+                      <p className="text-xs text-gray-600 mt-1">Bills Generated</p>
+                    </div>
+                    <div className="bg-orange-50 rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-orange-600">{summary.pending_bills}</p>
+                      <p className="text-xs text-gray-600 mt-1">Pending Bills</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   {canAccessPage(['mb_clerk', 'clerk', 'Junior Engineer', 'Junior Engineer (JE)', 'Deputy Engineer', 'Sub Division Engineer', 'Divisional Engineer', 'Executive Engineer', 'Auditor', 'Accountant', 'inspector', 'officer', 'Jr./Asst. Administration Officer', 'admin', 'super_admin', 'developer']) && (
                     <button
                       onClick={() => onNavigate('work')}
-                      className="flex flex-col items-center justify-center p-4 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors"
+                      className="flex flex-col items-center justify-center p-3 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors"
                     >
-                      <Briefcase className="w-8 h-8 text-indigo-600 mb-2" />
-                      <span className="text-sm font-medium text-indigo-900">Manage Work</span>
+                      <Briefcase className="w-6 h-6 text-indigo-600 mb-1" />
+                      <span className="text-xs font-medium text-indigo-900">Manage Work</span>
                     </button>
                   )}
 
                   {canAccessPage(['mb_clerk', 'clerk', 'Junior Engineer', 'Junior Engineer (JE)', 'Deputy Engineer', 'Sub Division Engineer', 'Divisional Engineer', 'Executive Engineer', 'Auditor', 'Accountant', 'inspector', 'officer', 'Jr./Asst. Administration Officer', 'admin', 'super_admin', 'developer']) && (
                     <button
                       onClick={() => onNavigate('boq')}
-                      className="flex flex-col items-center justify-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+                      className="flex flex-col items-center justify-center p-3 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
                     >
-                      <FileSpreadsheet className="w-8 h-8 text-blue-600 mb-2" />
-                      <span className="text-sm font-medium text-blue-900">Upload BOQ</span>
+                      <FileSpreadsheet className="w-6 h-6 text-blue-600 mb-1" />
+                      <span className="text-xs font-medium text-blue-900">Upload BOQ</span>
                     </button>
                   )}
 
                   {canAccessPage(['mb_clerk', 'clerk', 'Junior Engineer', 'Junior Engineer (JE)', 'Deputy Engineer', 'Sub Division Engineer', 'Divisional Engineer', 'Executive Engineer', 'Auditor', 'Accountant', 'inspector', 'officer', 'Jr./Asst. Administration Officer', 'admin', 'super_admin', 'developer']) && (
                     <button
                       onClick={() => onNavigate('measurements')}
-                      className="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
+                      className="flex flex-col items-center justify-center p-3 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
                     >
-                      <ClipboardList className="w-8 h-8 text-green-600 mb-2" />
-                      <span className="text-sm font-medium text-green-900">Add Measurement</span>
+                      <ClipboardList className="w-6 h-6 text-green-600 mb-1" />
+                      <span className="text-xs font-medium text-green-900">Add Measurement</span>
                     </button>
                   )}
 
                   <button
-                    onClick={() => onNavigate('status')}
-                    className="flex flex-col items-center justify-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg border border-purple-200 transition-colors"
+                    onClick={() => onNavigate('bills')}
+                    className="flex flex-col items-center justify-center p-3 bg-purple-50 hover:bg-purple-100 rounded-lg border border-purple-200 transition-colors"
                   >
-                    <BarChart3 className="w-8 h-8 text-purple-600 mb-2" />
-                    <span className="text-sm font-medium text-purple-900">View Status</span>
+                    <Receipt className="w-6 h-6 text-purple-600 mb-1" />
+                    <span className="text-xs font-medium text-purple-900">View Bills</span>
                   </button>
 
                   {canAccessPage(['mb_clerk', 'clerk', 'Junior Engineer', 'Junior Engineer (JE)', 'Deputy Engineer', 'Sub Division Engineer', 'Divisional Engineer', 'Executive Engineer', 'Auditor', 'Accountant', 'inspector', 'officer', 'Jr./Asst. Administration Officer', 'admin', 'super_admin', 'developer']) && (
                     <button
                       onClick={() => onNavigate('reports')}
-                      className="flex flex-col items-center justify-center p-4 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors"
+                      className="flex flex-col items-center justify-center p-3 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors"
                     >
-                      <FileText className="w-8 h-8 text-orange-600 mb-2" />
-                      <span className="text-sm font-medium text-orange-900">Generate Report</span>
+                      <FileText className="w-6 h-6 text-orange-600 mb-1" />
+                      <span className="text-xs font-medium text-orange-900">Generate Report</span>
                     </button>
                   )}
                 </div>
