@@ -61,7 +61,7 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [boqItems, setBoqItems] = useState<BOQItem[]>([]);
   const [selectedBoqItem, setSelectedBoqItem] = useState<BOQItem | null>(null);
-  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [measurementsByItem, setMeasurementsByItem] = useState<Record<string, Measurement[]>>({});
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -148,7 +148,10 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
         .order('measurement_date', { ascending: false });
 
       if (error) throw error;
-      setMeasurements(data || []);
+      setMeasurementsByItem(prev => ({
+        ...prev,
+        [boqItemId]: data || []
+      }));
     } catch (error) {
       console.error('Error fetching measurements:', error);
     }
@@ -160,7 +163,6 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
       newExpanded.delete(itemId);
       if (selectedBoqItem?.id === itemId) {
         setSelectedBoqItem(null);
-        setMeasurements([]);
         setShowAddForm(false);
       }
     } else {
@@ -344,7 +346,7 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
               setSelectedProject(e.target.value);
               setBoqItems([]);
               setSelectedBoqItem(null);
-              setMeasurements([]);
+              setMeasurementsByItem({});
               setExpandedItems(new Set());
               setShowAddForm(false);
             }}
@@ -564,78 +566,85 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                     )}
 
                     <div className="mt-4">
-                      <h4 className="text-md font-semibold text-gray-900 mb-3">
-                        Measurement Entries ({measurements.length})
-                      </h4>
+                      {(() => {
+                        const itemMeasurements = measurementsByItem[item.id] || [];
+                        return (
+                          <>
+                            <h4 className="text-md font-semibold text-gray-900 mb-3">
+                              Measurement Entries ({itemMeasurements.length})
+                            </h4>
 
-                      {measurements.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
-                          No measurements recorded yet. Click "Add" to create a new measurement entry.
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-100">
-                              <tr>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">MB No.</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">L</th>
-                                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">B</th>
-                                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">H</th>
-                                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {measurements.map((measurement) => (
-                                <tr key={measurement.id} className="hover:bg-gray-50">
-                                  <td className="px-3 py-2 text-sm text-gray-900 font-medium">{measurement.measurement_number}</td>
-                                  <td className="px-3 py-2 text-sm text-gray-600">
-                                    {new Date(measurement.measurement_date).toLocaleDateString('en-GB')}
-                                  </td>
-                                  <td className="px-3 py-2 text-sm text-gray-600 max-w-xs truncate">
-                                    {measurement.description || '-'}
-                                  </td>
-                                  <td className="px-3 py-2 text-sm text-right text-gray-900">
-                                    {measurement.length ? measurement.length.toFixed(3) : '-'}
-                                  </td>
-                                  <td className="px-3 py-2 text-sm text-right text-gray-900">
-                                    {measurement.breadth ? measurement.breadth.toFixed(3) : '-'}
-                                  </td>
-                                  <td className="px-3 py-2 text-sm text-right text-gray-900">
-                                    {measurement.height ? measurement.height.toFixed(3) : '-'}
-                                  </td>
-                                  <td className="px-3 py-2 text-sm text-right font-medium text-gray-900">
-                                    {measurement.quantity.toFixed(3)}
-                                  </td>
-                                  <td className="px-3 py-2 text-sm text-right font-medium text-green-600">
-                                    ₹{measurement.amount.toFixed(2)}
-                                  </td>
-                                  <td className="px-3 py-2 text-sm">
-                                    {getStatusBadge(measurement.status)}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot className="bg-gray-50">
-                              <tr>
-                                <td colSpan={6} className="px-3 py-2 text-sm font-semibold text-gray-900 text-right">
-                                  Total:
-                                </td>
-                                <td className="px-3 py-2 text-sm font-bold text-gray-900 text-right">
-                                  {measurements.reduce((sum, m) => sum + m.quantity, 0).toFixed(3)}
-                                </td>
-                                <td className="px-3 py-2 text-sm font-bold text-green-600 text-right">
-                                  ₹{measurements.reduce((sum, m) => sum + m.amount, 0).toFixed(2)}
-                                </td>
-                                <td></td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      )}
+                            {itemMeasurements.length === 0 ? (
+                              <div className="text-center py-8 text-gray-500">
+                                No measurements recorded yet. Click "Add" to create a new measurement entry.
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                  <thead className="bg-gray-100">
+                                    <tr>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">MB No.</th>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">L</th>
+                                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">B</th>
+                                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">H</th>
+                                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {itemMeasurements.map((measurement) => (
+                                      <tr key={measurement.id} className="hover:bg-gray-50">
+                                        <td className="px-3 py-2 text-sm text-gray-900 font-medium">{measurement.measurement_number}</td>
+                                        <td className="px-3 py-2 text-sm text-gray-600">
+                                          {new Date(measurement.measurement_date).toLocaleDateString('en-GB')}
+                                        </td>
+                                        <td className="px-3 py-2 text-sm text-gray-600 max-w-xs truncate">
+                                          {measurement.description || '-'}
+                                        </td>
+                                        <td className="px-3 py-2 text-sm text-right text-gray-900">
+                                          {measurement.length ? measurement.length.toFixed(3) : '-'}
+                                        </td>
+                                        <td className="px-3 py-2 text-sm text-right text-gray-900">
+                                          {measurement.breadth ? measurement.breadth.toFixed(3) : '-'}
+                                        </td>
+                                        <td className="px-3 py-2 text-sm text-right text-gray-900">
+                                          {measurement.height ? measurement.height.toFixed(3) : '-'}
+                                        </td>
+                                        <td className="px-3 py-2 text-sm text-right font-medium text-gray-900">
+                                          {measurement.quantity.toFixed(3)}
+                                        </td>
+                                        <td className="px-3 py-2 text-sm text-right font-medium text-green-600">
+                                          ₹{measurement.amount.toFixed(2)}
+                                        </td>
+                                        <td className="px-3 py-2 text-sm">
+                                          {getStatusBadge(measurement.status)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                  <tfoot className="bg-gray-50">
+                                    <tr>
+                                      <td colSpan={6} className="px-3 py-2 text-sm font-semibold text-gray-900 text-right">
+                                        Total:
+                                      </td>
+                                      <td className="px-3 py-2 text-sm font-bold text-gray-900 text-right">
+                                        {itemMeasurements.reduce((sum, m) => sum + m.quantity, 0).toFixed(3)}
+                                      </td>
+                                      <td className="px-3 py-2 text-sm font-bold text-green-600 text-right">
+                                        ₹{itemMeasurements.reduce((sum, m) => sum + m.amount, 0).toFixed(2)}
+                                      </td>
+                                      <td></td>
+                                    </tr>
+                                  </tfoot>
+                                </table>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
