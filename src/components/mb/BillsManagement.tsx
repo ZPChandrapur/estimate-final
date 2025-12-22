@@ -232,7 +232,7 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
       // Get all approved measurements (BOQ items with executed quantities)
       const { data: boqData, error: boqError } = await supabase
         .schema('estimate')
-        .from('mb_boq')
+        .from('mb_boq_items')
         .select('*')
         .eq('project_id', selectedProject);
 
@@ -254,7 +254,7 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
 
       // Calculate total amount and create bill
       const totalAmount = boqData.reduce((sum, item) => {
-        const executedQty = item.executed_qty || 0;
+        const executedQty = item.executed_quantity || 0;
         const rate = item.rate || 0;
         return sum + (executedQty * rate);
       }, 0);
@@ -283,7 +283,7 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
 
       // Create bill items from BOQ
       const billItems = boqData.map(item => {
-        const executedQty = item.executed_qty || 0;
+        const executedQty = item.executed_quantity || 0;
         const rate = item.rate || 0;
         const amount = executedQty * rate;
 
@@ -296,7 +296,7 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
           rate: rate,
           bill_rate: rate,
           amount: amount,
-          is_clause_38: item.is_clause_38 || false
+          is_clause_38: item.is_clause_38_applicable || false
         };
       });
 
