@@ -207,6 +207,51 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
     }
   };
 
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        'Item Number': '1.1',
+        'Description': 'Excavation in foundation',
+        'Unit': 'Cum',
+        'Quantity': 100,
+        'Rate': 250.50,
+        'Remarks': 'Sample item 1'
+      },
+      {
+        'Item Number': '1.2',
+        'Description': 'Concrete work M20 grade',
+        'Unit': 'Cum',
+        'Quantity': 50,
+        'Rate': 5500.00,
+        'Remarks': 'Sample item 2'
+      },
+      {
+        'Item Number': '2.1',
+        'Description': 'Brick work in CM 1:6',
+        'Unit': 'Sqm',
+        'Quantity': 200,
+        'Rate': 450.75,
+        'Remarks': 'Sample item 3'
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+
+    const colWidths = [
+      { wch: 15 },
+      { wch: 50 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 20 }
+    ];
+    ws['!cols'] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'BOQ Template');
+    XLSX.writeFile(wb, 'BOQ_Template.xlsx');
+  };
+
   const exportToExcel = () => {
     const exportData = boqItems.map(item => ({
       'Item Number': item.item_number,
@@ -297,6 +342,25 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
                 disabled={!selectedProject}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
+            </div>
+          </div>
+
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start">
+              <FileSpreadsheet className="w-5 h-5 text-blue-600 mr-3 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-medium text-blue-900 mb-1">Need a template?</h4>
+                <p className="text-sm text-blue-700 mb-3">
+                  Download our BOQ template with sample data to understand the required format. The template includes the following columns: Item Number, Description, Unit, Quantity, Rate, and Remarks.
+                </p>
+                <button
+                  onClick={downloadTemplate}
+                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download BOQ Template
+                </button>
+              </div>
             </div>
           </div>
         </div>
