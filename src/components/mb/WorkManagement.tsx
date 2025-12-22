@@ -204,16 +204,17 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
 
   const fetchAvailableUsers = async () => {
     try {
-      const { data, error } = await supabase.auth.admin.listUsers();
+      const { data, error } = await supabase
+        .schema('auth')
+        .from('users')
+        .select('id, email')
+        .order('email');
+
       if (error) throw error;
-      setAvailableUsers(data.users.map(u => ({ id: u.id, email: u.email || '' })));
+      setAvailableUsers(data || []);
     } catch (error) {
-      const { data, error: usersError } = await supabase
-        .from('auth.users')
-        .select('id, email');
-      if (!usersError && data) {
-        setAvailableUsers(data);
-      }
+      console.error('Error fetching users:', error);
+      showMessage('error', 'Failed to fetch users for role assignment');
     }
   };
 
@@ -279,12 +280,22 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
       const { data: rolesData, error: rolesError } = await supabase
         .schema('estimate')
         .from('mb_work_role_assignments')
-        .select('role_type, user_id')
+        .select(`
+          role_type,
+          user_id
+        `)
         .eq('project_id', projectId);
 
       if (!rolesError && rolesData) {
+        const userIds = rolesData.map(r => r.user_id);
+        const { data: usersData } = await supabase
+          .schema('auth')
+          .from('users')
+          .select('id, email')
+          .in('id', userIds);
+
         const rolesWithEmails = rolesData.map(r => {
-          const user = availableUsers.find(u => u.id === r.user_id);
+          const user = usersData?.find(u => u.id === r.user_id);
           return {
             role_type: r.role_type,
             user_id: r.user_id,
@@ -319,6 +330,7 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
       quoted_amount: work.amount.toString()
     }));
     setShowWorksList(false);
+    showMessage('success', `Work "${work.works_name}" loaded. Associated subworks will be available in Subworks tab.`);
   };
 
   const saveWorkDetails = async () => {
@@ -674,19 +686,42 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
                 </div>
 
                 {showWorksList && (
-                  <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <h4 className="font-medium text-gray-900 mb-3">Select Work from Estimate</h4>
-                    <div className="max-h-60 overflow-y-auto space-y-2">
-                      {estimateWorks.map(work => (
-                        <button
-                          key={work.works_id}
-                          onClick={() => handleFetchWork(work)}
-                          className="w-full text-left px-4 py-3 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
-                        >
-                          <div className="font-medium text-gray-900">{work.works_name}</div>
-                          <div className="text-sm text-gray-600">ID: {work.works_id} | Amount: ₹{work.amount.toLocaleString('en-IN')}</div>
-                        </button>
-                      ))}
+                  <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-gray-900">Select Work from Estimate</h4>
+                      <button
+                        onClick={() => setShowWorksList(false)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    {estimateWorks.length === 0 ? (
+                      <div className="text-center py-4 text-gray-600">
+                        No works found in estimate system
+                      </div>
+                    ) : (
+                      <div className="max-h-60 overflow-y-auto space-y-2">
+                        {estimateWorks.map(work => (
+                          <button
+                            key={work.works_id}
+                            onClick={() => handleFetchWork(work)}
+                            className="w-full text-left px-4 py-3 bg-white border border-gray-200 rounded-lg hover:bg-blue-100 hover:border-blue-400 transition-colors"
+                          >
+                            <div className="font-medium text-gray-900">{work.works_name}</div>
+                            <div className="text-sm text-gray-600">Work ID: {work.works_id} | Amount: ₹{work.amount.toLocaleString('en-IN')}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {workDetails.works_id && (
+                  <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center text-green-800">
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      <span className="font-medium">Work loaded from Estimate (Work ID: {workDetails.works_id})</span>
                     </div>
                   </div>
                 )}
