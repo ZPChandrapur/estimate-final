@@ -76,7 +76,7 @@ const Landing: React.FC = () => {
 
         <div className="text-center mb-16">
           <h2 className="text-5xl font-bold text-gray-900 mb-4">
-            Welcome to the e-Estimate and e-MB Management
+            e-Estimate and e-MB Management
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Choose your module to get started with efficient project management
