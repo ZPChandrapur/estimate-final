@@ -200,10 +200,12 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
   };
 
   const selectMaterialOption = (option: { name: string; rate: string; unit: string }) => {
+    const rate = parseFloat(option.rate);
     setFormData({
       ...formData,
       material: option.name,
-      lead_charges: parseFloat(option.rate),
+      lead_charges: rate,
+      total_rate: rate,
       unit: option.unit
     });
     setShowMaterialOptions(false);
@@ -536,7 +538,10 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                       min="0"
                       step="0.01"
                       value={formData.lead_charges}
-                      onChange={(e) => setFormData({ ...formData, lead_charges: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        const charges = parseFloat(e.target.value) || 0;
+                        setFormData({ ...formData, lead_charges: charges, total_rate: charges });
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                       placeholder="0.00"
                       readOnly={showMaterialOptions}
@@ -581,9 +586,9 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                       min="0"
                       step="0.01"
                       value={formData.total_rate}
-                      onChange={(e) => setFormData({ ...formData, total_rate: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
                       placeholder="0.00"
+                      readOnly
                     />
                   </div>
 
