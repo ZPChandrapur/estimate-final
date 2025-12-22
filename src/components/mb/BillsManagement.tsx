@@ -810,7 +810,6 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                 <thead className="bg-blue-100">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-300">
-                      approval
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 border-r border-gray-300">
                       No Of Entries Check
@@ -819,7 +818,7 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                       Amount
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700">
-                      check %
+                      % Check
                     </th>
                   </tr>
                 </thead>
@@ -838,7 +837,7 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                           {totalItems}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 border-r border-gray-200">
-                          {check.calculated_amount.toFixed(2)}
+                          ₹{check.calculated_amount.toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-sm text-center text-gray-900">
                           {checkPercentage}
