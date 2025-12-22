@@ -134,16 +134,21 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['all'] },
-    { id: 'boq', label: 'BOQ Management', icon: FileSpreadsheet, roles: ['mb_clerk', 'Executive Engineer', 'admin'] },
-    { id: 'measurements', label: 'Measurement Entry', icon: ClipboardList, roles: ['Contractor', 'mb_clerk', 'admin'] },
+    { id: 'boq', label: 'BOQ Management', icon: FileSpreadsheet, roles: ['mb_clerk', 'Executive Engineer', 'admin', 'super_admin', 'developer'] },
+    { id: 'measurements', label: 'Measurement Entry', icon: ClipboardList, roles: ['Contractor', 'mb_clerk', 'admin', 'super_admin', 'developer'] },
     { id: 'status', label: 'MB Status', icon: BarChart3, roles: ['all'] },
-    { id: 'reports', label: 'Reports', icon: FileText, roles: ['Executive Engineer', 'Auditor', 'Accountant', 'admin'] },
-    { id: 'audit', label: 'Audit Logs', icon: History, roles: ['Auditor', 'Executive Engineer', 'admin'] },
+    { id: 'reports', label: 'Reports', icon: FileText, roles: ['Executive Engineer', 'Auditor', 'Accountant', 'admin', 'super_admin', 'developer'] },
+    { id: 'audit', label: 'Audit Logs', icon: History, roles: ['Auditor', 'Executive Engineer', 'admin', 'super_admin', 'developer'] },
   ];
 
   const canAccessPage = (pageRoles: string[]) => {
     if (pageRoles.includes('all')) return true;
-    return userRoles.some(role => pageRoles.includes(role) || role === 'admin');
+    return userRoles.some(role =>
+      pageRoles.includes(role) ||
+      role === 'admin' ||
+      role === 'super_admin' ||
+      role === 'developer'
+    );
   };
 
   const progressPercentage = summary.total_boq_amount > 0
