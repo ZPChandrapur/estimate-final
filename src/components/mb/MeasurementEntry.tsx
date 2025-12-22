@@ -24,6 +24,8 @@ interface BOQItem {
   executed_quantity: number;
   executed_amount: number;
   balance_quantity: number;
+  is_clause_38_applicable: boolean;
+  excess_percentage: number;
 }
 
 interface Measurement {
@@ -201,6 +203,28 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
     if (formData.quantity <= 0) {
       setError('Quantity must be greater than 0');
       return;
+    }
+
+    if (selectedBoqItem && status === 'submitted') {
+      const currentExecuted = selectedBoqItem.executed_quantity || 0;
+      const newTotal = currentExecuted + formData.quantity;
+      const excessPercentage = ((newTotal - selectedBoqItem.boq_quantity) / selectedBoqItem.boq_quantity) * 100;
+
+      if (excessPercentage >= 25) {
+        const confirmed = window.confirm(
+          `Warning: This measurement will exceed the BOQ quantity by ${excessPercentage.toFixed(2)}%.\n\n` +
+          `BOQ Quantity: ${selectedBoqItem.boq_quantity.toFixed(3)} ${selectedBoqItem.unit}\n` +
+          `Current Executed: ${currentExecuted.toFixed(3)} ${selectedBoqItem.unit}\n` +
+          `New Measurement: ${formData.quantity.toFixed(3)} ${selectedBoqItem.unit}\n` +
+          `Total after this: ${newTotal.toFixed(3)} ${selectedBoqItem.unit}\n\n` +
+          `This will be applicable under Clause 38 (excess > 25%).\n\n` +
+          `Do you want to proceed?`
+        );
+
+        if (!confirmed) {
+          return;
+        }
+      }
     }
 
     try {
@@ -381,6 +405,25 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                         </span>
                       </div>
                       <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{item.description}</p>
+
+                      {item.is_clause_38_applicable && (
+                        <div className="mt-3 px-4 py-3 bg-orange-50 border border-orange-300 rounded-lg">
+                          <div className="flex items-start space-x-2">
+                            <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-orange-900">
+                                Clause 38 Applicable - Quantity Exceeded by {item.excess_percentage.toFixed(2)}%
+                              </p>
+                              <p className="text-xs text-orange-700 mt-1">
+                                Executed quantity exceeds BOQ quantity by more than 25%. This requires approval under Clause 38.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
                         <div>
                           <span className="text-xs text-gray-500 block mb-1">BOQ Quantity</span>
@@ -397,8 +440,12 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                         </div>
                         <div>
                           <span className="text-xs text-gray-500 block mb-1">Balance</span>
-                          <p className="font-semibold text-orange-600">{item.balance_quantity.toFixed(3)}</p>
-                          <p className="text-xs text-orange-700 mt-0.5">₹{(item.balance_quantity * item.rate).toFixed(2)}</p>
+                          <p className={`font-semibold ${item.balance_quantity < 0 ? 'text-red-600' : 'text-orange-600'}`}>
+                            {item.balance_quantity.toFixed(3)}
+                          </p>
+                          <p className={`text-xs mt-0.5 ${item.balance_quantity < 0 ? 'text-red-700' : 'text-orange-700'}`}>
+                            ₹{(item.balance_quantity * item.rate).toFixed(2)}
+                          </p>
                         </div>
                       </div>
                     </div>
