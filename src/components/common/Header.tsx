@@ -46,7 +46,7 @@ const Header: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900 tracking-wide" style={{ fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}>
-                E-Estimate and MB
+                E-Estimate
               </h1>
               <p className="text-xs text-gray-500">ZP Chandrapur</p>
             </div>
