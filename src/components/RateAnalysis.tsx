@@ -66,9 +66,9 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     required_quantity: 0,
     rate_per_unit: 0
   });
-  const [newTax, setNewTax] = useState({ label: '', value: '', type: 'Addition' });
+  const [newTax, setNewTax] = useState({ label: '', value: '', factor: 1, type: 'Addition' });
   const [entries, setEntries] = useState<
-    { label: string; type: string; value: number; amount: number }
+    { label: string; type: string; value: number; factor: number; amount: number }
   >([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [leadStatements, setLeadStatements] = useState<any[]>([]);
@@ -78,7 +78,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   // NEW STATE FOR INLINE ADDING + EDITING
   const [rowBeingAddedBelow, setRowBeingAddedBelow] = useState<number | null>(null);
   const [rowBeingEdited, setRowBeingEdited] = useState<number | null>(null);
-  const [tempRow, setTempRow] = useState({ label: '', type: 'Addition', value: 0 });
+  const [tempRow, setTempRow] = useState({ label: '', type: 'Addition', value: 0, factor: 1 });
 
   // NEW STATE FOR FINAL-RATE TAX
   const [showFinalTaxInput, setShowFinalTaxInput] = useState(false);
@@ -86,15 +86,22 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   const [finalTaxApplied, setFinalTaxApplied] = useState<{ percent: number; amount: number } | null>(null);
 
   // Calculation helpers
-  const calculateAmount = (type: string, rate: number, value: number) => {
+  const calculateAmount = (
+    type: string,
+    rate: number,
+    value: number,
+    factor: number
+  ) => {
+    const effectiveValue = value * factor;
+
     if (type === 'Tax') {
-      return (rate * value) / 100;
+      return (rate * effectiveValue) / 100;
     }
     if (type === 'Addition') {
-      return value;
+      return effectiveValue;
     }
     if (type === 'Deletion') {
-      return -value;
+      return -effectiveValue;
     }
     return 0;
   };
@@ -103,14 +110,20 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     let additions = 0;
     let deletions = 0;
     let taxes = 0;
-    const baseRate = selectedRateValue > 0 ? selectedRateValue : (baseRateProp ?? item?.ssr_rate ?? 0);
-    let finalRate = baseRate;
+
+    const baseRate =
+      selectedRateValue > 0
+        ? selectedRateValue
+        : (baseRateProp ?? item?.ssr_rate ?? 0);
+
     entries.forEach((entry) => {
-      if (entry.type === 'Addition') additions += entry.value;
-      if (entry.type === 'Deletion') deletions += entry.value;
+      if (entry.type === 'Addition') additions += entry.amount;
+      if (entry.type === 'Deletion') deletions += Math.abs(entry.amount);
       if (entry.type === 'Tax') taxes += entry.amount;
     });
-    finalRate = baseRate + additions - deletions + taxes;
+
+    const finalRate = baseRate + additions - deletions + taxes;
+
     return { additions, deletions, taxes, finalRate, baseRate };
   }, [entries, baseRateProp, item?.ssr_rate, selectedRateValue]);
 
@@ -351,80 +364,88 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     setLeadStatements([]);
   };
 
-const saveRateAnalysis = async () => {
-  try {
-    setLoading(true);
+  const saveRateAnalysis = async () => {
+    debugger
+    try {
+      setLoading(true);
 
-    if (!item?.sr_no) {
-      alert('Item not found. Please try again.');
-      return;
-    }
+      // ✅ Decide correct FK source
+      const resolvedSubworkItemId = item?.sr_no ?? parentSubworkSrNo;
 
-    const totalRate =
-      summary.finalRate + (finalTaxApplied?.amount ?? 0);
+      if (!resolvedSubworkItemId) {
+        alert('Unable to resolve subwork reference. Please try again.');
+        return;
+      }
 
-    const payload = {
-      subwork_item_id: item.sr_no,
-      item_rate_id: selectedRateId,
-      base_rate: summary.baseRate,
-      entries,
-      final_tax_percent: finalTaxApplied?.percent ?? null,
-      final_tax_amount: finalTaxApplied?.amount ?? null,
-      total_additions: summary.additions,
-      total_deletions: summary.deletions,
-      total_taxes: summary.taxes,
-      final_rate: summary.finalRate,
-      total_rate: totalRate,
-      created_by: user?.id ?? null,
-      updated_at: new Date().toISOString(),
-    };
+      const totalRate =
+        summary.finalRate + (finalTaxApplied?.amount ?? 0);
 
-    const { data: existingAnalysis } = await supabase
-      .schema('estimate')
-      .from('item_rate_analysis')
-      .select('sr_no')
-      .eq('subwork_item_id', item.sr_no)
-      .eq('item_rate_id', selectedRateId || 0)
-      .maybeSingle();
+      const payload = {
+        subwork_item_id: resolvedSubworkItemId, // ✅ FIXED
+        item_rate_id: selectedRateId ?? null,
+        base_rate: summary.baseRate,
+        entries,
+        final_tax_percent: finalTaxApplied?.percent ?? null,
+        final_tax_amount: finalTaxApplied?.amount ?? null,
+        total_additions: summary.additions,
+        total_deletions: summary.deletions,
+        total_taxes: summary.taxes,
+        final_rate: summary.finalRate,
+        total_rate: totalRate,
+        created_by: user?.id ?? null,
+        updated_at: new Date().toISOString(),
+      };
 
-    if (existingAnalysis) {
-      const { error: updateError } = await supabase
+      // 🔍 Check if analysis already exists
+      const { data: existingAnalysis } = await supabase
         .schema('estimate')
         .from('item_rate_analysis')
-        .update(payload)
-        .eq('sr_no', existingAnalysis.sr_no);
+        .select('sr_no')
+        .eq('subwork_item_id', resolvedSubworkItemId)
+        .eq('item_rate_id', selectedRateId ?? null)
+        .maybeSingle();
 
-      if (updateError) throw updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .schema('estimate')
-        .from('item_rate_analysis')
-        .insert(payload);
+      if (existingAnalysis?.sr_no) {
+        // ✅ UPDATE
+        const { error } = await supabase
+          .schema('estimate')
+          .from('item_rate_analysis')
+          .update(payload)
+          .eq('sr_no', existingAnalysis.sr_no);
 
-      if (insertError) throw insertError;
+        if (error) throw error;
+      } else {
+        // ✅ INSERT
+        const { error } = await supabase
+          .schema('estimate')
+          .from('item_rate_analysis')
+          .insert(payload);
+
+        if (error) throw error;
+      }
+
+      // ✅ Update item_rates only when rate exists
+      if (selectedRateId) {
+        const { error } = await supabase
+          .schema('estimate')
+          .from('item_rates')
+          .update({ rate: totalRate })
+          .eq('sr_no', selectedRateId);
+
+        if (error) throw error;
+      }
+
+      // ✅ UI sync
+      onSaveRate?.(totalRate);
+      onClose();
+
+    } catch (err) {
+      console.error('Error saving rate analysis:', err);
+      alert('Failed to save rate analysis');
+    } finally {
+      setLoading(false);
     }
-
-    // Update the rate in item_rates table
-    if (selectedRateId) {
-      const { error: rateUpdateError } = await supabase
-        .schema('estimate')
-        .from('item_rates')
-        .update({ rate: totalRate })
-        .eq('sr_no', selectedRateId);
-
-      if (rateUpdateError) throw rateUpdateError;
-    }
-
-    // ✅ Update UI immediately
-    onSaveRate?.(totalRate);
-    onClose();
-  } catch (err) {
-    console.error('Error saving rate analysis:', err);
-    alert('Failed to save rate analysis');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('hi-IN', {
@@ -442,16 +463,33 @@ const saveRateAnalysis = async () => {
 
   // Add entry handler
   const handleAddEntry = () => {
-    if (newTax.label && newTax.type && Number(newTax.value) > 0) {
+    if (
+      newTax.label &&
+      newTax.type &&
+      Number(newTax.value) > 0 &&
+      Number(newTax.factor) > 0
+    ) {
       const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
-      const amount = calculateAmount(newTax.type, baseRate, Number(newTax.value));
-      setEntries(prev => [...prev, {
-        label: newTax.label,
-        type: newTax.type,
-        value: Number(newTax.value),
-        amount,
-      }]);
-      setNewTax({ label: '', value: '', type: 'Addition' });
+
+      const amount = calculateAmount(
+        newTax.type,
+        baseRate,
+        Number(newTax.value),
+        Number(newTax.factor)
+      );
+
+      setEntries(prev => [
+        ...prev,
+        {
+          label: newTax.label,
+          type: newTax.type,
+          value: Number(newTax.value),
+          factor: Number(newTax.factor),
+          amount,
+        }
+      ]);
+
+      setNewTax({ label: '', value: '', factor: 1, type: 'Addition' });
       setEditIndex(null);
     }
   };
@@ -465,15 +503,35 @@ const saveRateAnalysis = async () => {
 
   // Update handler
   const handleUpdate = () => {
-    if (editIndex !== null && newTax.label && newTax.type && Number(newTax.value) > 0) {
+    if (
+      editIndex !== null &&
+      newTax.label &&
+      newTax.type &&
+      Number(newTax.value) > 0 &&
+      Number(newTax.factor) > 0
+    ) {
       const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
-      const amount = calculateAmount(newTax.type, baseRate, Number(newTax.value));
+
+      const amount = calculateAmount(
+        newTax.type,
+        baseRate,
+        Number(newTax.value),
+        Number(newTax.factor)
+      );
+
       setEntries(entries.map((ent, idx) =>
         idx === editIndex
-          ? { label: newTax.label, type: newTax.type, value: Number(newTax.value), amount }
+          ? {
+            label: newTax.label,
+            type: newTax.type,
+            value: Number(newTax.value),
+            factor: Number(newTax.factor),
+            amount
+          }
           : ent
       ));
-      setNewTax({ label: '', value: '', type: 'Addition' });
+
+      setNewTax({ label: '', value: '', factor: 1, type: 'Addition' });
       setEditIndex(null);
     }
   };
@@ -488,11 +546,17 @@ const saveRateAnalysis = async () => {
   // INLINE SAVE FOR NEW ROW (Option A behavior)
   const saveNewRow = (index: number) => {
     const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
-    const amount = calculateAmount(tempRow.type, baseRate, Number(tempRow.value));
+    const amount = calculateAmount(
+      tempRow.type,
+      baseRate,
+      Number(tempRow.value),
+      Number(tempRow.factor)
+    );
     const newEntry = {
       label: tempRow.label,
       type: tempRow.type,
       value: Number(tempRow.value),
+      factor: Number(tempRow.factor),
       amount,
     };
 
@@ -501,21 +565,34 @@ const saveRateAnalysis = async () => {
     setEntries(updated);
 
     setRowBeingAddedBelow(null);
-    setTempRow({ label: '', type: 'Addition', value: 0 });
+    setTempRow({ label: '', type: 'Addition', value: 0, factor: 1 });
   };
 
   // INLINE SAVE FOR EDITED ROW
   const saveEditedRow = (index: number) => {
     const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
-    const amount = calculateAmount(tempRow.type, baseRate, Number(tempRow.value));
+    const amount = calculateAmount(
+      tempRow.type,
+      baseRate,
+      Number(tempRow.value),
+      Number(tempRow.factor)
+    );
 
     const updated = entries.map((row, idx) =>
-      idx === index ? { label: tempRow.label, type: tempRow.type, value: Number(tempRow.value), amount } : row
+      idx === index
+        ? {
+          label: tempRow.label,
+          type: tempRow.type,
+          value: Number(tempRow.value),
+          factor: Number(tempRow.factor),
+          amount
+        }
+        : row
     );
 
     setEntries(updated);
     setRowBeingEdited(null);
-    setTempRow({ label: '', type: 'Addition', value: 0 });
+    setTempRow({ label: '', type: 'Addition', value: 0, factor: 1 });
   };
 
   // FINAL RATE TAX HANDLERS
@@ -749,6 +826,23 @@ const saveRateAnalysis = async () => {
                   placeholder="0.00"
                 />
               </div>
+
+              <div className="w-24">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  Factor
+                </label>
+                <input
+                  type="number"
+                  step=""
+                  value={newTax.factor}
+                  onChange={(e) =>
+                    setNewTax({ ...newTax, factor: Number(e.target.value) || 1 })
+                  }
+                  className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md
+               focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="1"
+                />
+              </div>
               <div>
                 {editIndex === null ? (
                   <button
@@ -782,63 +876,113 @@ const saveRateAnalysis = async () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Label</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Type</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Value</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Calculated Amount</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                        Label
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">
+                        Type
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">
+                        Value
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">
+                        Factor
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">
+                        Calculated Amount
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-600 uppercase">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
+
                   <tbody className="bg-white divide-y divide-gray-200">
                     {entries.map((entry, idx) => (
                       <React.Fragment key={idx}>
                         <tr className="hover:bg-gray-50 transition-colors">
                           {rowBeingEdited === idx ? (
                             <>
+                              {/* Label */}
                               <td className="px-4 py-3">
                                 <input
                                   className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
                                   value={tempRow.label}
-                                  onChange={(e) => setTempRow({ ...tempRow, label: e.target.value })}
+                                  onChange={(e) =>
+                                    setTempRow({ ...tempRow, label: e.target.value })
+                                  }
                                 />
                               </td>
+
+                              {/* Type */}
                               <td className="px-4 py-3">
                                 <select
                                   className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
                                   value={tempRow.type}
-                                  onChange={(e) => setTempRow({ ...tempRow, type: e.target.value })}
+                                  onChange={(e) =>
+                                    setTempRow({ ...tempRow, type: e.target.value })
+                                  }
                                 >
                                   <option value="Addition">Addition</option>
                                   <option value="Deletion">Deletion</option>
                                   <option value="Tax">Tax</option>
                                 </select>
                               </td>
+
+                              {/* Value */}
                               <td className="px-4 py-3">
                                 <input
                                   type="number"
                                   className="border border-gray-300 rounded px-2 py-1 w-full text-sm text-right"
                                   value={tempRow.value}
-                                  onChange={(e) => setTempRow({ ...tempRow, value: Number(e.target.value) })}
+                                  onChange={(e) =>
+                                    setTempRow({
+                                      ...tempRow,
+                                      value: Number(e.target.value),
+                                    })
+                                  }
                                 />
                               </td>
+
+                              {/* Factor */}
+                              <td className="px-4 py-3">
+                                <input
+                                  type="number"
+                                  className="border border-gray-300 rounded px-2 py-1 w-full text-sm text-right"
+                                  value={tempRow.factor}
+                                  onChange={(e) =>
+                                    setTempRow({
+                                      ...tempRow,
+                                      factor: Number(e.target.value) || 1,
+                                    })
+                                  }
+                                />
+                              </td>
+
+                              {/* Calculated Amount */}
                               <td className="px-4 py-3 text-right text-sm font-medium">
                                 {formatCurrency(
-                                  calculateAmount(tempRow.type, summary.baseRate, Number(tempRow.value))
+                                  calculateAmount(
+                                    tempRow.type,
+                                    summary.baseRate,
+                                    Number(tempRow.value),
+                                    Number(tempRow.factor)
+                                  )
                                 )}
                               </td>
+
+                              {/* Actions */}
                               <td className="px-4 py-3">
                                 <div className="flex gap-2 justify-center">
                                   <button
                                     onClick={() => saveEditedRow(idx)}
-                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
-                                    title="Save"
+                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded"
                                   >
                                     <Check className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => setRowBeingEdited(null)}
-                                    className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                                    title="Cancel"
+                                    className="p-1.5 text-gray-600 hover:bg-gray-100 rounded"
                                   >
                                     <CancelIcon className="w-4 h-4" />
                                   </button>
@@ -847,27 +991,53 @@ const saveRateAnalysis = async () => {
                             </>
                           ) : (
                             <>
-                              <td className="px-4 py-3 text-sm text-gray-900">{entry.label}</td>
+                              {/* Label */}
+                              <td className="px-4 py-3 text-sm text-gray-900">
+                                {entry.label}
+                              </td>
+
+                              {/* Type */}
                               <td className="px-4 py-3">
-                                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border ${getTypeColor(entry.type)}`}>
+                                <span
+                                  className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border ${getTypeColor(
+                                    entry.type
+                                  )}`}
+                                >
                                   {entry.type}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-right text-sm text-gray-900 font-medium">
-                                {entry.type === 'Tax' ? `${entry.value}%` : formatCurrency(entry.value)}
+
+                              {/* Value */}
+                              <td className="px-4 py-3 text-right text-sm text-gray-900">
+                                {entry.type === 'Tax'
+                                  ? `${entry.value}%`
+                                  : formatCurrency(entry.value)}
                               </td>
+
+                              {/* Factor */}
+                              <td className="px-4 py-3 text-right text-sm text-gray-900">
+                                {entry.factor}
+                              </td>
+
+                              {/* Calculated Amount */}
                               <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
                                 {formatCurrency(entry.amount)}
                               </td>
+
+                              {/* Actions */}
                               <td className="px-4 py-3">
                                 <div className="flex gap-2 justify-center">
                                   <button
                                     onClick={() => {
                                       setRowBeingAddedBelow(idx);
-                                      setTempRow({ label: '', type: 'Addition', value: 0 });
+                                      setTempRow({
+                                        label: '',
+                                        type: 'Addition',
+                                        value: 0,
+                                        factor: 1,
+                                      });
                                     }}
-                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
-                                    title="Add row below"
+                                    className="p-1.5 text-green-600 hover:bg-green-50 rounded"
                                   >
                                     <Plus className="w-4 h-4" />
                                   </button>
@@ -878,19 +1048,18 @@ const saveRateAnalysis = async () => {
                                         label: entry.label,
                                         type: entry.type,
                                         value: entry.value,
+                                        factor: entry.factor,
                                       });
                                     }}
-                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                    title="Edit"
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
                                   >
                                     <Edit2 className="w-4 h-4" />
                                   </button>
                                   <button
-                                    onClick={() => {
-                                      setEntries(entries.filter((_, i) => i !== idx));
-                                    }}
-                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                    title="Delete"
+                                    onClick={() =>
+                                      setEntries(entries.filter((_, i) => i !== idx))
+                                    }
+                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
@@ -900,55 +1069,83 @@ const saveRateAnalysis = async () => {
                           )}
                         </tr>
 
-                        {/* INLINE NEW ROW BELOW */}
+                        {/* INLINE NEW ROW */}
                         {rowBeingAddedBelow === idx && (
                           <tr className="bg-blue-50">
                             <td className="px-4 py-3">
                               <input
                                 className="border border-blue-300 rounded px-2 py-1 w-full text-sm"
-                                placeholder="Label"
                                 value={tempRow.label}
-                                onChange={(e) => setTempRow({ ...tempRow, label: e.target.value })}
+                                onChange={(e) =>
+                                  setTempRow({ ...tempRow, label: e.target.value })
+                                }
                               />
                             </td>
+
                             <td className="px-4 py-3">
                               <select
                                 className="border border-blue-300 rounded px-2 py-1 w-full text-sm"
                                 value={tempRow.type}
-                                onChange={(e) => setTempRow({ ...tempRow, type: e.target.value })}
+                                onChange={(e) =>
+                                  setTempRow({ ...tempRow, type: e.target.value })
+                                }
                               >
                                 <option value="Addition">Addition</option>
                                 <option value="Deletion">Deletion</option>
                                 <option value="Tax">Tax</option>
                               </select>
                             </td>
+
                             <td className="px-4 py-3">
                               <input
                                 type="number"
                                 className="border border-blue-300 rounded px-2 py-1 w-full text-sm text-right"
-                                placeholder="0.00"
                                 value={tempRow.value}
-                                onChange={(e) => setTempRow({ ...tempRow, value: Number(e.target.value) })}
+                                onChange={(e) =>
+                                  setTempRow({
+                                    ...tempRow,
+                                    value: Number(e.target.value),
+                                  })
+                                }
                               />
                             </td>
+
+                            <td className="px-4 py-3">
+                              <input
+                                type="number"
+                                className="border border-blue-300 rounded px-2 py-1 w-full text-sm text-right"
+                                value={tempRow.factor}
+                                onChange={(e) =>
+                                  setTempRow({
+                                    ...tempRow,
+                                    factor: Number(e.target.value) || 1,
+                                  })
+                                }
+                              />
+                            </td>
+
                             <td className="px-4 py-3 text-right text-sm font-medium">
                               {formatCurrency(
-                                calculateAmount(tempRow.type, summary.baseRate, Number(tempRow.value))
+                                calculateAmount(
+                                  tempRow.type,
+                                  summary.baseRate,
+                                  Number(tempRow.value),
+                                  Number(tempRow.factor)
+                                )
                               )}
                             </td>
+
                             <td className="px-4 py-3">
                               <div className="flex gap-2 justify-center">
                                 <button
                                   onClick={() => saveNewRow(idx)}
-                                  className="p-1.5 text-green-700 hover:bg-green-100 rounded transition-colors"
-                                  title="Save"
+                                  className="p-1.5 text-green-700 hover:bg-green-100 rounded"
                                 >
                                   <Check className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => setRowBeingAddedBelow(null)}
-                                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                                  title="Cancel"
+                                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded"
                                 >
                                   <CancelIcon className="w-4 h-4" />
                                 </button>
