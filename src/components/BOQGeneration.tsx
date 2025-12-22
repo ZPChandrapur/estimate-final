@@ -270,73 +270,73 @@ const BOQGeneration: React.FC = () => {
 
       const boqDataToExport = data.boq_data as BOQData;
 
-      const workbook = XLSX.utils.book_new();
+      const numberToWords = (num: number): string => {
+        if (num === 0) return 'Zero Only';
+
+        const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+        const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+
+        const convertLessThanThousand = (n: number): string => {
+          if (n === 0) return '';
+          if (n < 10) return ones[n];
+          if (n < 20) return teens[n - 10];
+          if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+          return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' & ' + convertLessThanThousand(n % 100) : '');
+        };
+
+        const crore = Math.floor(num / 10000000);
+        const lakh = Math.floor((num % 10000000) / 100000);
+        const thousand = Math.floor((num % 100000) / 1000);
+        const remainder = Math.floor(num % 1000);
+
+        let result = '';
+        if (crore > 0) result += convertLessThanThousand(crore) + ' Crore ';
+        if (lakh > 0) result += convertLessThanThousand(lakh) + ' Lakh ';
+        if (thousand > 0) result += convertLessThanThousand(thousand) + ' Thousand ';
+        if (remainder > 0) result += convertLessThanThousand(remainder);
+
+        return 'INR ' + result.trim() + ' Only';
+      };
 
       const excelData: any[] = [];
+      let slNo = 1;
 
-      excelData.push(['BOQ (Bill of Quantities) - Schedule B']);
-      excelData.push([]);
-      excelData.push([boqDataToExport.project_title]);
-      excelData.push([]);
-
-      excelData.push([
-        'Item No.',
-        'Estimated Quantity (may be more or less)',
-        'Item of Work',
-        'Estimated Rate (in figure)',
-        'Estimated Rate (in words)',
-        'Unit',
-        'Total Amount'
-      ]);
-
-      boqDataToExport.sections.forEach((section) => {
-        excelData.push([]);
-        excelData.push([section.name]);
-        excelData.push([]);
-
+      boqDataToExport.sections.forEach((section, sectionIdx) => {
         section.subsections.forEach((subsection) => {
-          if (subsection.name !== 'Items') {
-            excelData.push([subsection.name]);
-          }
-
           subsection.items.forEach((item) => {
-            excelData.push([
-              item.item_no,
-              item.quantity,
-              item.description,
-              item.rate_figure,
-              item.rate_words,
-              item.unit,
-              item.total_amount
-            ]);
-          });
+            const amountWithTaxes = item.total_amount;
+            const amountInWords = numberToWords(Math.round(amountWithTaxes));
+            const itemDescription = `${section.name}\nItem No.${item.item_no}: ${item.description}`;
 
-          const subsectionTotal = subsection.items.reduce((sum, item) => sum + item.total_amount, 0);
-          excelData.push(['', '', '', '', '', 'Subtotal:', subsectionTotal]);
-          excelData.push([]);
+            excelData.push({
+              'Sl. No.': slNo++,
+              'Item Description': itemDescription,
+              'Quantity': item.quantity,
+              'Units': item.unit,
+              'Estimated Rate': item.rate_figure,
+              'TOTAL AMOUNT Without Taxes': item.total_amount,
+              'TOTAL AMOUNT With Taxes': amountWithTaxes,
+              'TOTAL AMOUNT In Words': amountInWords
+            });
+          });
         });
       });
 
-      const grandTotal = boqDataToExport.sections.reduce((total, section) => {
-        return total + section.subsections.reduce((sectionTotal, subsection) => {
-          return sectionTotal + subsection.items.reduce((sum, item) => sum + item.total_amount, 0);
-        }, 0);
-      }, 0);
-
-      excelData.push(['', '', '', '', '', 'Grand Total:', grandTotal]);
-
-      const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
 
       worksheet['!cols'] = [
+        { wch: 8 },
+        { wch: 80 },
+        { wch: 12 },
         { wch: 10 },
         { wch: 15 },
-        { wch: 50 },
-        { wch: 15 },
-        { wch: 30 },
-        { wch: 10 },
-        { wch: 15 }
+        { wch: 25 },
+        { wch: 22 },
+        { wch: 50 }
       ];
 
+      const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'BOQ');
 
       const work = works.find(w => w.works_id === selectedWork);
