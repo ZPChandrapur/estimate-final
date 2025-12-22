@@ -20,7 +20,9 @@ interface BOQItem {
   unit: string;
   boq_quantity: number;
   rate: number;
+  amount: number;
   executed_quantity: number;
+  executed_amount: number;
   balance_quantity: number;
 }
 
@@ -218,12 +220,15 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
         measurementNumber = `MB-${String(lastNumber + 1).padStart(4, '0')}`;
       }
 
+      const amount = formData.quantity * formData.rate;
+
       const { error: insertError } = await supabase
         .schema('estimate')
         .from('mb_measurements')
         .insert({
           ...formData,
           measurement_number: measurementNumber,
+          amount: amount,
           status,
           created_by: user.id,
           submitted_at: status === 'submitted' ? new Date().toISOString() : null
@@ -370,20 +375,22 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
                       <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{item.description}</p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
                         <div>
-                          <span className="text-xs text-gray-500">BOQ Quantity</span>
-                          <p className="font-medium text-gray-900">{item.boq_quantity.toFixed(3)}</p>
+                          <span className="text-xs text-gray-500 block mb-1">BOQ Quantity</span>
+                          <p className="font-semibold text-gray-900">{item.boq_quantity.toFixed(3)}</p>
                         </div>
                         <div>
-                          <span className="text-xs text-gray-500">Rate</span>
-                          <p className="font-medium text-gray-900">₹{item.rate.toFixed(2)}</p>
+                          <span className="text-xs text-gray-500 block mb-1">Rate</span>
+                          <p className="font-semibold text-gray-900">₹{item.rate.toFixed(2)}</p>
                         </div>
                         <div>
-                          <span className="text-xs text-gray-500">Executed</span>
-                          <p className="font-medium text-green-600">{item.executed_quantity.toFixed(3)}</p>
+                          <span className="text-xs text-gray-500 block mb-1">Executed</span>
+                          <p className="font-semibold text-green-600">{(item.executed_quantity || 0).toFixed(3)}</p>
+                          <p className="text-xs text-green-700 mt-0.5">₹{(item.executed_amount || 0).toFixed(2)}</p>
                         </div>
                         <div>
-                          <span className="text-xs text-gray-500">Balance</span>
-                          <p className="font-medium text-orange-600">{item.balance_quantity.toFixed(3)}</p>
+                          <span className="text-xs text-gray-500 block mb-1">Balance</span>
+                          <p className="font-semibold text-orange-600">{item.balance_quantity.toFixed(3)}</p>
+                          <p className="text-xs text-orange-700 mt-0.5">₹{(item.balance_quantity * item.rate).toFixed(2)}</p>
                         </div>
                       </div>
                     </div>
