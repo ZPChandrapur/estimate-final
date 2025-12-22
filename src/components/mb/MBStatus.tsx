@@ -51,6 +51,7 @@ const MBStatus: React.FC<MBStatusProps> = ({ onNavigate }) => {
   const [approvalAction, setApprovalAction] = useState<'approved' | 'rejected' | ''>('');
   const [approvalRemarks, setApprovalRemarks] = useState('');
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [approvingAll, setApprovingAll] = useState(false);
 
   useEffect(() => {
     fetchProjects();
@@ -223,6 +224,84 @@ const MBStatus: React.FC<MBStatusProps> = ({ onNavigate }) => {
     }
   };
 
+  const approveAll = async () => {
+    if (!user) return;
+
+    const approvableMeasurements = measurements.filter(m => canApprove(m));
+    if (approvableMeasurements.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to approve all ${approvableMeasurements.length} measurements?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setApprovingAll(true);
+
+      const isJE = userRoles.some(role => role.includes('Junior Engineer'));
+      const isDE = userRoles.some(role => role.includes('Deputy Engineer'));
+      const isEE = userRoles.some(role => role.includes('Executive Engineer'));
+      const isAdmin = userRoles.includes('admin') || userRoles.includes('super_admin') || userRoles.includes('developer');
+
+      for (const measurement of approvableMeasurements) {
+        let newStatus = measurement.status;
+        let approverRole = '';
+
+        if (isJE || (isAdmin && measurement.status === 'submitted')) {
+          approverRole = 'Junior Engineer';
+          newStatus = 'je_approved';
+        } else if (isDE || (isAdmin && measurement.status === 'je_approved')) {
+          approverRole = 'Deputy Engineer';
+          newStatus = 'de_approved';
+        } else if (isEE || (isAdmin && measurement.status === 'de_approved')) {
+          approverRole = 'Executive Engineer';
+          newStatus = 'ee_approved';
+        }
+
+        await supabase
+          .schema('estimate')
+          .from('mb_measurements')
+          .update({ status: newStatus })
+          .eq('id', measurement.id);
+
+        await supabase
+          .schema('estimate')
+          .from('mb_approvals')
+          .insert({
+            measurement_id: measurement.id,
+            project_id: selectedProject,
+            approver_role: approverRole,
+            approver_id: user.id,
+            action: 'approved',
+            remarks: 'Bulk approval'
+          });
+
+        await supabase
+          .schema('estimate')
+          .from('mb_audit_logs')
+          .insert({
+            project_id: selectedProject,
+            user_id: user.id,
+            action: 'measurement_approved',
+            entity_type: 'approval',
+            entity_id: measurement.id,
+            details: {
+              measurement_number: measurement.measurement_number,
+              approver_role: approverRole,
+              remarks: 'Bulk approval'
+            }
+          });
+      }
+
+      fetchMeasurements();
+    } catch (error) {
+      console.error('Error approving all:', error);
+    } finally {
+      setApprovingAll(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -258,10 +337,20 @@ const MBStatus: React.FC<MBStatusProps> = ({ onNavigate }) => {
 
         {selectedProject && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">
                 Measurements ({measurements.length})
               </h3>
+              {measurements.filter(m => canApprove(m)).length > 0 && (
+                <button
+                  onClick={approveAll}
+                  disabled={approvingAll}
+                  className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  {approvingAll ? 'Approving...' : `Approve All (${measurements.filter(m => canApprove(m)).length})`}
+                </button>
+              )}
             </div>
 
             {loading ? (
@@ -293,11 +382,13 @@ const MBStatus: React.FC<MBStatusProps> = ({ onNavigate }) => {
                               {statusConfig.label}
                             </span>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <span className="text-gray-600">BOQ Item:</span>
-                              <p className="font-medium text-gray-900">{measurement.boq_item?.item_number}</p>
-                            </div>
+                          <div className="mb-3">
+                            <span className="text-xs text-gray-500">BOQ Item #{measurement.boq_item?.item_number}</span>
+                            <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                              {measurement.boq_item?.description}
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                             <div>
                               <span className="text-gray-600">Date:</span>
                               <p className="font-medium text-gray-900">
