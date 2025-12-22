@@ -810,30 +810,42 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                 <thead className="bg-blue-100">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 border-r border-gray-300">
-                      No Of Entries Check
+                      approval
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 border-r border-gray-300">
-                      Check %
+                      No Of Entries Check
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 border-r border-gray-300">
                       Amount
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700">
+                      check %
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {billChecks.map((check) => (
-                    <tr key={check.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
-                        {check.check_type.check_name}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200">
-                        {check.check_type.percentage}%
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
-                        ₹{check.calculated_amount.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
+                  {billChecks.map((check) => {
+                    const totalItems = billItems.filter(item => item.amount > 0).length;
+                    const checkedItems = billItems.filter(item => item.amount > 0 && item.is_checked).length;
+                    const checkPercentage = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
+
+                    return (
+                      <tr key={check.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200">
+                          {check.check_type.check_name}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-center text-gray-900 border-r border-gray-200">
+                          {totalItems}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 border-r border-gray-200">
+                          {check.calculated_amount.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-center text-gray-900">
+                          {checkPercentage}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
