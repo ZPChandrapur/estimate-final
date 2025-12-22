@@ -633,20 +633,30 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     // Load existing rates for this item
     const existingRates = itemRatesMap[item.sr_no.toString()] || [];
     if (existingRates.length > 0) {
-      setItemRates(existingRates.map(rate => ({
+      const rates = existingRates.map(rate => ({
         description: rate.description,
         rate: rate.rate,
-        unit: rate.unit || '',
+        unit: rate.ssr_unit || '',
         ssr_quantity: rate.ssr_quantity || 1
-      })));
+      }));
+      setItemRates(rates);
+
+      // Initialize rate search queries with descriptions
+      const searchQueries: { [key: number]: string } = {};
+      rates.forEach((rate, index) => {
+        searchQueries[index] = rate.description;
+      });
+      setRateSearchQueries(searchQueries);
     } else {
       // Fallback to item's main rate if no separate rates exist
-      setItemRates([{
+      const rates = [{
         description: item.description_of_item,
-        rate: item.rate_total_amount,
-        ssr_unit: item.ssr_unit || '',
+        rate: item.rate_total_amount || 0,
+        unit: item.ssr_unit || '',
         ssr_quantity: 1
-      }]);
+      }];
+      setItemRates(rates);
+      setRateSearchQueries({ 0: item.description_of_item });
     }
 
     setNewItem({
@@ -731,6 +741,11 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         category: ''
       });
       setItemRates([{ description: '', rate: 0, unit: '' }]);
+      setRateSearchQueries({});
+      setRateSuggestions({});
+      setShowRateSuggestions({});
+      Object.values(rateSearchTimeoutRefs.current).forEach(timeout => clearTimeout(timeout));
+      rateSearchTimeoutRefs.current = {};
       fetchSubworkItems();
     } catch (error) {
       console.error('Error updating item:', error);
@@ -1244,9 +1259,14 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                     setSelectedCSRItem(null);
                     setSelectedSSRItem(null);
                     setIsManualEntry(false);
+                    setRateSearchQueries({});
+                    setRateSuggestions({});
+                    setShowRateSuggestions({});
                     if (searchTimeoutRef.current) {
                       clearTimeout(searchTimeoutRef.current);
                     }
+                    Object.values(rateSearchTimeoutRefs.current).forEach(timeout => clearTimeout(timeout));
+                    rateSearchTimeoutRefs.current = {};
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
@@ -1787,6 +1807,11 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                     setSelectedCSRItem(null);
                     setSelectedSSRItem(null);
                     setIsManualEntry(false);
+                    setRateSearchQueries({});
+                    setRateSuggestions({});
+                    setShowRateSuggestions({});
+                    Object.values(rateSearchTimeoutRefs.current).forEach(timeout => clearTimeout(timeout));
+                    rateSearchTimeoutRefs.current = {};
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
@@ -1813,7 +1838,14 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Edit Item</h3>
                 <button
-                  onClick={() => setShowEditItemModal(false)}
+                  onClick={() => {
+                    setShowEditItemModal(false);
+                    setRateSearchQueries({});
+                    setRateSuggestions({});
+                    setShowRateSuggestions({});
+                    Object.values(rateSearchTimeoutRefs.current).forEach(timeout => clearTimeout(timeout));
+                    rateSearchTimeoutRefs.current = {};
+                  }}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X className="w-5 h-5" />
@@ -2096,9 +2128,14 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                     setDescriptionQuery('');
                     setSsrSuggestions([]);
                     setShowSuggestions(false);
+                    setRateSearchQueries({});
+                    setRateSuggestions({});
+                    setShowRateSuggestions({});
                     if (searchTimeoutRef.current) {
                       clearTimeout(searchTimeoutRef.current);
                     }
+                    Object.values(rateSearchTimeoutRefs.current).forEach(timeout => clearTimeout(timeout));
+                    rateSearchTimeoutRefs.current = {};
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
