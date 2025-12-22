@@ -76,6 +76,12 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const [searchingCSR, setSearchingCSR] = useState(false);
   const [csrSearchQuery, setCsrSearchQuery] = useState('');
   const [selectedCSRItem, setSelectedCSRItem] = useState<any>(null);
+  const [ssrSearchSuggestions, setSsrSearchSuggestions] = useState<any[]>([]);
+  const [showSsrSearchSuggestions, setShowSsrSearchSuggestions] = useState(false);
+  const [searchingSSRTable, setSearchingSSRTable] = useState(false);
+  const [ssrSearchQuery, setSsrSearchQuery] = useState('');
+  const [selectedSSRItem, setSelectedSSRItem] = useState<any>(null);
+  const [searchSource, setSearchSource] = useState<'CSR' | 'SSR'>('CSR');
 
   useEffect(() => {
     if (isOpen && subworkId) {
@@ -287,6 +293,88 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     }
   };
 
+  const searchSSRTableItems = async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setSsrSearchSuggestions([]);
+      setShowSsrSearchSuggestions(false);
+      return;
+    }
+
+    try {
+      setSearchingSSRTable(true);
+
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('SSR_2022_23')
+        .select('*')
+        .or(`"SSR Item No.".ilike.%${query}%,"Reference No.".ilike.%${query}%,"Description of the item".ilike.%${query}%`)
+        .limit(20);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setSsrSearchSuggestions(data);
+        setShowSsrSearchSuggestions(true);
+      } else {
+        setSsrSearchSuggestions([]);
+        setShowSsrSearchSuggestions(false);
+      }
+    } catch (error) {
+      console.error('Error searching SSR items:', error);
+      setSsrSearchSuggestions([]);
+      setShowSsrSearchSuggestions(false);
+    } finally {
+      setSearchingSSRTable(false);
+    }
+  };
+
+  const handleSSRSearchChange = (value: string) => {
+    setSsrSearchQuery(value);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!value || value.trim().length < 2) {
+      setSsrSearchSuggestions([]);
+      setShowSsrSearchSuggestions(false);
+      return;
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      searchSSRTableItems(value);
+    }, 500);
+  };
+
+  const selectSSRTableItem = (item: any) => {
+    setSsrSearchQuery(`${item['SSR Item No.']} - ${item['Description of the item']}`);
+
+    const completedRate = parseInt(item['Proposed Completed Rate for 2022-23\nexcluding GST\nIn Rs.']) || 0;
+    const labourRate = parseFloat(item['Proposed Labour Rate for 2022-23\nexcluding GST\nIn Rs.']) || 0;
+    const unit = item['Unit'] || '';
+    const description = item['Description of the item'] || '';
+
+    setNewItem({
+      ...newItem,
+      description_of_item: description
+    });
+
+    setSelectedSSRItem(item);
+
+    setItemRates([{
+      description: description,
+      rate: completedRate,
+      unit: unit
+    }]);
+
+    setShowSsrSearchSuggestions(false);
+    setSsrSearchSuggestions([]);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+  };
+
   const fetchSubworkItems = async () => {
     try {
       setLoading(true);
@@ -438,10 +526,10 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
           item_number: itemNumber,
           ssr_rate: validRates[0]?.rate || 0,
           ssr_unit: mainUnit,
-          csr_item_no: selectedCSRItem ? selectedCSRItem['Item No'] : null,
-          csr_reference: selectedCSRItem ? selectedCSRItem['Reference'] : null,
-          csr_labour_cost: selectedCSRItem ? parseFloat(selectedCSRItem['Labour']) || 0 : 0,
-          csr_unit: selectedCSRItem ? selectedCSRItem['Unit'] : null,
+          csr_item_no: selectedCSRItem ? selectedCSRItem['Item No'] : (selectedSSRItem ? selectedSSRItem['SSR Item No.'] : null),
+          csr_reference: selectedCSRItem ? selectedCSRItem['Reference'] : (selectedSSRItem ? selectedSSRItem['Reference No.'] : null),
+          csr_labour_cost: selectedCSRItem ? parseFloat(selectedCSRItem['Labour']) || 0 : (selectedSSRItem ? parseFloat(selectedSSRItem['Proposed Labour Rate for 2022-23\nexcluding GST\nIn Rs.']) || 0 : 0),
+          csr_unit: selectedCSRItem ? selectedCSRItem['Unit'] : (selectedSSRItem ? selectedSSRItem['Unit'] : null),
           created_by: user.id
         })
         .select()
@@ -521,7 +609,11 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       setCsrSearchQuery('');
       setCsrSuggestions([]);
       setShowCsrSuggestions(false);
+      setSsrSearchQuery('');
+      setSsrSearchSuggestions([]);
+      setShowSsrSearchSuggestions(false);
       setSelectedCSRItem(null);
+      setSelectedSSRItem(null);
       setIsManualEntry(false);
       fetchSubworkItems();
     } catch (error) {
@@ -1037,7 +1129,11 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                     setCsrSearchQuery('');
                     setCsrSuggestions([]);
                     setShowCsrSuggestions(false);
+                    setSsrSearchQuery('');
+                    setSsrSearchSuggestions([]);
+                    setShowSsrSearchSuggestions(false);
                     setSelectedCSRItem(null);
+                    setSelectedSSRItem(null);
                     setIsManualEntry(false);
                     if (searchTimeoutRef.current) {
                       clearTimeout(searchTimeoutRef.current);
@@ -1079,20 +1175,61 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Search Item from CSR *
+                    Search Item from Rate Schedule *
                   </label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    Search by Item No, Item description, or Reference
-                  </p>
-                  <div className="flex items-center mb-2">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          value="CSR"
+                          checked={searchSource === 'CSR'}
+                          onChange={(e) => {
+                            setSearchSource(e.target.value as 'CSR' | 'SSR');
+                            setCsrSearchQuery('');
+                            setSsrSearchQuery('');
+                            setSelectedCSRItem(null);
+                            setSelectedSSRItem(null);
+                            setCsrSuggestions([]);
+                            setSsrSearchSuggestions([]);
+                          }}
+                          className="mr-1"
+                        />
+                        <span className="text-sm">CSR</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          value="SSR"
+                          checked={searchSource === 'SSR'}
+                          onChange={(e) => {
+                            setSearchSource(e.target.value as 'CSR' | 'SSR');
+                            setCsrSearchQuery('');
+                            setSsrSearchQuery('');
+                            setSelectedCSRItem(null);
+                            setSelectedSSRItem(null);
+                            setCsrSuggestions([]);
+                            setSsrSearchSuggestions([]);
+                          }}
+                          className="mr-1"
+                        />
+                        <span className="text-sm">SSR</span>
+                      </label>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setIsManualEntry(!isManualEntry)}
                       className="text-sm text-blue-600 hover:text-blue-800 underline"
                     >
-                      {isManualEntry ? 'Switch to CSR Search' : 'Switch to Manual Entry'}
+                      {isManualEntry ? `Switch to ${searchSource} Search` : 'Switch to Manual Entry'}
                     </button>
                   </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    {searchSource === 'CSR'
+                      ? 'Search by Item No, Item description, or Reference'
+                      : 'Search by SSR Item No, Reference No, or Description'
+                    }
+                  </p>
 
                   {isManualEntry ? (
                     <textarea
@@ -1103,7 +1240,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                       rows={3}
                       required
                     />
-                  ) : (
+                  ) : searchSource === 'CSR' ? (
                     <div className="relative">
                       <input
                         type="text"
@@ -1177,9 +1314,88 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                         </div>
                       )}
                     </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={ssrSearchQuery}
+                        onChange={(e) => handleSSRSearchChange(e.target.value)}
+                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Search SSR items by SSR Item No, Reference No, or Description..."
+                      />
+                      {searchingSSRTable && (
+                        <div className="absolute right-3 top-3">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        </div>
+                      )}
+
+                      {showSsrSearchSuggestions && ssrSearchSuggestions.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-96 overflow-y-auto">
+                          <div className="p-2 text-xs text-gray-500 border-b bg-gray-50">
+                            <Search className="w-3 h-3 inline mr-1" />
+                            SSR 2022-2023 Items
+                          </div>
+                          {ssrSearchSuggestions.map((item, index) => (
+                            <div
+                              key={index}
+                              onClick={() => selectSSRTableItem(item)}
+                              className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    {item['SSR Item No.'] && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                        {item['SSR Item No.']}
+                                      </span>
+                                    )}
+                                    {item['Unit'] && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                        {item['Unit']}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-sm font-medium text-gray-900 mb-1">
+                                    {item['Description of the item']}
+                                  </div>
+                                  <div className="flex items-center gap-3 text-xs">
+                                    {item['Proposed Completed Rate for 2022-23\nexcluding GST\nIn Rs.'] && (
+                                      <span className="text-green-600">
+                                        Completed Rate: <span className="font-semibold">₹{parseInt(item['Proposed Completed Rate for 2022-23\nexcluding GST\nIn Rs.']).toFixed(2)}</span>
+                                      </span>
+                                    )}
+                                    {item['Proposed Labour Rate for 2022-23\nexcluding GST\nIn Rs.'] && (
+                                      <span className="text-blue-600">
+                                        Labour: <span className="font-semibold">₹{parseFloat(item['Proposed Labour Rate for 2022-23\nexcluding GST\nIn Rs.']).toFixed(2)}</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                  {item['Reference No.'] && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      Reference: {item['Reference No.']}
+                                    </div>
+                                  )}
+                                  {item['Additional Specification'] && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      Spec: {item['Additional Specification']}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="ml-2">
+                                  <CheckCircle className="w-5 h-5 text-green-500" />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="p-2 text-xs text-gray-400 text-center border-t bg-gray-50">
+                            Click on an item to auto-fill unit and completed rate
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
 
-                  {selectedCSRItem && !isManualEntry && (
+                  {selectedCSRItem && !isManualEntry && searchSource === 'CSR' && (
                     <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
                       <div className="text-xs font-medium text-blue-800 mb-2">Selected CSR Item:</div>
                       <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1211,6 +1427,48 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                             <div className="text-gray-700 text-xs leading-relaxed bg-white p-2 rounded">
                               {selectedCSRItem.parentDescription}
                             </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedSSRItem && !isManualEntry && searchSource === 'SSR' && (
+                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <div className="text-xs font-medium text-green-800 mb-2">Selected SSR Item:</div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-gray-600">SSR Item No:</span>
+                          <span className="ml-1 font-medium">{selectedSSRItem['SSR Item No.']}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Unit:</span>
+                          <span className="ml-1 font-medium">{selectedSSRItem['Unit']}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Completed Rate:</span>
+                          <span className="ml-1 font-medium">₹{parseInt(selectedSSRItem['Proposed Completed Rate for 2022-23\nexcluding GST\nIn Rs.']).toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Labour Rate:</span>
+                          <span className="ml-1 font-medium">₹{parseFloat(selectedSSRItem['Proposed Labour Rate for 2022-23\nexcluding GST\nIn Rs.']).toFixed(2)}</span>
+                        </div>
+                        {selectedSSRItem['Reference No.'] && (
+                          <div className="col-span-2">
+                            <span className="text-gray-600">Reference:</span>
+                            <span className="ml-1 font-medium">{selectedSSRItem['Reference No.']}</span>
+                          </div>
+                        )}
+                        {selectedSSRItem['Additional Specification'] && (
+                          <div className="col-span-2">
+                            <span className="text-gray-600">Additional Spec:</span>
+                            <span className="ml-1 font-medium">{selectedSSRItem['Additional Specification']}</span>
+                          </div>
+                        )}
+                        {selectedSSRItem['Chapter'] && (
+                          <div className="col-span-2">
+                            <span className="text-gray-600">Chapter:</span>
+                            <span className="ml-1 font-medium">{selectedSSRItem['Chapter']}</span>
                           </div>
                         )}
                       </div>
@@ -1336,7 +1594,11 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                     setCsrSearchQuery('');
                     setCsrSuggestions([]);
                     setShowCsrSuggestions(false);
+                    setSsrSearchQuery('');
+                    setSsrSearchSuggestions([]);
+                    setShowSsrSearchSuggestions(false);
                     setSelectedCSRItem(null);
+                    setSelectedSSRItem(null);
                     setIsManualEntry(false);
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
