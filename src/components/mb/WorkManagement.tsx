@@ -54,7 +54,7 @@ interface Contractor {
 interface RoleAssignment {
   role_type: string;
   user_id: string;
-  user_email: string;
+  user_name: string;
 }
 
 interface Subwork {
@@ -127,7 +127,7 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
   });
 
   const [roleAssignments, setRoleAssignments] = useState<RoleAssignment[]>([]);
-  const [availableUsers, setAvailableUsers] = useState<{ id: string; email: string }[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<{ id: string; name: string }[]>([]);
   const [subworks, setSubworks] = useState<Subwork[]>([]);
   const [estimateSubworks, setEstimateSubworks] = useState<any[]>([]);
 
@@ -206,13 +206,13 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
   const fetchAvailableUsers = async () => {
     try {
       const { data, error } = await supabase
-        .schema('auth')
-        .from('users')
-        .select('id, email')
-        .order('email');
+        .from('user_roles')
+        .select('user_id, name')
+        .order('name');
 
       if (error) throw error;
-      setAvailableUsers(data || []);
+      const users = (data || []).map(u => ({ id: u.user_id, name: u.name }));
+      setAvailableUsers(users);
     } catch (error) {
       console.error('Error fetching users:', error);
       showMessage('error', 'Failed to fetch users for role assignment');
@@ -290,20 +290,19 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
       if (!rolesError && rolesData) {
         const userIds = rolesData.map(r => r.user_id);
         const { data: usersData } = await supabase
-          .schema('auth')
-          .from('users')
-          .select('id, email')
-          .in('id', userIds);
+          .from('user_roles')
+          .select('user_id, name')
+          .in('user_id', userIds);
 
-        const rolesWithEmails = rolesData.map(r => {
-          const user = usersData?.find(u => u.id === r.user_id);
+        const rolesWithNames = rolesData.map(r => {
+          const user = usersData?.find(u => u.user_id === r.user_id);
           return {
             role_type: r.role_type,
             user_id: r.user_id,
-            user_email: user?.email || ''
+            user_name: user?.name || ''
           };
         });
-        setRoleAssignments(rolesWithEmails);
+        setRoleAssignments(rolesWithNames);
       }
 
       const { data: subworksData, error: subworksError } = await supabase
@@ -536,7 +535,7 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
   };
 
   const addRoleAssignment = () => {
-    setRoleAssignments([...roleAssignments, { role_type: 'JE', user_id: '', user_email: '' }]);
+    setRoleAssignments([...roleAssignments, { role_type: 'JE', user_id: '', user_name: '' }]);
   };
 
   const updateRoleAssignment = (index: number, field: string, value: string) => {
@@ -544,7 +543,7 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
     if (field === 'user_id') {
       const user = availableUsers.find(u => u.id === value);
       updated[index].user_id = value;
-      updated[index].user_email = user?.email || '';
+      updated[index].user_name = user?.name || '';
     } else {
       updated[index][field as keyof RoleAssignment] = value;
     }
@@ -1252,7 +1251,7 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
                         >
                           <option value="">Select User</option>
                           {availableUsers.map(u => (
-                            <option key={u.id} value={u.id}>{u.email}</option>
+                            <option key={u.id} value={u.id}>{u.name}</option>
                           ))}
                         </select>
                       </div>
