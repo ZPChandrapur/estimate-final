@@ -17,7 +17,8 @@ import {
   AlertCircle,
   TrendingUp,
   Home,
-  Briefcase
+  Briefcase,
+  Receipt
 } from 'lucide-react';
 
 interface UserRole {
@@ -138,6 +139,7 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
     { id: 'work', label: 'Work Management', icon: Briefcase, roles: ['mb_clerk', 'clerk', 'Junior Engineer', 'Junior Engineer (JE)', 'Deputy Engineer', 'Sub Division Engineer', 'Divisional Engineer', 'Executive Engineer', 'Auditor', 'Accountant', 'inspector', 'officer', 'Jr./Asst. Administration Officer', 'admin', 'super_admin', 'developer'] },
     { id: 'boq', label: 'BOQ Management', icon: FileSpreadsheet, roles: ['mb_clerk', 'clerk', 'Junior Engineer', 'Junior Engineer (JE)', 'Deputy Engineer', 'Sub Division Engineer', 'Divisional Engineer', 'Executive Engineer', 'Auditor', 'Accountant', 'inspector', 'officer', 'Jr./Asst. Administration Officer', 'admin', 'super_admin', 'developer'] },
     { id: 'measurements', label: 'Measurements', icon: ClipboardList, roles: ['all'] },
+    { id: 'bills', label: 'Bills', icon: Receipt, roles: ['all'] },
     { id: 'reports', label: 'Reports', icon: FileText, roles: ['mb_clerk', 'clerk', 'Junior Engineer', 'Junior Engineer (JE)', 'Deputy Engineer', 'Sub Division Engineer', 'Divisional Engineer', 'Executive Engineer', 'Auditor', 'Accountant', 'inspector', 'officer', 'Jr./Asst. Administration Officer', 'admin', 'super_admin', 'developer'] },
     { id: 'audit', label: 'Audit Logs', icon: History, roles: ['mb_clerk', 'clerk', 'Junior Engineer', 'Junior Engineer (JE)', 'Deputy Engineer', 'Sub Division Engineer', 'Divisional Engineer', 'Executive Engineer', 'Auditor', 'Accountant', 'inspector', 'officer', 'Jr./Asst. Administration Officer', 'admin', 'super_admin', 'developer'] },
   ];
