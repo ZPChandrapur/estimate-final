@@ -122,8 +122,30 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
           .eq('Lead in KM', leadKm.toString())
           .maybeSingle();
 
-        data = result2.data;
-        error = result2.error;
+        if (result2.data) {
+          data = result2.data;
+        } else {
+          const result3 = await supabase
+            .schema('estimate')
+            .from('Lead_Charges_Materials_22-23')
+            .select('*')
+            .eq('KM', leadKm.toFixed(2))
+            .maybeSingle();
+
+          if (result3.data) {
+            data = result3.data;
+          } else {
+            const result4 = await supabase
+              .schema('estimate')
+              .from('Lead_Charges_Materials_22-23')
+              .select('*')
+              .eq('KM', leadKm.toString())
+              .maybeSingle();
+
+            data = result4.data;
+            error = result4.error;
+          }
+        }
       }
 
       if (error) throw error;

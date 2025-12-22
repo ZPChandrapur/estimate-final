@@ -1309,7 +1309,16 @@ const fetchSSRData = async () => {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Manure Sludge</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Excavated Rock</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Sand, Stone</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Stone Aggregate 40mm+</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Stone Aggregate 40mm+</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">KM</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Cost per Trip 2</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">ConcreteBlock</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Cement, Lime, Stone Block</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Bricks</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Tiles</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Steel</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Flooring Tiles</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Asphalt in Drum</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1322,7 +1331,16 @@ const fetchSSRData = async () => {
                           <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Manure  Sludge']}</td>
                           <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Excavated Rock soling stone']}</td>
                           <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Sand, Stone below 40 mm, Normal Brick sider aggre. Timber']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{row['Stone aggregate 40mm Normal size and above']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Stone aggregate 40mm Normal size and above']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['KM']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Cost per Trip Lead Charges_1']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['ConcreteBlock (FORM)']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Cement, Lime, Stone Block, GI, CI, CC & AC Pipes / Sheet& Plate']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Bricks']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Tiles Half Round Tiles /Roofing Tiles/Manlore Tiles']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Steel (MS, TMT, H.Y.S.D.) Structural Steel']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Flooring Tiles Ceramic/ Marbonate']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{row['Asphalt in Drum']}</td>
                         </tr>
                       ))}
                     </tbody>
