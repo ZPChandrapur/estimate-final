@@ -106,8 +106,7 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
             subwork_name
           )
         `)
-        .eq('project_id', projectId)
-        .order('item_number');
+        .eq('project_id', projectId);
 
       if (error) throw error;
 
@@ -116,7 +115,13 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
         subwork_name: item.mb_work_subworks?.subwork_name || ''
       }));
 
-      setBoqItems(itemsWithSubwork);
+      const sortedItems = itemsWithSubwork.sort((a, b) => {
+        const numA = parseFloat(a.item_number) || 0;
+        const numB = parseFloat(b.item_number) || 0;
+        return numA - numB;
+      });
+
+      setBoqItems(sortedItems);
     } catch (error) {
       console.error('Error fetching BOQ items:', error);
       setError('Failed to fetch BOQ items');
@@ -179,7 +184,13 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
             return;
           }
 
-          setPreviewItems(items);
+          const sortedItems = items.sort((a, b) => {
+            const numA = parseFloat(a.item_number) || 0;
+            const numB = parseFloat(b.item_number) || 0;
+            return numA - numB;
+          });
+
+          setPreviewItems(sortedItems);
           setShowPreview(true);
         } catch (parseError) {
           console.error('Error parsing file:', parseError);
@@ -404,7 +415,13 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
         return;
       }
 
-      setPreviewItems(allItems);
+      const sortedItems = allItems.sort((a, b) => {
+        const numA = parseFloat(a.item_number) || 0;
+        const numB = parseFloat(b.item_number) || 0;
+        return numA - numB;
+      });
+
+      setPreviewItems(sortedItems);
       setShowPreview(true);
       setShowEstimateImport(false);
       setSuccess(`Loaded ${allItems.length} items from ${subworks.length} subworks`);
