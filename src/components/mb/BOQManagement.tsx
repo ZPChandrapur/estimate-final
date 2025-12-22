@@ -216,20 +216,72 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
       setUploading(true);
       setError('');
 
-      const { error } = await supabase
+      const { count } = await supabase
         .schema('estimate')
         .from('mb_boq_items')
-        .insert(previewItems);
+        .select('*', { count: 'exact', head: true })
+        .eq('project_id', selectedProject);
 
-      if (error) throw error;
+      if (count && count > 0) {
+        const confirmReplace = window.confirm(
+          `This project already has ${count} BOQ items. Do you want to replace them with the new data?`
+        );
 
-      setSuccess('BOQ items uploaded successfully');
+        if (!confirmReplace) {
+          setUploading(false);
+          setShowPreview(false);
+          return;
+        }
+
+        const { error: deleteError } = await supabase
+          .schema('estimate')
+          .from('mb_boq_items')
+          .delete()
+          .eq('project_id', selectedProject);
+
+        if (deleteError) {
+          console.error('Error deleting existing items:', deleteError);
+          throw new Error('Failed to delete existing BOQ items');
+        }
+      }
+
+      const cleanedItems = previewItems.map(item => ({
+        project_id: item.project_id,
+        subwork_id: item.subwork_id || null,
+        item_number: item.item_number,
+        description: item.description,
+        unit: item.unit,
+        boq_quantity: item.boq_quantity,
+        rate: item.rate,
+        amount: item.amount,
+        amount_with_taxes: item.amount_with_taxes || item.amount,
+        amount_in_words: item.amount_in_words || '',
+        executed_quantity: item.executed_quantity || 0,
+        balance_quantity: item.balance_quantity || item.boq_quantity,
+        remarks: item.remarks || null
+      }));
+
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < cleanedItems.length; i += BATCH_SIZE) {
+        const batch = cleanedItems.slice(i, i + BATCH_SIZE);
+        const { error: insertError } = await supabase
+          .schema('estimate')
+          .from('mb_boq_items')
+          .insert(batch);
+
+        if (insertError) {
+          console.error('Error inserting batch:', insertError);
+          throw insertError;
+        }
+      }
+
+      setSuccess(`Successfully uploaded ${cleanedItems.length} BOQ items`);
       setShowPreview(false);
       setPreviewItems([]);
       fetchBOQItems(selectedProject);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving BOQ items:', error);
-      setError('Failed to save BOQ items');
+      setError(`Failed to save BOQ items: ${error.message || 'Unknown error'}`);
     } finally {
       setUploading(false);
     }
@@ -405,10 +457,44 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
     XLSX.writeFile(wb, `BOQ_${selectedProject}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const clearAllBOQItems = async () => {
+    if (!selectedProject) return;
+
+    const confirmClear = window.confirm(
+      `Are you sure you want to delete all ${boqItems.length} BOQ items for this project? This action cannot be undone.`
+    );
+
+    if (!confirmClear) return;
+
+    try {
+      setLoading(true);
+      setError('');
+
+      const { error } = await supabase
+        .schema('estimate')
+        .from('mb_boq_items')
+        .delete()
+        .eq('project_id', selectedProject);
+
+      if (error) throw error;
+
+      setSuccess('All BOQ items deleted successfully');
+      setBoqItems([]);
+    } catch (error) {
+      console.error('Error deleting BOQ items:', error);
+      setError('Failed to delete BOQ items');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredItems = boqItems.filter(item =>
     item.item_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const totalBOQAmount = boqItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+  const totalExecutedAmount = boqItems.reduce((sum, item) => sum + ((item.executed_quantity || 0) * item.rate), 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -648,31 +734,61 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
         )}
 
         {selectedProject && boqItems.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">BOQ Items ({filteredItems.length})</h3>
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search items..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <button
-                    onClick={exportToExcel}
-                    className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Export
-                  </button>
+          <>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">BOQ Summary</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="text-sm text-blue-600 font-medium mb-1">Total Items</div>
+                  <div className="text-2xl font-bold text-blue-900">{boqItems.length}</div>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4">
+                  <div className="text-sm text-green-600 font-medium mb-1">Total BOQ Amount</div>
+                  <div className="text-2xl font-bold text-green-900">₹{totalBOQAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <div className="text-sm text-purple-600 font-medium mb-1">Executed Amount</div>
+                  <div className="text-2xl font-bold text-purple-900">₹{totalExecutedAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-4">
+                  <div className="text-sm text-orange-600 font-medium mb-1">Balance Amount</div>
+                  <div className="text-2xl font-bold text-orange-900">₹{(totalBOQAmount - totalExecutedAmount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
                 </div>
               </div>
             </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold text-gray-900">BOQ Items ({filteredItems.length})</h3>
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search items..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <button
+                      onClick={exportToExcel}
+                      className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Export
+                    </button>
+                    <button
+                      onClick={clearAllBOQItems}
+                      className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+              </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -710,6 +826,7 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
               </table>
             </div>
           </div>
+          </>
         )}
 
         {loading && (
