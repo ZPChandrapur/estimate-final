@@ -44,6 +44,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   const [rateGroups, setRateGroups] = useState<{ [key: string]: { rate: number, quantity: number, description?: string } }>({});
   const [currentItem, setCurrentItem] = useState<SubworkItem>(item || {} as SubworkItem);
   const [selectedDescription, setSelectedDescription] = useState<string>('');
+  const [selectedRateId, setSelectedRateId] = useState<number | null>(null);
+  const [selectedRateValue, setSelectedRateValue] = useState<number>(0);
   const [newMeasurement, setNewMeasurement] = useState<Partial<ItemMeasurement>>({
     no_of_units: 0,
     length: 0,
@@ -101,7 +103,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     let additions = 0;
     let deletions = 0;
     let taxes = 0;
-    const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
+    const baseRate = selectedRateValue > 0 ? selectedRateValue : (baseRateProp ?? item?.ssr_rate ?? 0);
     let finalRate = baseRate;
     entries.forEach((entry) => {
       if (entry.type === 'Addition') additions += entry.value;
@@ -110,7 +112,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     });
     finalRate = baseRate + additions - deletions + taxes;
     return { additions, deletions, taxes, finalRate, baseRate };
-  }, [entries, baseRateProp, item?.ssr_rate]);
+  }, [entries, baseRateProp, item?.ssr_rate, selectedRateValue]);
 
   // Keep previous logic and API untouched
   const getSelectedRate = () => {
@@ -125,8 +127,27 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     if (isOpen && item?.sr_no) {
       fetchData();
       fetchRateAnalysis();
+      fetchItemRates();
     }
   }, [isOpen, item?.sr_no, activeTab]);
+
+  useEffect(() => {
+    if (itemRates.length > 0 && !selectedRateId) {
+      setSelectedRateId(itemRates[0].sr_no);
+      setSelectedRateValue(itemRates[0].rate);
+    } else if (itemRates.length === 0) {
+      setSelectedRateId(null);
+      setSelectedRateValue(0);
+    }
+  }, [itemRates]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedRateId(null);
+      setSelectedRateValue(0);
+      setItemRates([]);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     setCurrentItem(item || {} as SubworkItem);
@@ -177,6 +198,30 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       return selected ? selected.rate : (measurement.rate || (baseRateProp ?? item?.ssr_rate ?? 0));
     }
     return measurement.rate || (baseRateProp ?? item?.ssr_rate ?? 0);
+  };
+
+  const fetchItemRates = async () => {
+    try {
+      if (!item?.sr_no) return;
+
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('item_rates')
+        .select('*')
+        .eq('subwork_item_sr_no', item.sr_no)
+        .order('sr_no', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setItemRates(data);
+      } else {
+        setItemRates([]);
+      }
+    } catch (error) {
+      console.error('Error fetching item rates:', error);
+      setItemRates([]);
+    }
   };
 
   const fetchData = async () => {
@@ -498,6 +543,33 @@ const saveRateAnalysis = async () => {
         </div>
 
         <div className="px-6 py-6">
+          {/* Rate Selection Dropdown - Show when multiple rates exist */}
+          {itemRates.length > 1 && (
+            <div className="mb-6 bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <label className="block text-sm font-medium text-purple-800 mb-2">
+                Select Rate to View/Edit:
+              </label>
+              <select
+                value={selectedRateId || ''}
+                onChange={(e) => {
+                  const rateId = parseInt(e.target.value);
+                  const rate = itemRates.find(r => r.sr_no === rateId);
+                  if (rate) {
+                    setSelectedRateId(rateId);
+                    setSelectedRateValue(rate.rate);
+                  }
+                }}
+                className="w-full px-3 py-2 border border-purple-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+              >
+                {itemRates.map((rate) => (
+                  <option key={rate.sr_no} value={rate.sr_no}>
+                    {rate.description} - ₹{rate.rate.toFixed(2)} ({rate.ssr_unit})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* CSR Item Details Section */}
           {item?.csr_item_no && (
             <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
