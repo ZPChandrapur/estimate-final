@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import MBDashboard from './MBDashboard';
+import WorkManagement from './WorkManagement';
 import BOQManagement from './BOQManagement';
 import MeasurementEntry from './MeasurementEntry';
 import MBStatus from './MBStatus';
@@ -13,6 +14,8 @@ const MeasurementBookApp: React.FC = () => {
     switch (currentPage) {
       case 'dashboard':
         return <MBDashboard onNavigate={setCurrentPage} currentPage={currentPage} />;
+      case 'work':
+        return <WorkManagement onNavigate={setCurrentPage} />;
       case 'boq':
         return <BOQManagement onNavigate={setCurrentPage} />;
       case 'measurements':

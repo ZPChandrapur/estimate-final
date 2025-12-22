@@ -16,7 +16,8 @@ import {
   Clock,
   AlertCircle,
   TrendingUp,
-  Home
+  Home,
+  Briefcase
 } from 'lucide-react';
 
 interface UserRole {
@@ -134,6 +135,7 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['all'] },
+    { id: 'work', label: 'Work Management', icon: Briefcase, roles: ['mb_clerk', 'Executive Engineer', 'admin', 'super_admin', 'developer'] },
     { id: 'boq', label: 'BOQ Management', icon: FileSpreadsheet, roles: ['mb_clerk', 'Executive Engineer', 'admin', 'super_admin', 'developer'] },
     { id: 'measurements', label: 'Measurement Entry', icon: ClipboardList, roles: ['Contractor', 'mb_clerk', 'admin', 'super_admin', 'developer'] },
     { id: 'status', label: 'MB Status', icon: BarChart3, roles: ['all'] },
@@ -328,7 +330,17 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  {canAccessPage(['mb_clerk', 'Executive Engineer', 'admin']) && (
+                  {canAccessPage(['mb_clerk', 'Executive Engineer', 'admin', 'super_admin', 'developer']) && (
+                    <button
+                      onClick={() => onNavigate('work')}
+                      className="flex flex-col items-center justify-center p-4 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors"
+                    >
+                      <Briefcase className="w-8 h-8 text-indigo-600 mb-2" />
+                      <span className="text-sm font-medium text-indigo-900">Manage Work</span>
+                    </button>
+                  )}
+
+                  {canAccessPage(['mb_clerk', 'Executive Engineer', 'admin', 'super_admin', 'developer']) && (
                     <button
                       onClick={() => onNavigate('boq')}
                       className="flex flex-col items-center justify-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
@@ -338,7 +350,7 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
                     </button>
                   )}
 
-                  {canAccessPage(['Contractor', 'mb_clerk', 'admin']) && (
+                  {canAccessPage(['Contractor', 'mb_clerk', 'admin', 'super_admin', 'developer']) && (
                     <button
                       onClick={() => onNavigate('measurements')}
                       className="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
@@ -356,7 +368,7 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
                     <span className="text-sm font-medium text-purple-900">View Status</span>
                   </button>
 
-                  {canAccessPage(['Executive Engineer', 'Auditor', 'Accountant', 'admin']) && (
+                  {canAccessPage(['Executive Engineer', 'Auditor', 'Accountant', 'admin', 'super_admin', 'developer']) && (
                     <button
                       onClick={() => onNavigate('reports')}
                       className="flex flex-col items-center justify-center p-4 bg-orange-50 hover:bg-orange-100 rounded-lg border border-orange-200 transition-colors"
