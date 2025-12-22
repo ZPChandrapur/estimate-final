@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { FileText, Plus, Eye, Download, ArrowLeft, Send, CheckCircle, XCircle, BarChart2, Trash2, Edit } from 'lucide-react';
+import { FileText, Plus, Eye, Download, ArrowLeft, Send, CheckCircle, XCircle, BarChart2, Trash2, Edit, Check } from 'lucide-react';
 import BillProgressChart from './BillProgressChart';
 
 interface BillsManagementProps {
@@ -37,6 +37,10 @@ interface BillItem {
   bill_rate: number;
   amount: number;
   is_clause_38: boolean;
+  is_checked: boolean;
+  checked_by: string | null;
+  checked_at: string | null;
+  check_percentage: number;
   boq_item: {
     item_number: string;
     description: string;
@@ -376,6 +380,27 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
     }
   };
 
+  const handleToggleItemCheck = async (itemId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .schema('estimate')
+        .from('mb_bill_items')
+        .update({
+          is_checked: !currentStatus,
+          checked_by: !currentStatus ? user?.id : null,
+          checked_at: !currentStatus ? new Date().toISOString() : null
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      fetchBillItems();
+    } catch (error: any) {
+      console.error('Error toggling item check:', error);
+      alert('Error updating check status: ' + error.message);
+    }
+  };
+
   const handleCreateBill = async () => {
     if (!selectedProject) return;
 
@@ -589,8 +614,11 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 border-r border-gray-300">
                       Bill Rate
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 border-r border-gray-300">
                       Amount
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700">
+                      Check
                     </th>
                   </tr>
                 </thead>
@@ -618,8 +646,21 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                       <td className="px-4 py-3 text-sm text-right text-gray-900 border-r border-gray-200">
                         {item.bill_rate.toFixed(2)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
+                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 border-r border-gray-200">
                         ₹{item.amount.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleToggleItemCheck(item.id, item.is_checked)}
+                          className={`p-1 rounded transition-colors ${
+                            item.is_checked
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                          }`}
+                          title={item.is_checked ? 'Checked' : 'Click to check'}
+                        >
+                          <Check className="w-5 h-5" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -637,9 +678,10 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                       {regularItems.reduce((sum, item) => sum + item.qty_now_to_be_paid, 0).toFixed(2)}
                     </td>
                     <td colSpan={2} className="px-4 py-3 border-r border-gray-300"></td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-900">
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 border-r border-gray-300">
                       ₹{regularItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
                     </td>
+                    <td className="px-4 py-3"></td>
                   </tr>
                 </tbody>
               </table>
@@ -680,8 +722,11 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 border-r border-gray-300">
                       Bill Rate
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 border-r border-gray-300">
                       Amount
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700">
+                      Check
                     </th>
                   </tr>
                 </thead>
@@ -709,8 +754,21 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                       <td className="px-4 py-3 text-sm text-right text-gray-900 border-r border-gray-200">
                         {item.bill_rate.toFixed(2)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
+                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 border-r border-gray-200">
                         ₹{item.amount.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleToggleItemCheck(item.id, item.is_checked)}
+                          className={`p-1 rounded transition-colors ${
+                            item.is_checked
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                          }`}
+                          title={item.is_checked ? 'Checked' : 'Click to check'}
+                        >
+                          <Check className="w-5 h-5" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -728,9 +786,10 @@ const BillsManagement: React.FC<BillsManagementProps> = ({ onNavigate }) => {
                       {clause38Items.reduce((sum, item) => sum + item.qty_now_to_be_paid, 0).toFixed(2)}
                     </td>
                     <td colSpan={2} className="px-4 py-3 border-r border-gray-300"></td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-900">
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 border-r border-gray-300">
                       ₹{clause38Items.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}
                     </td>
+                    <td className="px-4 py-3"></td>
                   </tr>
                 </tbody>
               </table>
