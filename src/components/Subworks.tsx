@@ -62,123 +62,127 @@ const Subworks: React.FC = () => {
   const [csrData, setCSRData] = useState<any[]>([]);
   const [loadingLeadCharges, setLoadingLeadCharges] = useState(false);
   const [loadingCSR, setLoadingCSR] = useState(false);
+  const [showSSRModal, setShowSSRModal] = useState(false);
+  const [ssrData, setSSRData] = useState<any[]>([]);
+  const [loadingSSR, setLoadingSSR] = useState(false);
+
 
   // Add state for Lead Statement modal
   const [showLeadStatementModal, setShowLeadStatementModal] = useState(false);
   const [selectedWorkForLeadStatement, setSelectedWorkForLeadStatement] = useState<{ id: string; name: string } | null>(null);
 
-useEffect(() => {
-  // Always fetch all works on selectedWorkId change, not just filtered
-  fetchWorks();
-}, [selectedWorkId]);
+  useEffect(() => {
+    // Always fetch all works on selectedWorkId change, not just filtered
+    fetchWorks();
+  }, [selectedWorkId]);
 
-useEffect(() => {
-  // Check if we received a selected works ID from navigation state
-  if (location.state?.selectedWorksId) {
-    setSelectedWorkId(location.state.selectedWorksId);
-    // Clear the navigation state to prevent re-execution
-    window.history.replaceState({}, document.title);
-  }
-}, [location.state]);
-
-useEffect(() => {
-  if (selectedWorkId) {
-    fetchSubworks(selectedWorkId);
-  }
-}, [selectedWorkId]);
-
-useEffect(() => {
-  if (selectedSubworkIds.length > 0) {
-    fetchItemCounts();
-    fetchSubworkTotals();
-  }
-}, [selectedSubworkIds]);
-
-useEffect(() => {
-  if (subworks.length > 0) {
-    fetchSubworkTotals();
-  }
-}, [subworks]);
-
-const fetchWorks = async (selectedId = '') => {
-  try {
-    setLoading(true);
-
-    // Fetch all works always (remove filtering by selectedId)
-    let query = supabase
-      .schema('estimate')
-      .from('works')
-      .select('*')
-      .order('sr_no', { ascending: false });
-
-    // Removed filtering by selectedId: fetch all works regardless
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    setWorks(data || []);
-
-    // Auto-select first work only if nothing is selected yet
-    if (data && data.length > 0 && !selectedWorkId && !location.state?.selectedWorksId) {
-      setSelectedWorkId(data[0].works_id);
+  useEffect(() => {
+    // Check if we received a selected works ID from navigation state
+    if (location.state?.selectedWorksId) {
+      setSelectedWorkId(location.state.selectedWorksId);
+      // Clear the navigation state to prevent re-execution
+      window.history.replaceState({}, document.title);
     }
-  } catch (error) {
-    console.error('Error fetching works:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+  }, [location.state]);
 
-const fetchSubworks = async (workId: string) => {
-  if (!workId) return;
-  try {
-    setLoading(true);
+  useEffect(() => {
+    if (selectedWorkId) {
+      fetchSubworks(selectedWorkId);
+    }
+  }, [selectedWorkId]);
 
-    // Fetch all subworks for the selected work
-    const { data: subworksData, error: subworksError } = await supabase
-      .schema('estimate')
-      .from('subworks')
-      .select('*')
-      .eq('works_id', workId)
-      .order('sr_no', { ascending: true });
-    if (subworksError) throw subworksError;
+  useEffect(() => {
+    if (selectedSubworkIds.length > 0) {
+      fetchItemCounts();
+      fetchSubworkTotals();
+    }
+  }, [selectedSubworkIds]);
 
-    setSubworks(subworksData || []);
+  useEffect(() => {
+    if (subworks.length > 0) {
+      fetchSubworkTotals();
+    }
+  }, [subworks]);
 
-    // ✅ Fetch all related subwork_items in a single call
-    const subworkIds = (subworksData || []).map(sw => sw.subworks_id);
-    if (subworkIds.length > 0) {
-      const { data: itemsData, error: itemsError } = await supabase
+  const fetchWorks = async (selectedId = '') => {
+    try {
+      setLoading(true);
+
+      // Fetch all works always (remove filtering by selectedId)
+      let query = supabase
         .schema('estimate')
-        .from('subwork_items')
-        .select('subworks_id, subwork_amount')
-        .in('subworks_id', subworkIds);
-      if (itemsError) throw itemsError;
+        .from('works')
+        .select('*')
+        .order('sr_no', { ascending: false });
 
-      // ✅ Compute totals and item counts locally
-      const totals: Record<string, number> = {};
-      const counts: Record<string, number> = {};
+      // Removed filtering by selectedId: fetch all works regardless
 
-      (itemsData || []).forEach(item => {
-        const id = item.subworks_id;
-        totals[id] = (totals[id] || 0) + (item.subwork_amount || 0);
-        counts[id] = (counts[id] || 0) + 1;
-      });
+      const { data, error } = await query;
+      if (error) throw error;
 
-      // Update your state
-      setSubworkTotals(totals);
-      setSubworkItemCounts(counts);
-    } else {
-      setSubworkTotals({});
-      setSubworkItemCounts({});
+      setWorks(data || []);
+
+      // Auto-select first work only if nothing is selected yet
+      if (data && data.length > 0 && !selectedWorkId && !location.state?.selectedWorksId) {
+        setSelectedWorkId(data[0].works_id);
+      }
+    } catch (error) {
+      console.error('Error fetching works:', error);
+    } finally {
+      setLoading(false);
     }
+  };
 
-  } catch (error) {
-    console.error('Error fetching subworks:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+  const fetchSubworks = async (workId: string) => {
+    if (!workId) return;
+    try {
+      setLoading(true);
+
+      // Fetch all subworks for the selected work
+      const { data: subworksData, error: subworksError } = await supabase
+        .schema('estimate')
+        .from('subworks')
+        .select('*')
+        .eq('works_id', workId)
+        .order('sr_no', { ascending: true });
+      if (subworksError) throw subworksError;
+
+      setSubworks(subworksData || []);
+
+      // ✅ Fetch all related subwork_items in a single call
+      const subworkIds = (subworksData || []).map(sw => sw.subworks_id);
+      if (subworkIds.length > 0) {
+        const { data: itemsData, error: itemsError } = await supabase
+          .schema('estimate')
+          .from('subwork_items')
+          .select('subworks_id, subwork_amount')
+          .in('subworks_id', subworkIds);
+        if (itemsError) throw itemsError;
+
+        // ✅ Compute totals and item counts locally
+        const totals: Record<string, number> = {};
+        const counts: Record<string, number> = {};
+
+        (itemsData || []).forEach(item => {
+          const id = item.subworks_id;
+          totals[id] = (totals[id] || 0) + (item.subwork_amount || 0);
+          counts[id] = (counts[id] || 0) + 1;
+        });
+
+        // Update your state
+        setSubworkTotals(totals);
+        setSubworkItemCounts(counts);
+      } else {
+        setSubworkTotals({});
+        setSubworkItemCounts({});
+      }
+
+    } catch (error) {
+      console.error('Error fetching subworks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
   const fetchItemCounts = async () => {
@@ -202,78 +206,78 @@ const fetchSubworks = async (workId: string) => {
     }
   };
 
-const fetchSubworkTotals = async () => {
-  try {
-    const totals: { [key: string]: number } = {};
+  const fetchSubworkTotals = async () => {
+    try {
+      const totals: { [key: string]: number } = {};
 
-    if (!subworks || subworks.length === 0) return;
+      if (!subworks || subworks.length === 0) return;
 
-    // ✅ Step 1: Fetch all subwork_items for these subworks at once
-    const subworkIds = subworks.map(sw => sw.subworks_id);
-    const { data: subworkItems, error: itemsError } = await supabase
-      .schema('estimate')
-      .from('subwork_items')
-      .select('sr_no, subwork_id')
-      .in('subwork_id', subworkIds);
+      // ✅ Step 1: Fetch all subwork_items for these subworks at once
+      const subworkIds = subworks.map(sw => sw.subworks_id);
+      const { data: subworkItems, error: itemsError } = await supabase
+        .schema('estimate')
+        .from('subwork_items')
+        .select('sr_no, subwork_id')
+        .in('subwork_id', subworkIds);
 
-    if (itemsError) throw itemsError;
+      if (itemsError) throw itemsError;
 
-    // If no items found, set all to 0
-    if (!subworkItems || subworkItems.length === 0) {
-      for (const subwork of subworks) {
-        totals[subwork.subworks_id] = 0;
+      // If no items found, set all to 0
+      if (!subworkItems || subworkItems.length === 0) {
+        for (const subwork of subworks) {
+          totals[subwork.subworks_id] = 0;
 
-        // Update subwork_amount = 0 (same functionality, just kept as-is)
+          // Update subwork_amount = 0 (same functionality, just kept as-is)
+          await supabase
+            .schema('estimate')
+            .from('subworks')
+            .update({ subwork_amount: 0 })
+            .eq('subworks_id', subwork.subworks_id);
+        }
+        setSubworkTotals(totals);
+        return;
+      }
+
+      // ✅ Step 2: Fetch all item_rates for all subwork_items in one go
+      const itemSrNos = subworkItems.map(i => i.sr_no);
+      const { data: rateRows, error: rateError } = await supabase
+        .schema('estimate')
+        .from('item_rates')
+        .select('subwork_item_sr_no, rate_total_amount')
+        .in('subwork_item_sr_no', itemSrNos);
+
+      if (rateError) throw rateError;
+
+      // ✅ Step 3: Compute totals efficiently in memory
+      const itemTotals: Record<number, number> = {};
+      (rateRows || []).forEach(rate => {
+        itemTotals[rate.subwork_item_sr_no] =
+          (itemTotals[rate.subwork_item_sr_no] || 0) + (rate.rate_total_amount || 0);
+      });
+
+      // ✅ Step 4: Aggregate totals by subwork_id
+      subworkItems.forEach(item => {
+        const subworkId = item.subwork_id;
+        const totalItemAmt = itemTotals[item.sr_no] || 0;
+        totals[subworkId] = (totals[subworkId] || 0) + totalItemAmt;
+      });
+
+      // ✅ Step 5: Update all subworks’ subwork_amounts (same as your logic)
+      // → We’ll keep the same one-by-one updates to preserve exact functionality.
+      for (const subworkId in totals) {
         await supabase
           .schema('estimate')
           .from('subworks')
-          .update({ subwork_amount: 0 })
-          .eq('subworks_id', subwork.subworks_id);
+          .update({ subwork_amount: totals[subworkId] })
+          .eq('subworks_id', subworkId);
       }
+
+      // ✅ Step 6: Update React state (same)
       setSubworkTotals(totals);
-      return;
+    } catch (error) {
+      console.error('Error fetching subwork totals:', error);
     }
-
-    // ✅ Step 2: Fetch all item_rates for all subwork_items in one go
-    const itemSrNos = subworkItems.map(i => i.sr_no);
-    const { data: rateRows, error: rateError } = await supabase
-      .schema('estimate')
-      .from('item_rates')
-      .select('subwork_item_sr_no, rate_total_amount')
-      .in('subwork_item_sr_no', itemSrNos);
-
-    if (rateError) throw rateError;
-
-    // ✅ Step 3: Compute totals efficiently in memory
-    const itemTotals: Record<number, number> = {};
-    (rateRows || []).forEach(rate => {
-      itemTotals[rate.subwork_item_sr_no] =
-        (itemTotals[rate.subwork_item_sr_no] || 0) + (rate.rate_total_amount || 0);
-    });
-
-    // ✅ Step 4: Aggregate totals by subwork_id
-    subworkItems.forEach(item => {
-      const subworkId = item.subwork_id;
-      const totalItemAmt = itemTotals[item.sr_no] || 0;
-      totals[subworkId] = (totals[subworkId] || 0) + totalItemAmt;
-    });
-
-    // ✅ Step 5: Update all subworks’ subwork_amounts (same as your logic)
-    // → We’ll keep the same one-by-one updates to preserve exact functionality.
-    for (const subworkId in totals) {
-      await supabase
-        .schema('estimate')
-        .from('subworks')
-        .update({ subwork_amount: totals[subworkId] })
-        .eq('subworks_id', subworkId);
-    }
-
-    // ✅ Step 6: Update React state (same)
-    setSubworkTotals(totals);
-  } catch (error) {
-    console.error('Error fetching subwork totals:', error);
-  }
-};
+  };
 
   const fetchDesignPhotos = async (subworkId: string) => {
     try {
@@ -348,6 +352,71 @@ const fetchSubworkTotals = async () => {
       setLoadingCSR(false);
     }
   };
+
+const fetchSSRData = async () => {
+  try {
+    setLoadingSSR(true);
+
+    // Select all columns and normalize messy column names returned by Supabase
+    const { data, error } = await supabase
+      .schema('estimate')
+      .from('SSR_2022_23')
+      .select('*');
+
+    if (error) throw error;
+
+    // Debug: log raw response to help diagnose empty results
+    console.debug('SSR raw response:', { length: (data || []).length, sample: (data || []).slice(0, 3) });
+
+    const mapped = (data || []).map((row: any) => {
+      const keys = Object.keys(row || {});
+
+      const findKey = (pred: (k: string) => boolean) => keys.find(k => pred(k)) ?? undefined;
+
+      const srKey = findKey(k => k.replace(/\s|\.|\n|\r/gi, '').toLowerCase().includes('srno')) || 'id';
+      const chapterKey = findKey(k => k.toLowerCase().includes('chapter'));
+      const ssrItemKey = findKey(k => k.replace(/\s|\.|\n|\r/gi, '').toLowerCase().includes('ssritem'));
+      const referenceKey = findKey(k => k.toLowerCase().includes('reference'));
+      const descriptionKey = findKey(k => k.toLowerCase().includes('description'));
+      const additionalKey = findKey(k => k.toLowerCase().includes('additional'));
+      const unitKey = findKey(k => k.toLowerCase().includes('unit'));
+      const completedKey = findKey(k => /completed|proposed/i.test(k.replace(/\s|\n|\r/gi, '')) || k.toLowerCase().includes('completed'));
+      const labourKey = findKey(k => k.toLowerCase().includes('labour'));
+
+      return {
+        id: row.id,
+        sr_no: row[srKey] ?? row.id,
+        chapter: chapterKey ? row[chapterKey] : null,
+        ssr_item_no: ssrItemKey ? row[ssrItemKey] : null,
+        reference_no: referenceKey ? row[referenceKey] : null,
+        description: descriptionKey ? row[descriptionKey] : null,
+        additional_specification: additionalKey ? row[additionalKey] : null,
+        unit: unitKey ? row[unitKey] : null,
+        completed_rate: completedKey ? row[completedKey] : null,
+        labour_rate: labourKey ? row[labourKey] : null,
+      };
+    });
+
+    // Sort by numeric sr_no when possible, otherwise by id
+    mapped.sort((a: any, b: any) => {
+      const aNum = parseInt(String(a.sr_no || a.id || '0').replace(/[^0-9]/g, '') || '0', 10);
+      const bNum = parseInt(String(b.sr_no || b.id || '0').replace(/[^0-9]/g, '') || '0', 10);
+      return aNum - bNum;
+    });
+
+    if (!mapped || mapped.length === 0) {
+      // Likely RLS / permission issue if the table contains rows but query returns empty
+      console.warn('SSR fetch returned 0 rows. If the table has data in Supabase console, check Row Level Security (RLS) policies for estimate.SSR_2022_23 and ensure the anon/public role has SELECT permission.');
+    }
+
+    setSSRData(mapped);
+  } catch (error) {
+    console.error('Error fetching SSR data:', error);
+    alert('Error loading SSR 2022-23 data');
+  } finally {
+    setLoadingSSR(false);
+  }
+};
 
   const handleOpenLeadCharges = () => {
     setShowLeadChargesModal(true);
@@ -703,6 +772,17 @@ const fetchSubworkTotals = async () => {
                     <FileText className="w-3 h-3 mr-1" />
                     CSR 22-23
                   </button>
+
+                  <button
+                    onClick={() => {
+                      setShowSSRModal(true);
+                      fetchSSRData();
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105">
+                    <FileText className="w-3 h-3 mr-1" />
+                    SSR 22-23
+                  </button>
+
                   <button
                     onClick={handleOpenLeadStatement}
                     disabled={!selectedWorkId}
@@ -741,8 +821,8 @@ const fetchSubworkTotals = async () => {
                       <div className="flex-1">
                         <div className="flex items-center space-x-3">
                           <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${selectedSubworkIds.includes(subwork.subworks_id)
-                              ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-600'
-                              : 'border-gray-300'
+                            ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-600'
+                            : 'border-gray-300'
                             }`}>
                             {selectedSubworkIds.includes(subwork.subworks_id) && (
                               <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -1330,6 +1410,85 @@ const fetchSubworkTotals = async () => {
               <button
                 onClick={() => setShowCSRModal(false)}
                 className="px-6 py-2.5 bg-gray-600 text-white text-sm font-medium rounded-md hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SSR Modal */}
+      {showSSRModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-7xl bg-white rounded-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+
+            {/* Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  SSR 2022-2023
+                </h2>
+                <button
+                  onClick={() => setShowSSRModal(false)}
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-6">
+              {loadingSSR ? (
+                <div className="flex justify-center py-12">
+                  <LoadingSpinner />
+                </div>
+              ) : ssrData.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-xs font-medium border-r">Sr No</th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">Chapter</th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">SSR Item No</th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">Reference No</th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">Description</th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">Additional Spec</th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">Unit</th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">Completed Rate</th>
+                        <th className="px-3 py-2 text-xs font-medium">Labour Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {ssrData.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-sm border-r">{row.sr_no}</td>
+                          <td className="px-3 py-2 text-sm border-r">{row.chapter}</td>
+                          <td className="px-3 py-2 text-sm border-r">{row.ssr_item_no}</td>
+                          <td className="px-3 py-2 text-sm border-r">{row.reference_no}</td>
+                          <td className="px-3 py-2 text-sm border-r">{row.description}</td>
+                          <td className="px-3 py-2 text-sm border-r">{row.additional_specification}</td>
+                          <td className="px-3 py-2 text-sm border-r">{row.unit}</td>
+                            <td className="px-3 py-2 text-sm border-r">{row.completed_rate}</td>
+                          <td className="px-3 py-2 text-sm">{row.labour_rate}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  No SSR data available
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => setShowSSRModal(false)}
+                className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
               >
                 Close
               </button>
