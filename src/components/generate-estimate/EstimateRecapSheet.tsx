@@ -18,6 +18,7 @@ interface EstimateRecapSheetProps {
   pageNumber: number;
   recapCalculations?: RecapCalculations;
   taxes?: TaxEntry[];
+  department?: 'water_sanitation' | 'pwd' | 'irrigation';
 }
 
 export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
@@ -28,7 +29,8 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
   pageNumberPosition,
   pageNumber,
   recapCalculations,
-  taxes = []
+  taxes = [],
+  department = 'water_sanitation'
 }) => {
   const getPartASubworks = () => {
     return estimateData.subworks.filter(subwork => {
@@ -50,8 +52,7 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
   };
 
   const shouldShowFundingColumns = () => {
-    const division = estimateData.work?.division?.toLowerCase() || '';
-    return !(division.includes('pwd') || division.includes('irrigation'));
+    return department === 'water_sanitation';
   };
 
   const showFundingCols = shouldShowFundingColumns();

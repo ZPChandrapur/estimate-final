@@ -31,6 +31,7 @@ const WorksRecapSheet: React.FC<WorksRecapSheetProps> = ({
   ]);
   const [calculations, setCalculations] = useState<RecapCalculations | null>(null);
   const [saved, setSaved] = useState(false);
+  const [department, setDepartment] = useState<'water_sanitation' | 'pwd' | 'irrigation'>('water_sanitation');
 
   const [localUnitInputs, setLocalUnitInputs] = useState<{ [subworkId: string]: number }>({});
   const unitInputs = externalUnitInputs ?? localUnitInputs;
@@ -105,6 +106,12 @@ const fetchWorkData = async () => {debugger
         setLocalUnitInputs(recapJsonData.unitInputs);
       } else {
         setLocalUnitInputs({});
+      }
+
+      if (recapJsonData.department) {
+        setDepartment(recapJsonData.department);
+      } else {
+        setDepartment('water_sanitation');
       }
     } else {
       // If no recap_json, fallback to normal fetching (already correct)
@@ -245,6 +252,7 @@ const fetchWorkData = async () => {debugger
         taxes,
         calculations,
         unitInputs,
+        department,
         savedAt: new Date().toISOString(),
       };
 
@@ -289,8 +297,7 @@ const fetchWorkData = async () => {debugger
   };
 
   const shouldShowFundingColumns = () => {
-    const division = work?.division?.toLowerCase() || '';
-    return !(division.includes('pwd') || division.includes('irrigation'));
+    return department === 'water_sanitation';
   };
 
   const showFundingCols = shouldShowFundingColumns();
@@ -328,6 +335,29 @@ const fetchWorkData = async () => {debugger
           <p>
             <span className="font-medium">Village:</span> {work.village}
           </p>
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Department
+            </label>
+            <select
+              value={department}
+              onChange={(e) => {
+                setDepartment(e.target.value as 'water_sanitation' | 'pwd' | 'irrigation');
+                setSaved(false);
+              }}
+              disabled={readonly}
+              className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="water_sanitation">Water and Sanitation (SBM/15th FC)</option>
+              <option value="pwd">PWD</option>
+              <option value="irrigation">Irrigation</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              {department === 'water_sanitation'
+                ? 'SBM (G) and 15th FC funding columns will be shown'
+                : 'SBM (G) and 15th FC funding columns will be hidden'}
+            </p>
+          </div>
         </div>
       </div>
 
