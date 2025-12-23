@@ -49,6 +49,8 @@ const WorkAssignments: React.FC = () => {
     user_id: '',
     role_id: '',
   });
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -64,23 +66,19 @@ const WorkAssignments: React.FC = () => {
     try {
       setLoading(true);
 
-      const [worksRes, usersRes, rolesRes] = await Promise.all([
+      const [worksRes, rolesRes] = await Promise.all([
         supabase.schema('estimate').from('works').select('works_id, work_name, division, status').order('sr_no', { ascending: false }),
-        supabase.schema('public').from('user_roles').select('user_id, name'),
-        supabase.schema('public').from('roles').select('*').eq('application', 'estimate'),
+        supabase.schema('public').from('roles').select('*').in('application', ['estimate', 'mb']),
       ]);
 
       if (worksRes.error) {
         console.error('Works fetch error:', worksRes.error);
-        alert('Error loading works: ' + worksRes.error.message);
+        setError('Error loading works: ' + worksRes.error.message);
         throw worksRes.error;
-      }
-      if (usersRes.error) {
-        console.error('Users fetch error:', usersRes.error);
-        throw usersRes.error;
       }
       if (rolesRes.error) {
         console.error('Roles fetch error:', rolesRes.error);
+        setError('Error loading roles: ' + rolesRes.error.message);
         throw rolesRes.error;
       }
 
@@ -90,18 +88,31 @@ const WorkAssignments: React.FC = () => {
       setWorks(worksRes.data || []);
       setRoles(rolesRes.data || []);
 
-      const userRolesData = usersRes.data || [];
-      const mappedUsers = userRolesData.map((ur: any) => ({
+      const { data: userRolesData, error: usersError } = await supabase
+        .schema('public')
+        .from('user_roles')
+        .select('user_id, name, role_id, roles!inner(application)')
+        .in('roles.application', ['estimate', 'mb']);
+
+      if (usersError) {
+        console.error('Users fetch error:', usersError);
+        setError('Error loading users: ' + usersError.message);
+        throw usersError;
+      }
+
+      const mappedUsers = (userRolesData || []).map((ur: any) => ({
         id: ur.user_id,
         email: '',
         name: ur.name || 'Unknown User',
       }));
-      setUsers(mappedUsers);
 
-      console.log('Mapped users:', mappedUsers.length);
+      const uniqueUsers = Array.from(new Map(mappedUsers.map((u: User) => [u.id, u])).values());
+      setUsers(uniqueUsers);
+
+      console.log('Mapped users:', uniqueUsers.length);
     } catch (error: any) {
       console.error('Error fetching data:', error);
-      alert('Failed to load data. Please check console for details.');
+      setError('Failed to load data. Please check console for details.');
     } finally {
       setLoading(false);
     }
@@ -139,12 +150,14 @@ const WorkAssignments: React.FC = () => {
 
   const handleAddAssignment = async () => {
     if (!selectedWork || !formData.user_id || !formData.role_id) {
-      alert('Please fill all fields');
+      setError('Please fill all fields');
       return;
     }
 
     try {
-      const { error } = await supabase
+      setSaving(true);
+      setError(null);
+      const { error: insertError } = await supabase
         .schema('estimate')
         .from('work_assignments')
         .insert([
@@ -156,19 +169,27 @@ const WorkAssignments: React.FC = () => {
           },
         ]);
 
-      if (error) throw error;
+      if (insertError) {
+        console.error('Database error:', insertError);
+        throw insertError;
+      }
 
       setShowModal(false);
       setFormData({ user_id: '', role_id: '' });
+      setError(null);
       fetchAssignments(selectedWork);
       alert('Assignment added successfully');
     } catch (error: any) {
       console.error('Error adding assignment:', error);
       if (error.code === '23505') {
-        alert('This user is already assigned to this work');
+        setError('This user is already assigned to this work');
+      } else if (error.message) {
+        setError(`Failed to add assignment: ${error.message}`);
       } else {
-        alert('Failed to add assignment');
+        setError('Failed to add assignment. You may not have permission to assign users.');
       }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -374,6 +395,12 @@ const WorkAssignments: React.FC = () => {
           <div className="bg-white rounded-2xl p-6 w-full max-w-md relative shadow-lg">
             <h2 className="text-xl font-semibold mb-4">Assign User to Work</h2>
 
+            {error && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg relative">
+                <span className="block sm:inline">{error}</span>
+              </div>
+            )}
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Select User</label>
@@ -411,13 +438,19 @@ const WorkAssignments: React.FC = () => {
             <div className="mt-6 flex justify-end space-x-3">
               <button
                 onClick={handleAddAssignment}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold shadow-md hover:scale-[1.03] transition-transform duration-200"
+                disabled={saving || !formData.user_id || !formData.role_id}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold shadow-md hover:scale-[1.03] transition-transform duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                Assign
+                {saving ? 'Assigning...' : 'Assign'}
               </button>
               <button
-                onClick={() => setShowModal(false)}
-                className="px-6 py-3 bg-gray-300 text-gray-800 rounded-xl font-semibold shadow-sm hover:bg-gray-400 transition-colors duration-200"
+                onClick={() => {
+                  setShowModal(false);
+                  setError(null);
+                  setFormData({ user_id: '', role_id: '' });
+                }}
+                disabled={saving}
+                className="px-6 py-3 bg-gray-300 text-gray-800 rounded-xl font-semibold shadow-sm hover:bg-gray-400 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
