@@ -139,32 +139,36 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   useEffect(() => {
     if (isOpen && item?.sr_no) {
       fetchData();
-      fetchRateAnalysis();
       fetchItemRates();
     }
   }, [isOpen, item?.sr_no, activeTab]);
 
   useEffect(() => {
     if (itemRates.length > 0 && !selectedRateId) {
-      setSelectedRateId(itemRates[0].sr_no);
-      setSelectedRateValue(itemRates[0].rate);
+      const firstRateId = itemRates[0].sr_no;
+      const firstRateValue = itemRates[0].rate;
+      setSelectedRateId(firstRateId);
+      setSelectedRateValue(firstRateValue);
     } else if (itemRates.length === 0) {
       setSelectedRateId(null);
       setSelectedRateValue(0);
+      fetchRateAnalysis();
     }
   }, [itemRates]);
 
   useEffect(() => {
-    if (selectedRateId && isOpen) {
+    if (selectedRateId !== null && isOpen && item?.sr_no) {
       fetchRateAnalysis();
     }
-  }, [selectedRateId]);
+  }, [selectedRateId, isOpen, item?.sr_no]);
 
   useEffect(() => {
     if (!isOpen) {
       setSelectedRateId(null);
       setSelectedRateValue(0);
       setItemRates([]);
+      setEntries([]);
+      setFinalTaxApplied(null);
     }
   }, [isOpen]);
 
@@ -285,13 +289,19 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     try {
       if (!item?.sr_no) return;
 
-      const { data, error } = await supabase
+      let query = supabase
         .schema('estimate')
         .from('item_rate_analysis')
         .select('*')
-        .eq('subwork_item_id', item.sr_no)
-        .eq('item_rate_id', selectedRateId || 0)
-        .maybeSingle();
+        .eq('subwork_item_id', item.sr_no);
+
+      if (selectedRateId !== null && selectedRateId !== undefined) {
+        query = query.eq('item_rate_id', selectedRateId);
+      } else {
+        query = query.is('item_rate_id', null);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) throw error;
 
@@ -302,6 +312,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
             percent: data.final_tax_percent,
             amount: data.final_tax_amount
           });
+        } else {
+          setFinalTaxApplied(null);
         }
       } else {
         setEntries([]);
@@ -309,6 +321,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       }
     } catch (error) {
       console.error('Error fetching rate analysis:', error);
+      setEntries([]);
+      setFinalTaxApplied(null);
     }
   };
 
@@ -365,7 +379,6 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   };
 
   const saveRateAnalysis = async () => {
-    debugger
     try {
       setLoading(true);
 
@@ -373,9 +386,12 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       const resolvedSubworkItemId = item?.sr_no ?? parentSubworkSrNo;
 
       if (!resolvedSubworkItemId) {
+        console.error('Missing subwork item ID');
         alert('Unable to resolve subwork reference. Please try again.');
         return;
       }
+
+      console.log('Saving rate analysis for item:', resolvedSubworkItemId, 'rate:', selectedRateId);
 
       const totalRate =
         summary.finalRate + (finalTaxApplied?.amount ?? 0);
@@ -397,51 +413,73 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       };
 
       // 🔍 Check if analysis already exists
-      const { data: existingAnalysis } = await supabase
+      let existingQuery = supabase
         .schema('estimate')
         .from('item_rate_analysis')
         .select('sr_no')
-        .eq('subwork_item_id', resolvedSubworkItemId)
-        .eq('item_rate_id', selectedRateId ?? null)
-        .maybeSingle();
+        .eq('subwork_item_id', resolvedSubworkItemId);
+
+      if (selectedRateId !== null && selectedRateId !== undefined) {
+        existingQuery = existingQuery.eq('item_rate_id', selectedRateId);
+      } else {
+        existingQuery = existingQuery.is('item_rate_id', null);
+      }
+
+      const { data: existingAnalysis } = await existingQuery.maybeSingle();
 
       if (existingAnalysis?.sr_no) {
         // ✅ UPDATE
+        console.log('Updating existing rate analysis:', existingAnalysis.sr_no);
         const { error } = await supabase
           .schema('estimate')
           .from('item_rate_analysis')
           .update(payload)
           .eq('sr_no', existingAnalysis.sr_no);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating rate analysis:', error);
+          throw error;
+        }
+        console.log('Rate analysis updated successfully');
       } else {
         // ✅ INSERT
+        console.log('Inserting new rate analysis');
         const { error } = await supabase
           .schema('estimate')
           .from('item_rate_analysis')
           .insert(payload);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error inserting rate analysis:', error);
+          throw error;
+        }
+        console.log('Rate analysis inserted successfully');
       }
 
       // ✅ Update item_rates only when rate exists
       if (selectedRateId) {
+        console.log('Updating item rate:', selectedRateId, 'to:', totalRate);
         const { error } = await supabase
           .schema('estimate')
           .from('item_rates')
           .update({ rate: totalRate })
           .eq('sr_no', selectedRateId);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating item rate:', error);
+          throw error;
+        }
+        console.log('Item rate updated successfully');
       }
 
       // ✅ UI sync
       onSaveRate?.(totalRate);
+      alert('Rate analysis saved successfully!');
       onClose();
 
     } catch (err) {
       console.error('Error saving rate analysis:', err);
-      alert('Failed to save rate analysis');
+      alert(`Failed to save rate analysis: ${err.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
