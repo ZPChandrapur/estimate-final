@@ -107,6 +107,27 @@ const WorkAssignments: React.FC = () => {
       }));
 
       const uniqueUsers = Array.from(new Map(mappedUsers.map((u: User) => [u.id, u])).values());
+
+      if (user?.id) {
+        const currentUserExists = uniqueUsers.some(u => u.id === user.id);
+        if (!currentUserExists) {
+          const { data: currentUserRole, error: currentUserError } = await supabase
+            .schema('public')
+            .from('user_roles')
+            .select('name')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (!currentUserError && currentUserRole) {
+            uniqueUsers.push({
+              id: user.id,
+              email: user.email || '',
+              name: currentUserRole.name || user.email || 'Current User',
+            });
+          }
+        }
+      }
+
       setUsers(uniqueUsers);
 
       console.log('Mapped users:', uniqueUsers.length);
