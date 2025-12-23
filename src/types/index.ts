@@ -95,22 +95,34 @@ export interface SubworkItem {
 }
 
 export interface ItemMeasurement {
+  id?: string;
   sr_no: number;
   subwork_item_id: number;
-  work_id: string;
-  subwork_id: string;
-  item_id: string;
+  measurement_sr_no: number;
+  work_id?: string;
+  subwork_id?: string;
+  item_id?: string;
   description_of_items?: string;
   no_of_units: number;
   length: number;
   width_breadth: number;
   height_depth: number;
   calculated_quantity: number;
-  estimated_quantity: number;
-  actual_quantity: number;
-  variance: number;
+  estimated_quantity?: number;
+  actual_quantity?: number;
+  variance?: number;
   variance_reason?: string;
   unit?: string;
+  is_manual_quantity?: boolean;
+  manual_quantity?: number;
+  is_deduction?: boolean;
+  line_amount: number;
+  rate?: number;
+  rate_sr_no?: number;
+  selected_rate_id?: number;
+  excel_url?: string;
+  excel_name?: string;
+  created_by?: string;
   created_at: string;
   updated_at: string;
 }

@@ -11,7 +11,8 @@ import {
   Upload,
   X,
   ImageIcon,
-  Package2
+  Package2,
+  Download
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -149,7 +150,7 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
 
 const handleMeasurementExcelUpload = async (
   event: React.ChangeEvent<HTMLInputElement>
-) => {debugger
+) => {
   const file = event.target.files?.[0];
   if (!file || !currentItem || !user) return;
 
@@ -158,10 +159,10 @@ const handleMeasurementExcelUpload = async (
 
     const fileExt = file.name.split('.').pop();
     const storedFileName = `${currentItem.sr_no}_${Date.now()}.${fileExt}`;
-    const filePath = `measurements/${storedFileName}`; // ✅ FOLDER inside bucket
+    const filePath = `measurements/${storedFileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('estimate-designs') // ✅ BUCKET
+      .from('estimate-designs')
       .upload(filePath, file);
 
     if (uploadError) throw uploadError;
@@ -171,8 +172,6 @@ const handleMeasurementExcelUpload = async (
       .getPublicUrl(filePath);
 
     const publicUrl = data.publicUrl;
-
-    /* ------------------ 2️⃣ Read Excel ------------------ */
 
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer);
@@ -184,28 +183,30 @@ const handleMeasurementExcelUpload = async (
       return;
     }
 
-    /* ------------------ 3️⃣ Insert rows into item_measurements ------------------ */
-
     const nextSrNo = await getNextMeasurementSrNo();
 
-    const insertRows = rows.map((row, index) => ({
-      // subwork_item_id: currentItem.sr_no,
-      // measurement_sr_no: nextSrNo + index,
-      // description_of_items: row.Description || null,
-      // unit: row.Unit || currentItem.ssr_unit,
-      // no_of_units: 1,
-      // length: 0,
-      // width_breadth: 0,
-      // height_depth: 0,
-      // is_manual_quantity: true,
-      // manual_quantity: Number(row.Quantity || 0),
-      // calculated_quantity: Number(row.Quantity || 0),
-      // is_deduction: false,
-      // line_amount: Number(row.Quantity || 0) * getSelectedRate(),
-      excel_url: publicUrl,   // ✅ stored
-      excel_name: file.name,  // ✅ stored
-      // created_by: user.id,
-    }));
+    const insertRows = rows.map((row, index) => {
+      const quantity = Number(row.Quantity || row.quantity || 0);
+      return {
+        subwork_item_id: currentItem.sr_no,
+        measurement_sr_no: nextSrNo + index,
+        description_of_items: row.Description || row.description || null,
+        unit: currentItem.ssr_unit,
+        no_of_units: 1,
+        length: 1,
+        width_breadth: 1,
+        height_depth: 1,
+        is_manual_quantity: true,
+        manual_quantity: quantity,
+        calculated_quantity: quantity,
+        is_deduction: false,
+        rate: currentItem.ssr_rate || 0,
+        line_amount: quantity * (currentItem.ssr_rate || 0),
+        excel_url: publicUrl,
+        excel_name: file.name,
+        created_by: user.id,
+      };
+    });
 
     const { error: insertError } = await supabase
       .schema('estimate')
@@ -856,6 +857,18 @@ const handleMeasurementExcelUpload = async (
                             </td> */}
                             <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-medium">
                               <div className="flex items-center space-x-2">
+                                {measurement.excel_url && (
+                                  <a
+                                    href={measurement.excel_url}
+                                    download={measurement.excel_name || 'measurement.xlsx'}
+                                    className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                                    title="Download Excel"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </a>
+                                )}
                                 <button
                                   onClick={() => handleEditMeasurement(measurement)}
                                   className="text-green-600 hover:text-green-900 p-1 rounded"
@@ -1157,7 +1170,7 @@ const handleMeasurementExcelUpload = async (
                   </button>
 
                   <p className="text-xs text-gray-500 mt-1">
-                    Excel columns: <b>Description</b>, <b>Quantity</b>, <b>Unit</b>
+                    Upload Excel with quantity calculations. File will be attached for reference.
                   </p>
                 </div>
 
