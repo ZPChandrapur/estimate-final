@@ -382,14 +382,13 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     try {
       setLoading(true);
 
-      // ✅ Decide correct FK source
-      const resolvedSubworkItemId = item?.sr_no ?? parentSubworkSrNo;
-
-      if (!resolvedSubworkItemId) {
-        console.error('Missing subwork item ID');
-        alert('Unable to resolve subwork reference. Please try again.');
+      if (!item?.sr_no) {
+        console.error('Missing subwork item ID - item.sr_no is required');
+        alert('Unable to save: Item reference is missing. Please close and reopen this dialog.');
         return;
       }
+
+      const resolvedSubworkItemId = item.sr_no;
 
       console.log('Saving rate analysis for item:', resolvedSubworkItemId, 'rate:', selectedRateId);
 
@@ -397,7 +396,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
         summary.finalRate + (finalTaxApplied?.amount ?? 0);
 
       const payload = {
-        subwork_item_id: resolvedSubworkItemId, // ✅ FIXED
+        subwork_item_id: resolvedSubworkItemId,
         item_rate_id: selectedRateId ?? null,
         base_rate: summary.baseRate,
         entries,
@@ -411,6 +410,25 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
         created_by: user?.id ?? null,
         updated_at: new Date().toISOString(),
       };
+
+      const { data: itemExists, error: checkError } = await supabase
+        .schema('estimate')
+        .from('subwork_items')
+        .select('sr_no')
+        .eq('sr_no', resolvedSubworkItemId)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking if item exists:', checkError);
+        throw checkError;
+      }
+
+      if (!itemExists) {
+        console.log('Item does not exist yet - returning payload for pending save');
+        onSaveRate?.(totalRate, payload);
+        onClose();
+        return;
+      }
 
       // 🔍 Check if analysis already exists
       let existingQuery = supabase
