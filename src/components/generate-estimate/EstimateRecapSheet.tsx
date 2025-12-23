@@ -49,6 +49,14 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
     return items.reduce((sum, item) => sum + (item.total_item_amount || 0), 0);
   };
 
+  const shouldShowFundingColumns = () => {
+    const division = estimateData.work?.division?.toLowerCase() || '';
+    return !(division.includes('pwd') || division.includes('irrigation'));
+  };
+
+  const showFundingCols = shouldShowFundingColumns();
+  const totalColspan = showFundingCols ? 8 : 6;
+
   return (
     <div className="page-break bg-white p-8 min-h-screen flex flex-col">
       <div className="text-center mb-6 border-b border-gray-300 pb-4">
@@ -80,13 +88,17 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
               <th className="border border-black p-2">No. of unit</th>
               <th className="border border-black p-2">Amount per unit (Rs.)</th>
               <th className="border border-black p-2">Total Amount (Rs.)</th>
-              <th className="border border-black p-2">SBM (G) (70%) (Rs.)</th>
-              <th className="border border-black p-2">Convergence-15th Finance Commission (30%) (Rs.)</th>
+              {showFundingCols && (
+                <>
+                  <th className="border border-black p-2">SBM (G) (70%) (Rs.)</th>
+                  <th className="border border-black p-2">Convergence-15th Finance Commission (30%) (Rs.)</th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
             <tr className="bg-gray-200 font-bold">
-              <td colSpan={8} className="border border-black p-2">PART-A: Purchasing Items including GST & all Taxes</td>
+              <td colSpan={totalColspan} className="border border-black p-2">PART-A: Purchasing Items including GST & all Taxes</td>
             </tr>
             {getPartASubworks().map((subwork, index) => {
               const items = estimateData.subworkItems[subwork.subworks_id] || [];
@@ -101,8 +113,12 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
                   <td className="border border-black p-2 text-center">{unitCount}</td>
                   <td className="border border-black p-2 text-right">{subworkTotal > 0 ? (subworkTotal / Math.max(unitCount, 1)).toFixed(2) : '0.00'}</td>
                   <td className="border border-black p-2 text-right">{subworkTotal.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(subworkTotal * 0.7).toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(subworkTotal * 0.3).toFixed(2)}</td>
+                  {showFundingCols && (
+                    <>
+                      <td className="border border-black p-2 text-right">{(subworkTotal * 0.7).toFixed(2)}</td>
+                      <td className="border border-black p-2 text-right">{(subworkTotal * 0.3).toFixed(2)}</td>
+                    </>
+                  )}
                 </tr>
               );
             })}
@@ -112,8 +128,12 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
                 <tr className="font-bold">
                   <td colSpan={5} className="border border-black p-2 text-right">Subtotal - Part A</td>
                   <td className="border border-black p-2 text-right">{recapCalculations.partA.subtotal.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.partA.subtotal * 0.7).toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.partA.subtotal * 0.3).toFixed(2)}</td>
+                  {showFundingCols && (
+                    <>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.partA.subtotal * 0.7).toFixed(2)}</td>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.partA.subtotal * 0.3).toFixed(2)}</td>
+                    </>
+                  )}
                 </tr>
 
                 {taxes.filter(tax => tax.applyTo === 'part_a' || tax.applyTo === 'both').map(tax => (
@@ -124,26 +144,34 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
                     <td className="border border-black p-2 text-right">
                       {(recapCalculations.partA.taxes[tax.id] || 0).toFixed(2)}
                     </td>
-                    <td className="border border-black p-2 text-right">
-                      {((recapCalculations.partA.taxes[tax.id] || 0) * 0.7).toFixed(2)}
-                    </td>
-                    <td className="border border-black p-2 text-right">
-                      {((recapCalculations.partA.taxes[tax.id] || 0) * 0.3).toFixed(2)}
-                    </td>
+                    {showFundingCols && (
+                      <>
+                        <td className="border border-black p-2 text-right">
+                          {((recapCalculations.partA.taxes[tax.id] || 0) * 0.7).toFixed(2)}
+                        </td>
+                        <td className="border border-black p-2 text-right">
+                          {((recapCalculations.partA.taxes[tax.id] || 0) * 0.3).toFixed(2)}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
 
                 <tr className="font-bold">
                   <td colSpan={5} className="border border-black p-2 text-right">Total of PART - A</td>
                   <td className="border border-black p-2 text-right">{recapCalculations.partA.total.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.partA.total * 0.7).toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.partA.total * 0.3).toFixed(2)}</td>
+                  {showFundingCols && (
+                    <>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.partA.total * 0.7).toFixed(2)}</td>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.partA.total * 0.3).toFixed(2)}</td>
+                    </>
+                  )}
                 </tr>
               </>
             )}
 
             <tr className="bg-gray-200 font-bold">
-              <td colSpan={8} className="border border-black p-2">PART-B: Construction works for E-Tendering</td>
+              <td colSpan={totalColspan} className="border border-black p-2">PART-B: Construction works for E-Tendering</td>
             </tr>
             {getPartBSubworks().map((subwork, index) => {
               const items = estimateData.subworkItems[subwork.subworks_id] || [];
@@ -158,8 +186,12 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
                   <td className="border border-black p-2 text-center">{unitCount}</td>
                   <td className="border border-black p-2 text-right">{subworkTotal > 0 ? (subworkTotal / Math.max(unitCount, 1)).toFixed(2) : '0.00'}</td>
                   <td className="border border-black p-2 text-right">{subworkTotal.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(subworkTotal * 0.7).toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(subworkTotal * 0.3).toFixed(2)}</td>
+                  {showFundingCols && (
+                    <>
+                      <td className="border border-black p-2 text-right">{(subworkTotal * 0.7).toFixed(2)}</td>
+                      <td className="border border-black p-2 text-right">{(subworkTotal * 0.3).toFixed(2)}</td>
+                    </>
+                  )}
                 </tr>
               );
             })}
@@ -169,8 +201,12 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
                 <tr className="font-bold">
                   <td colSpan={5} className="border border-black p-2 text-right">Subtotal - Part B</td>
                   <td className="border border-black p-2 text-right">{recapCalculations.partB.subtotal.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.partB.subtotal * 0.7).toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.partB.subtotal * 0.3).toFixed(2)}</td>
+                  {showFundingCols && (
+                    <>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.partB.subtotal * 0.7).toFixed(2)}</td>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.partB.subtotal * 0.3).toFixed(2)}</td>
+                    </>
+                  )}
                 </tr>
 
                 {taxes.filter(tax => tax.applyTo === 'part_b' || tax.applyTo === 'both').map(tax => (
@@ -181,48 +217,72 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
                     <td className="border border-black p-2 text-right">
                       {(recapCalculations.partB.taxes[tax.id] || 0).toFixed(2)}
                     </td>
-                    <td className="border border-black p-2 text-right">
-                      {((recapCalculations.partB.taxes[tax.id] || 0) * 0.7).toFixed(2)}
-                    </td>
-                    <td className="border border-black p-2 text-right">
-                      {((recapCalculations.partB.taxes[tax.id] || 0) * 0.3).toFixed(2)}
-                    </td>
+                    {showFundingCols && (
+                      <>
+                        <td className="border border-black p-2 text-right">
+                          {((recapCalculations.partB.taxes[tax.id] || 0) * 0.7).toFixed(2)}
+                        </td>
+                        <td className="border border-black p-2 text-right">
+                          {((recapCalculations.partB.taxes[tax.id] || 0) * 0.3).toFixed(2)}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
 
                 <tr className="font-bold">
                   <td colSpan={5} className="border border-black p-2 text-right">Total of PART - B</td>
                   <td className="border border-black p-2 text-right">{recapCalculations.partB.total.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.partB.total * 0.7).toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.partB.total * 0.3).toFixed(2)}</td>
+                  {showFundingCols && (
+                    <>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.partB.total * 0.7).toFixed(2)}</td>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.partB.total * 0.3).toFixed(2)}</td>
+                    </>
+                  )}
                 </tr>
 
                 <tr className="font-bold">
                   <td colSpan={5} className="border border-black p-2 text-right">Add 0.50% Contingencies</td>
                   <td className="border border-black p-2 text-right">{recapCalculations.additionalCharges.contingencies.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.additionalCharges.contingencies * 0.7).toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.additionalCharges.contingencies * 0.3).toFixed(2)}</td>
+                  {showFundingCols && (
+                    <>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.additionalCharges.contingencies * 0.7).toFixed(2)}</td>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.additionalCharges.contingencies * 0.3).toFixed(2)}</td>
+                    </>
+                  )}
                 </tr>
 
                 <tr className="font-bold">
                   <td colSpan={5} className="border border-black p-2 text-right">Inspection charges 0.50%</td>
                   <td className="border border-black p-2 text-right">{recapCalculations.additionalCharges.inspectionCharges.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.additionalCharges.inspectionCharges * 0.7).toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">0.00</td>
+                  {showFundingCols && (
+                    <>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.additionalCharges.inspectionCharges * 0.7).toFixed(2)}</td>
+                      <td className="border border-black p-2 text-right">0.00</td>
+                    </>
+                  )}
                 </tr>
 
                 <tr className="font-bold">
                   <td colSpan={5} className="border border-black p-2 text-right">DPR charges 5% or 1 Lakh whichever is less</td>
                   <td className="border border-black p-2 text-right">{recapCalculations.additionalCharges.dprCharges.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{recapCalculations.additionalCharges.dprCharges.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">0.00</td>
+                  {showFundingCols && (
+                    <>
+                      <td className="border border-black p-2 text-right">{recapCalculations.additionalCharges.dprCharges.toFixed(2)}</td>
+                      <td className="border border-black p-2 text-right">0.00</td>
+                    </>
+                  )}
                 </tr>
 
                 <tr className="font-bold bg-gray-100 text-lg">
                   <td colSpan={5} className="border border-black p-2 text-right">Gross Total Estimated Amount</td>
                   <td className="border border-black p-2 text-right">{recapCalculations.grandTotal.toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.grandTotal * 0.7).toFixed(2)}</td>
-                  <td className="border border-black p-2 text-right">{(recapCalculations.grandTotal * 0.3).toFixed(2)}</td>
+                  {showFundingCols && (
+                    <>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.grandTotal * 0.7).toFixed(2)}</td>
+                      <td className="border border-black p-2 text-right">{(recapCalculations.grandTotal * 0.3).toFixed(2)}</td>
+                    </>
+                  )}
                 </tr>
               </>
             )}
