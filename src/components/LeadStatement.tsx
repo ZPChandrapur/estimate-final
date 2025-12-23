@@ -48,6 +48,8 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
   const [materialOptions, setMaterialOptions] = useState<{ name: string; rate: string; unit: string }[]>([]);
   const [showMaterialOptions, setShowMaterialOptions] = useState(false);
   const [searchingLeadCharges, setSearchingLeadCharges] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen && worksId) {
@@ -212,12 +214,17 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
   };
 
   const handleAdd = async () => {
-    if (!formData.material || !user) return;
+    if (!formData.material || !user) {
+      setError('Material is required and you must be logged in.');
+      return;
+    }
 
     try {
+      setSaving(true);
+      setError(null);
       const nextSrNo = await getNextSrNo();
 
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .schema('estimate')
         .from('lead_statements')
         .insert([{
@@ -232,13 +239,19 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
           created_by: user.id
         }]);
 
-      if (error) throw error;
+      if (insertError) {
+        console.error('Database error:', insertError);
+        throw new Error(`Failed to add lead statement: ${insertError.message}`);
+      }
 
       setShowAddModal(false);
       resetForm();
       fetchLeadStatements();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding lead statement:', error);
+      setError(error.message || 'Failed to add lead statement. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -256,10 +269,15 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
   };
 
   const handleUpdate = async () => {
-    if (!formData.material || !selectedItem) return;
+    if (!formData.material || !selectedItem) {
+      setError('Material is required.');
+      return;
+    }
 
     try {
-      const { error } = await supabase
+      setSaving(true);
+      setError(null);
+      const { error: updateError } = await supabase
         .schema('estimate')
         .from('lead_statements')
         .update({
@@ -273,14 +291,20 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
         })
         .eq('id', selectedItem.id);
 
-      if (error) throw error;
+      if (updateError) {
+        console.error('Database error:', updateError);
+        throw new Error(`Failed to update lead statement: ${updateError.message}`);
+      }
 
       setShowEditModal(false);
       setSelectedItem(null);
       resetForm();
       fetchLeadStatements();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating lead statement:', error);
+      setError(error.message || 'Failed to update lead statement. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -314,6 +338,8 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
     });
     setMaterialOptions([]);
     setShowMaterialOptions(false);
+    setError(null);
+    setSaving(false);
   };
 
   if (!isOpen) return null;
@@ -481,6 +507,12 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                 </button>
               </div>
 
+              {error && (
+                <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
+                  <span className="block sm:inline">{error}</span>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -615,16 +647,17 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                     setSelectedItem(null);
                     resetForm();
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  disabled={saving}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={showEditModal ? handleUpdate : handleAdd}
-                  disabled={!formData.material}
+                  disabled={!formData.material || saving}
                   className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {showEditModal ? 'Update' : 'Add'}
+                  {saving ? 'Saving...' : (showEditModal ? 'Update' : 'Add')}
                 </button>
               </div>
             </div>
