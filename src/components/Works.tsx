@@ -173,7 +173,7 @@ const Works: React.FC = () => {
   );
 
   const handleDeleteWork = async (work: Work) => {
-    if (!confirm('Are you sure you want to delete this work? This action cannot be undone.')) {
+    if (!confirm(`Are you sure you want to delete "${work.work_name}"? This will permanently delete all related data including subworks, items, measurements, and approvals. This action cannot be undone.`)) {
       return;
     }
 
@@ -184,10 +184,17 @@ const Works: React.FC = () => {
         .delete()
         .eq('sr_no', work.sr_no);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting work:', error);
+        alert(`Failed to delete work: ${error.message}`);
+        return;
+      }
+
+      alert('Work deleted successfully!');
       fetchWorks();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting work:', error);
+      alert(`An error occurred while deleting the work: ${error.message || 'Unknown error'}`);
     }
   };
 
