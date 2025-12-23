@@ -165,7 +165,10 @@ const handleMeasurementExcelUpload = async (
       .from('estimate-designs')
       .upload(filePath, file);
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError);
+      throw new Error(`Failed to upload file: ${uploadError.message}`);
+    }
 
     const { data } = supabase.storage
       .from('estimate-designs')
@@ -179,7 +182,8 @@ const handleMeasurementExcelUpload = async (
     const rows: any[] = XLSX.utils.sheet_to_json(sheet);
 
     if (!rows.length) {
-      alert('Excel file is empty');
+      alert('Excel file is empty. Please add data to the Excel file.');
+      event.target.value = '';
       return;
     }
 
@@ -213,17 +217,22 @@ const handleMeasurementExcelUpload = async (
       .from('item_measurements')
       .insert(insertRows);
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error('Database insert error:', insertError);
+      throw new Error(`Failed to save measurements: ${insertError.message}`);
+    }
 
-    fetchData();
+    await fetchData();
     await updateItemSSRQuantity();
 
-    alert('Measurement Excel uploaded successfully');
+    alert(`${rows.length} measurement(s) uploaded successfully from Excel!`);
+    setShowAddModal(false);
     event.target.value = '';
 
   } catch (error) {
     console.error('Error uploading measurement Excel:', error);
-    alert('Error uploading measurement Excel');
+    alert(error.message || 'Error uploading measurement Excel. Please try again.');
+    event.target.value = '';
   } finally {
     setUploadingExcel(false);
   }
@@ -1145,35 +1154,6 @@ const handleMeasurementExcelUpload = async (
                   </div>
                 </div>
 
-                {/* Excel Upload */}
-                <div className="ml-6 mt-3">
-                  <input
-                    type="file"
-                    id="measurement-excel-upload"
-                    accept=".xlsx,.xls"
-                    onChange={handleMeasurementExcelUpload}
-                    className="hidden"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      document.getElementById('measurement-excel-upload')?.click()
-                    }
-                    disabled={uploadingExcel}
-                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md
-               border border-blue-300 text-blue-700 bg-blue-50
-               hover:bg-blue-100 disabled:opacity-50"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {uploadingExcel ? 'Uploading...' : 'Upload Measurement Excel'}
-                  </button>
-
-                  <p className="text-xs text-gray-500 mt-1">
-                    Upload Excel with quantity calculations. File will be attached for reference.
-                  </p>
-                </div>
-
                 <div className="space-y-3">
                   <div className="flex items-center">
                     <input
@@ -1214,6 +1194,40 @@ const handleMeasurementExcelUpload = async (
                       />
                     </div>
                   )}
+                </div>
+
+                {/* Excel Upload */}
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Or Upload Measurement Excel
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Upload Excel with quantity calculations. File will be attached for reference.
+                  </p>
+
+                  <input
+                    type="file"
+                    id="measurement-excel-upload"
+                    accept=".xlsx,.xls"
+                    onChange={handleMeasurementExcelUpload}
+                    className="hidden"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      document.getElementById('measurement-excel-upload')?.click()
+                    }
+                    disabled={uploadingExcel}
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md
+               border border-blue-300 text-blue-700 bg-blue-50
+               hover:bg-blue-100 disabled:opacity-50"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {uploadingExcel ? 'Uploading...' : 'Upload Measurement Excel'}
+                  </button>
                 </div>
 
                 <div className="space-y-2">
