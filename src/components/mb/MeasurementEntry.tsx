@@ -278,7 +278,8 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
           status,
           created_by: user.id,
           submitted_at: status === 'submitted' ? new Date().toISOString() : null
-        });
+        })
+        .select();
 
       if (insertError) throw insertError;
 
