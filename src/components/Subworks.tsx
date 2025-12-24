@@ -16,7 +16,6 @@ import {
   FileText,
   IndianRupee,
   Calculator,
-  ChevronRight,
   Camera,
   Upload,
   Image as ImageIcon,
@@ -38,24 +37,32 @@ const Subworks: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSubwork, setSelectedSubwork] = useState<SubWork | null>(null);
-  const totalEstimateSum = works.reduce((acc, work) => acc + (work.total_estimated_cost || 0), 0);
+  const totalEstimateSum = works.reduce(
+    (acc, work) => acc + (work.total_estimated_cost || 0),
+    0
+  );
   const [newSubwork, setNewSubwork] = useState<Partial<SubWork>>({
     subworks_name: ''
   });
   const [showItemsModal, setShowItemsModal] = useState(false);
-  const [currentSubworkForItems, setCurrentSubworkForItems] = useState<{ id: string; name: string } | null>(null);
+  const [currentSubworkForItems, setCurrentSubworkForItems] =
+    useState<{ id: string; name: string } | null>(null);
 
   // Design photo states
   const [showDesignModal, setShowDesignModal] = useState(false);
-  const [selectedSubworkForDesign, setSelectedSubworkForDesign] = useState<SubWork | null>(null);
+  const [selectedSubworkForDesign, setSelectedSubworkForDesign] =
+    useState<SubWork | null>(null);
   const [designPhotos, setDesignPhotos] = useState<any[]>([]);
   const [uploadingDesign, setUploadingDesign] = useState(false);
 
-  // Add state for subwork totals
+  // Subwork totals
   const [subworkTotals, setSubworkTotals] = useState<Record<string, number>>({});
-  const totalSubworkEstimate = Object.values(subworkTotals || {}).reduce((acc, val) => acc + val, 0);
+  const totalSubworkEstimate = Object.values(subworkTotals || {}).reduce(
+    (acc, val) => acc + val,
+    0
+  );
 
-  // Add states for Lead Charges and CSR tables
+  // Lead / CSR / SSR
   const [showLeadChargesModal, setShowLeadChargesModal] = useState(false);
   const [showCSRModal, setShowCSRModal] = useState(false);
   const [leadChargesData, setLeadChargesData] = useState<any[]>([]);
@@ -66,24 +73,31 @@ const Subworks: React.FC = () => {
   const [ssrData, setSSRData] = useState<any[]>([]);
   const [loadingSSR, setLoadingSSR] = useState(false);
 
-  // Add state for Lead Statement modal
+  // Lead statement
   const [showLeadStatementModal, setShowLeadStatementModal] = useState(false);
   const [selectedWorkForLeadStatement, setSelectedWorkForLeadStatement] =
     useState<{ id: string; name: string } | null>(null);
 
-  // Optional: placeholder quarry chart modal state (UI only for now)
+  // Quarry chart state
   const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
+  const [quarryTitle, setQuarryTitle] = useState('Quarry Chart');
+  const [quarryRows, setQuarryRows] = useState(25);
+  const [quarryCols, setQuarryCols] = useState(40);
+  const [quarryGrid, setQuarryGrid] = useState<string[][]>(() =>
+    Array.from({ length: 25 }, () => Array(40).fill(' '))
+  );
+  const [quarrySelectedTool, setQuarrySelectedTool] =
+    useState<'line-h' | 'line-v' | 'node' | 'text'>('line-h');
+  const [quarryCurrentLabel, setQuarryCurrentLabel] = useState<string>('');
+  const [quarryChar, setQuarryChar] = useState<string>('●');
 
   useEffect(() => {
-    // Always fetch all works on selectedWorkId change, not just filtered
     fetchWorks();
   }, [selectedWorkId]);
 
   useEffect(() => {
-    // Check if we received a selected works ID from navigation state
     if (location.state?.selectedWorksId) {
       setSelectedWorkId(location.state.selectedWorksId);
-      // Clear the navigation state to prevent re-execution
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
@@ -111,22 +125,22 @@ const Subworks: React.FC = () => {
     try {
       setLoading(true);
 
-      // Fetch all works always (remove filtering by selectedId)
-      let query = supabase
+      const { data, error } = await supabase
         .schema('estimate')
         .from('works')
         .select('*')
         .order('sr_no', { ascending: false });
 
-      // Removed filtering by selectedId: fetch all works regardless
-
-      const { data, error } = await query;
       if (error) throw error;
 
       setWorks(data || []);
 
-      // Auto-select first work only if nothing is selected yet
-      if (data && data.length > 0 && !selectedWorkId && !location.state?.selectedWorksId) {
+      if (
+        data &&
+        data.length > 0 &&
+        !selectedWorkId &&
+        !location.state?.selectedWorksId
+      ) {
         setSelectedWorkId(data[0].works_id);
       }
     } catch (error) {
@@ -141,7 +155,6 @@ const Subworks: React.FC = () => {
     try {
       setLoading(true);
 
-      // Fetch all subworks for the selected work
       const { data: subworksData, error: subworksError } = await supabase
         .schema('estimate')
         .from('subworks')
@@ -152,7 +165,6 @@ const Subworks: React.FC = () => {
 
       setSubworks(subworksData || []);
 
-      // ✅ Fetch all related subwork_items in a single call
       const subworkIds = (subworksData || []).map(sw => sw.subworks_id);
       if (subworkIds.length > 0) {
         const { data: itemsData, error: itemsError } = await supabase
@@ -162,7 +174,6 @@ const Subworks: React.FC = () => {
           .in('subworks_id', subworkIds);
         if (itemsError) throw itemsError;
 
-        // ✅ Compute totals and item counts locally
         const totals: Record<string, number> = {};
         const counts: Record<string, number> = {};
 
@@ -172,7 +183,6 @@ const Subworks: React.FC = () => {
           counts[id] = (counts[id] || 0) + 1;
         });
 
-        // Update your state
         setSubworkTotals(totals);
         setSubworkItemCounts(counts);
       } else {
@@ -213,7 +223,6 @@ const Subworks: React.FC = () => {
 
       if (!subworks || subworks.length === 0) return;
 
-      // ✅ Step 1: Fetch all subwork_items for these subworks at once
       const subworkIds = subworks.map(sw => sw.subworks_id);
       const { data: subworkItems, error: itemsError } = await supabase
         .schema('estimate')
@@ -223,12 +232,10 @@ const Subworks: React.FC = () => {
 
       if (itemsError) throw itemsError;
 
-      // If no items found, set all to 0
       if (!subworkItems || subworkItems.length === 0) {
         for (const subwork of subworks) {
           totals[subwork.subworks_id] = 0;
 
-          // Update subwork_amount = 0 (same functionality, just kept as-is)
           await supabase
             .schema('estimate')
             .from('subworks')
@@ -239,7 +246,6 @@ const Subworks: React.FC = () => {
         return;
       }
 
-      // ✅ Step 2: Fetch all item_rates for all subwork_items in one go
       const itemSrNos = subworkItems.map(i => i.sr_no);
       const { data: rateRows, error: rateError } = await supabase
         .schema('estimate')
@@ -249,21 +255,19 @@ const Subworks: React.FC = () => {
 
       if (rateError) throw rateError;
 
-      // ✅ Step 3: Compute totals efficiently in memory
       const itemTotals: Record<number, number> = {};
       (rateRows || []).forEach(rate => {
         itemTotals[rate.subwork_item_sr_no] =
-          (itemTotals[rate.subwork_item_sr_no] || 0) + (rate.rate_total_amount || 0);
+          (itemTotals[rate.subwork_item_sr_no] || 0) +
+          (rate.rate_total_amount || 0);
       });
 
-      // ✅ Step 4: Aggregate totals by subwork_id
       subworkItems.forEach(item => {
         const subworkId = item.subwork_id;
         const totalItemAmt = itemTotals[item.sr_no] || 0;
         totals[subworkId] = (totals[subworkId] || 0) + totalItemAmt;
       });
 
-      // ✅ Step 5: Update all subworks’ subwork_amounts (same as your logic)
       for (const subworkId in totals) {
         await supabase
           .schema('estimate')
@@ -272,7 +276,6 @@ const Subworks: React.FC = () => {
           .eq('subworks_id', subworkId);
       }
 
-      // ✅ Step 6: Update React state (same)
       setSubworkTotals(totals);
     } catch (error) {
       console.error('Error fetching subwork totals:', error);
@@ -371,18 +374,26 @@ const Subworks: React.FC = () => {
 
       const mapped = (data || []).map((row: any) => {
         const keys = Object.keys(row || {});
-
-        const findKey = (pred: (k: string) => boolean) => keys.find(k => pred(k)) ?? undefined;
+        const findKey = (pred: (k: string) => boolean) =>
+          keys.find(k => pred(k)) ?? undefined;
 
         const srKey =
-          findKey(k => k.replace(/\s|\.|\n|\r/gi, '').toLowerCase().includes('srno')) || 'id';
+          findKey(k =>
+            k.replace(/\s|\.|\n|\r/gi, '').toLowerCase().includes('srno')
+          ) || 'id';
         const chapterKey = findKey(k => k.toLowerCase().includes('chapter'));
         const ssrItemKey = findKey(k =>
           k.replace(/\s|\.|\n|\r/gi, '').toLowerCase().includes('ssritem')
         );
-        const referenceKey = findKey(k => k.toLowerCase().includes('reference'));
-        const descriptionKey = findKey(k => k.toLowerCase().includes('description'));
-        const additionalKey = findKey(k => k.toLowerCase().includes('additional'));
+        const referenceKey = findKey(k =>
+          k.toLowerCase().includes('reference')
+        );
+        const descriptionKey = findKey(k =>
+          k.toLowerCase().includes('description')
+        );
+        const additionalKey = findKey(k =>
+          k.toLowerCase().includes('additional')
+        );
         const unitKey = findKey(k => k.toLowerCase().includes('unit'));
         const completedKey = findKey(
           k =>
@@ -419,7 +430,7 @@ const Subworks: React.FC = () => {
 
       if (!mapped || mapped.length === 0) {
         console.warn(
-          'SSR fetch returned 0 rows. If the table has data in Supabase console, check Row Level Security (RLS) policies for estimate.SSR_2022_23 and ensure the anon/public role has SELECT permission.'
+          'SSR fetch returned 0 rows. If the table has data in Supabase console, check RLS for estimate.SSR_2022_23.'
         );
       }
 
@@ -457,12 +468,9 @@ const Subworks: React.FC = () => {
     }
   };
 
-  // Placeholder for Quarry Chart – hook your diagram modal here
-  const handleOpenQuarryChart = () => {
-    setShowQuarryChartModal(true);
-  };
-
-  const handleDesignUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDesignUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file || !selectedSubworkForDesign || !user) return;
 
@@ -622,25 +630,27 @@ const Subworks: React.FC = () => {
     }
   };
 
-  const handleDeleteSubwork = (subwork: SubWork) => {
-    if (!confirm('Are you sure you want to delete this subwork? This action cannot be undone.')) {
+  const handleDeleteSubwork = async (subwork: SubWork) => {
+    if (
+      !confirm(
+        'Are you sure you want to delete this subwork? This action cannot be undone.'
+      )
+    ) {
       return;
     }
 
-    (async () => {
-      try {
-        const { error } = await supabase
-          .schema('estimate')
-          .from('subworks')
-          .delete()
-          .eq('sr_no', subwork.sr_no);
+    try {
+      const { error } = await supabase
+        .schema('estimate')
+        .from('subworks')
+        .delete()
+        .eq('sr_no', subwork.sr_no);
 
-        if (error) throw error;
-        fetchSubworks(selectedWorkId);
-      } catch (error) {
-        console.error('Error deleting subwork:', error);
-      }
-    })();
+      if (error) throw error;
+      fetchSubworks(selectedWorkId);
+    } catch (error) {
+      console.error('Error deleting subwork:', error);
+    }
   };
 
   const handleSubworkCheckbox = (subworkId: string) => {
@@ -659,7 +669,9 @@ const Subworks: React.FC = () => {
       return;
     }
 
-    const firstSelected = subworks.find(sw => sw.subworks_id === selectedSubworkIds[0]);
+    const firstSelected = subworks.find(
+      sw => sw.subworks_id === selectedSubworkIds[0]
+    );
     if (firstSelected) {
       setCurrentSubworkForItems({
         id: firstSelected.subworks_id,
@@ -690,6 +702,55 @@ const Subworks: React.FC = () => {
       subwork.subworks_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Quarry chart UI helpers
+
+  const resetQuarryGrid = (rows: number, cols: number) => {
+    setQuarryRows(rows);
+    setQuarryCols(cols);
+    setQuarryGrid(
+      Array.from({ length: rows }, () => Array(cols).fill(' '))
+    );
+  };
+
+  const handleQuarryCellClick = (r: number, c: number) => {
+    setQuarryGrid(prev => {
+      const next = prev.map(row => [...row]);
+
+      if (quarrySelectedTool === 'line-h') {
+        next[r] = next[r].map((ch, idx) =>
+          idx >= Math.max(0, c - 3) && idx <= Math.min(quarryCols - 1, c + 3)
+            ? '─'
+            : ch
+        );
+      } else if (quarrySelectedTool === 'line-v') {
+        for (
+          let i = Math.max(0, r - 3);
+          i <= Math.min(quarryRows - 1, r + 3);
+          i++
+        ) {
+          next[i][c] = '│';
+        }
+      } else if (quarrySelectedTool === 'node') {
+        next[r][c] = quarryChar || '●';
+      } else if (quarrySelectedTool === 'text') {
+        if (!quarryCurrentLabel) return prev;
+        const chars = quarryCurrentLabel.split('');
+        chars.forEach((ch, idx) => {
+          const col = c + idx;
+          if (col < quarryCols) {
+            next[r][col] = ch;
+          }
+        });
+      }
+
+      return next;
+    });
+  };
+
+  const handleOpenQuarryChart = () => {
+    setShowQuarryChartModal(true);
+  };
+
   if (loading) {
     return <LoadingSpinner text={t('common.loading')} />;
   }
@@ -699,13 +760,14 @@ const Subworks: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('subworks.title')}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {t('subworks.title')}
+          </h1>
           <p className="mt-1 text-sm text-gray-500">
             Manage detailed sub-work items and their estimates
           </p>
         </div>
         <div className="mt-4 sm:mt-0">
-          {/* Work Selection and Search */}
           <div className="flex flex-col sm:flex-row gap-3">
             {/* Work Selection */}
             <div className="sm:w-48">
@@ -762,7 +824,9 @@ const Subworks: React.FC = () => {
               </p>
               <div className="flex items-center mt-2 text-sm text-indigo-600">
                 <IndianRupee className="w-3 h-3 mr-1" />
-                <span>Total Estimate: {formatCurrency(totalSubworkEstimate)}</span>
+                <span>
+                  Total Estimate: {formatCurrency(totalSubworkEstimate)}
+                </span>
               </div>
             </div>
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-lg">
@@ -772,92 +836,97 @@ const Subworks: React.FC = () => {
         </div>
       )}
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       {selectedWorkId ? (
-        <div className="grid grid-cols-1 gap-6">
-          {/* Left Panel - Subworks List */}
+        <div className="space-y-4">
+          {/* Toolbar outside Sub Works card */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            {/* Schedules square */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3 flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-semibold text-slate-500 mr-2">
+                Schedules
+              </span>
+              <button
+                onClick={handleOpenCSR}
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition"
+              >
+                <FileText className="w-3 h-3 mr-1" />
+                CSR 22-23
+              </button>
+              <button
+                onClick={() => {
+                  setShowSSRModal(true);
+                  fetchSSRData();
+                }}
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition"
+              >
+                <FileText className="w-3 h-3 mr-1" />
+                SSR 22-23
+              </button>
+            </div>
+
+            {/* Leads + Quarry */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3 flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-semibold text-slate-500 mr-2">
+                Leads
+              </span>
+              <button
+                onClick={handleOpenLeadCharges}
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition"
+              >
+                <FileText className="w-3 h-3 mr-1" />
+                Lead Charges
+              </button>
+              <button
+                onClick={handleOpenLeadStatement}
+                disabled={!selectedWorkId}
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition disabled:opacity-50"
+              >
+                <FileText className="w-3 h-3 mr-1" />
+                Lead Statement
+              </button>
+              <button
+                onClick={handleOpenQuarryChart}
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition"
+              >
+                <FileText className="w-3 h-3 mr-1" />
+                Quarry Chart
+              </button>
+            </div>
+
+            {/* Sub Works actions */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3 flex flex-wrap gap-2 items-center justify-start lg:justify-end">
+              <button
+                onClick={() => setShowAddModal(true)}
+                disabled={!selectedWorkId}
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition disabled:opacity-50"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add Sub Work
+              </button>
+              <button
+                onClick={handleViewItems}
+                disabled={selectedSubworkIds.length === 0}
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition disabled:opacity-50"
+              >
+                <Eye className="w-3 h-3 mr-1" />
+                View Items (
+                {selectedSubworkIds.length > 0
+                  ? `${getTotalItemsCount()} items`
+                  : '0 items'}
+                )
+              </button>
+            </div>
+          </div>
+
+          {/* Sub Works card */}
           <div className="bg-gradient-to-br from-white to-slate-50 shadow-xl rounded-2xl border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="p-2 bg-white/20 rounded-lg mr-3">
-                    <Calculator className="h-5 w-5 text-white" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-white">Sub Works</h3>
+              <div className="flex items-center">
+                <div className="p-2 bg-white/20 rounded-lg mr-3">
+                  <Calculator className="h-5 w-5 text-white" />
                 </div>
-
-                {/* NEW grouped layout: 3 squares */}
-                <div className="flex flex-col lg:flex-row gap-3">
-                  {/* 1st square: CSR + SSR */}
-                  <div className="flex-1 rounded-xl bg-white/10 border border-white/30 px-3 py-2 flex flex-wrap gap-2">
-                    <button
-                      onClick={handleOpenCSR}
-                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105"
-                    >
-                      <FileText className="w-3 h-3 mr-1" />
-                      CSR 22-23
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowSSRModal(true);
-                        fetchSSRData();
-                      }}
-                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105"
-                    >
-                      <FileText className="w-3 h-3 mr-1" />
-                      SSR 22-23
-                    </button>
-                  </div>
-
-                  {/* 2nd square: Lead Charges + Lead Statement + Quarry Chart */}
-                  <div className="flex-1 rounded-xl bg-white/10 border border-white/30 px-3 py-2 flex flex-wrap gap-2">
-                    <button
-                      onClick={handleOpenLeadCharges}
-                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105"
-                    >
-                      <FileText className="w-3 h-3 mr-1" />
-                      Lead Charges
-                    </button>
-
-                    <button
-                      onClick={handleOpenLeadStatement}
-                      disabled={!selectedWorkId}
-                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 disabled:opacity-50 hover:scale-105"
-                    >
-                      <FileText className="w-3 h-3 mr-1" />
-                      Lead Statement
-                    </button>
-
-                    <button
-                      onClick={handleOpenQuarryChart}
-                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105"
-                    >
-                      <FileText className="w-3 h-3 mr-1" />
-                      Quarry Chart
-                    </button>
-                  </div>
-
-                  {/* 3rd square: Sub Works actions */}
-                  <div className="flex-1 rounded-xl bg-white/10 border border-white/30 px-3 py-2 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setShowAddModal(true)}
-                      disabled={!selectedWorkId}
-                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 disabled:opacity-50 hover:scale-105"
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Add Sub Work
-                    </button>
-                    <button
-                      onClick={handleViewItems}
-                      disabled={selectedSubworkIds.length === 0}
-                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 disabled:opacity-50 hover:scale-105"
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      View Items (
-                      {selectedSubworkIds.length > 0 ? `${getTotalItemsCount()} items` : '0 items'})
-                    </button>
-                  </div>
-                </div>
+                <h3 className="text-lg font-semibold text-white">Sub Works</h3>
               </div>
             </div>
 
@@ -866,7 +935,9 @@ const Subworks: React.FC = () => {
                 {filteredSubworks.map(subwork => (
                   <div
                     key={subwork.sr_no}
-                    onClick={() => handleSubworkCheckbox(subwork.subworks_id)}
+                    onClick={() =>
+                      handleSubworkCheckbox(subwork.subworks_id)
+                    }
                     className={`p-4 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-teal-50 transition-all duration-200 cursor-pointer ${
                       selectedSubworkIds.includes(subwork.subworks_id)
                         ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-500'
@@ -878,12 +949,16 @@ const Subworks: React.FC = () => {
                         <div className="flex items-center space-x-3">
                           <div
                             className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                              selectedSubworkIds.includes(subwork.subworks_id)
+                              selectedSubworkIds.includes(
+                                subwork.subworks_id
+                              )
                                 ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-600'
                                 : 'border-gray-300'
                             }`}
                           >
-                            {selectedSubworkIds.includes(subwork.subworks_id) && (
+                            {selectedSubworkIds.includes(
+                              subwork.subworks_id
+                            ) && (
                               <svg
                                 className="w-3 h-3 text-white"
                                 fill="currentColor"
@@ -906,10 +981,13 @@ const Subworks: React.FC = () => {
                         </p>
                         <div className="flex items-center justify-between mt-2">
                           <span className="text-xs text-gray-500">
-                            Items: {subworkItemCounts[subwork.subworks_id] || 0}
+                            Items:{' '}
+                            {subworkItemCounts[subwork.subworks_id] || 0}
                           </span>
                           <span className="text-sm font-medium text-green-600">
-                            {formatCurrency(subworkTotals[subwork.subworks_id] || 0)}
+                            {formatCurrency(
+                              subworkTotals[subwork.subworks_id] || 0
+                            )}
                           </span>
                         </div>
                       </div>
@@ -978,7 +1056,9 @@ const Subworks: React.FC = () => {
                 <div className="mx-auto w-20 h-20 bg-gradient-to-br from-emerald-100 to-teal-200 rounded-2xl flex items-center justify-center mb-4">
                   <Calculator className="h-10 w-10 text-emerald-600" />
                 </div>
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No sub works found</h3>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">
+                  No sub works found
+                </h3>
                 <p className="mt-1 text-sm text-gray-500">
                   Add sub work items to break down the estimate.
                 </p>
@@ -1087,7 +1167,9 @@ const Subworks: React.FC = () => {
                         {photo.photo_url.toLowerCase().includes('.pdf') ? (
                           <div className="flex items-center justify-center h-48">
                             <FileText className="h-12 w-12 text-red-500" />
-                            <span className="ml-2 text-sm text-gray-600">PDF Document</span>
+                            <span className="ml-2 text-sm text-gray-600">
+                              PDF Document
+                            </span>
                           </div>
                         ) : (
                           <img
@@ -1134,9 +1216,12 @@ const Subworks: React.FC = () => {
               ) : (
                 <div className="text-center py-8">
                   <ImageIcon className="mx-auto h-12 w-12 text-gray-300" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">No designs uploaded</h3>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">
+                    No designs uploaded
+                  </h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    Upload design drawings, diagrams, or photos for this subwork.
+                    Upload design drawings, diagrams, or photos for this
+                    subwork.
                   </p>
                 </div>
               )}
@@ -1164,7 +1249,9 @@ const Subworks: React.FC = () => {
           <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Add New Sub Work</h3>
+                <h3 className="text-lg font-medium text-gray-900">
+                  Add New Sub Work
+                </h3>
                 <button
                   onClick={() => setShowAddModal(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -1195,7 +1282,10 @@ const Subworks: React.FC = () => {
                     type="text"
                     value={newSubwork.subworks_name || ''}
                     onChange={e =>
-                      setNewSubwork({ ...newSubwork, subworks_name: e.target.value })
+                      setNewSubwork({
+                        ...newSubwork,
+                        subworks_name: e.target.value
+                      })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Enter sub work name"
@@ -1229,7 +1319,9 @@ const Subworks: React.FC = () => {
           <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">View Sub Work Details</h3>
+                <h3 className="text-lg font-medium text-gray-900">
+                  View Sub Work Details
+                </h3>
                 <button
                   onClick={() => setShowViewModal(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -1241,7 +1333,9 @@ const Subworks: React.FC = () => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sr No</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sr No
+                  </label>
                   <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
                     {selectedSubwork.sr_no}
                   </p>
@@ -1279,7 +1373,9 @@ const Subworks: React.FC = () => {
                     Created Date
                   </label>
                   <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                    {new Date(selectedSubwork.created_at).toLocaleDateString('en-IN')}
+                    {new Date(
+                      selectedSubwork.created_at
+                    ).toLocaleDateString('en-IN')}
                   </p>
                 </div>
               </div>
@@ -1303,7 +1399,9 @@ const Subworks: React.FC = () => {
           <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Edit Sub Work</h3>
+                <h3 className="text-lg font-medium text-gray-900">
+                  Edit Sub Work
+                </h3>
                 <button
                   onClick={() => setShowEditModal(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -1346,7 +1444,10 @@ const Subworks: React.FC = () => {
                     type="text"
                     value={newSubwork.subworks_name || ''}
                     onChange={e =>
-                      setNewSubwork({ ...newSubwork, subworks_name: e.target.value })
+                      setNewSubwork({
+                        ...newSubwork,
+                        subworks_name: e.target.value
+                      })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Enter sub work name"
@@ -1506,10 +1607,18 @@ const Subworks: React.FC = () => {
                             {row['Bricks']}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900 border-r">
-                            {row['Tiles Half Round Tiles /Roofing Tiles/Manlore Tiles']}
+                            {
+                              row[
+                                'Tiles Half Round Tiles /Roofing Tiles/Manlore Tiles'
+                              ]
+                            }
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900 border-r">
-                            {row['Steel (MS, TMT, H.Y.S.D.) Structural Steel']}
+                            {
+                              row[
+                                'Steel (MS, TMT, H.Y.S.D.) Structural Steel'
+                              ]
+                            }
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900 border-r">
                             {row['Flooring Tiles Ceramic/ Marbonate']}
@@ -1547,7 +1656,9 @@ const Subworks: React.FC = () => {
           <div className="relative w-full max-w-6xl bg-white rounded-lg shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">CSR 2022-2023</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  CSR 2022-2023
+                </h2>
                 <button
                   onClick={() => setShowCSRModal(false)}
                   className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors"
@@ -1626,7 +1737,9 @@ const Subworks: React.FC = () => {
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-12 text-gray-500">No CSR data available</div>
+                <div className="text-center py-12 text-gray-500">
+                  No CSR data available
+                </div>
               )}
             </div>
 
@@ -1648,7 +1761,9 @@ const Subworks: React.FC = () => {
           <div className="relative w-full max-w-7xl bg-white rounded-lg shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">SSR 2022-2023</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  SSR 2022-2023
+                </h2>
                 <button
                   onClick={() => setShowSSRModal(false)}
                   className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2"
@@ -1668,22 +1783,39 @@ const Subworks: React.FC = () => {
                   <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-3 py-2 text-xs font-medium border-r">Sr No</th>
-                        <th className="px-3 py-2 text-xs font-medium border-r">Chapter</th>
-                        <th className="px-3 py-2 text-xs font-medium border-r">SSR Item No</th>
-                        <th className="px-3 py-2 text-xs font-medium border-r">Reference No</th>
-                        <th className="px-3 py-2 text-xs font-medium border-r">Description</th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">
+                          Sr No
+                        </th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">
+                          Chapter
+                        </th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">
+                          SSR Item No
+                        </th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">
+                          Reference No
+                        </th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">
+                          Description
+                        </th>
                         <th className="px-3 py-2 text-xs font-medium border-r">
                           Additional Spec
                         </th>
-                        <th className="px-3 py-2 text-xs font-medium border-r">Unit</th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">
+                          Unit
+                        </th>
                         <th className="px-3 py-2 text-xs font-medium border-r">
                           Completed Rate
                         </th>
-                        <th className="px-3 py-2 text-xs font-medium">Labour Rate</th>
+                        <th className="px-3 py-2 text-xs font-medium">
+                          Labour Rate
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
+                      {ssrData.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-3 py-
                       {ssrData.map((row, idx) => (
                         <tr key={idx} className="hover:bg-gray-50">
                           <td className="px-3 py-2 text-sm border-r">{row.sr_no}</td>
@@ -1732,22 +1864,209 @@ const Subworks: React.FC = () => {
         />
       )}
 
-      {/* Optional Quarry Chart Modal – placeholder only */}
+      {/* Quarry Chart Modal */}
       {showQuarryChartModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-11/12 max-w-4xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Quarry Chart</h2>
+          <div className="bg-white rounded-xl shadow-2xl w-11/12 max-w-5xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Quarry Chart / Route Diagram
+                </h2>
+                <p className="text-xs text-gray-500">
+                  Build diagram using only lines, text, special characters, and simple node shapes.
+                </p>
+              </div>
               <button
                 onClick={() => setShowQuarryChartModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-sm text-gray-600">
-              Quarry chart diagram UI can be implemented here (similar to your Excel layout).
-            </p>
+
+            {/* Controls */}
+            <div className="px-6 py-3 border-b bg-gray-50 flex flex-wrap gap-4 items-end">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Chart Title
+                </label>
+                <input
+                  type="text"
+                  value={quarryTitle}
+                  onChange={e => setQuarryTitle(e.target.value)}
+                  className="border border-gray-300 rounded-md px-2 py-1 text-xs w-56"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Grid (rows × cols)
+                </label>
+                <div className="flex items-center gap-1 text-xs">
+                  <input
+                    type="number"
+                    min={10}
+                    max={50}
+                    value={quarryRows}
+                    onChange={e =>
+                      resetQuarryGrid(Number(e.target.value || 10), quarryCols)
+                    }
+                    className="border border-gray-300 rounded-md px-2 py-1 w-16"
+                  />
+                  <span>×</span>
+                  <input
+                    type="number"
+                    min={20}
+                    max={80}
+                    value={quarryCols}
+                    onChange={e =>
+                      resetQuarryGrid(quarryRows, Number(e.target.value || 20))
+                    }
+                    className="border border-gray-300 rounded-md px-2 py-1 w-16"
+                  />
+                  <button
+                    onClick={() => resetQuarryGrid(quarryRows, quarryCols)}
+                    className="ml-2 px-3 py-1 rounded-md bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                  >
+                    Clear Grid
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Tool
+                </label>
+                <div className="flex flex-wrap gap-1 text-xs">
+                  <button
+                    onClick={() => setQuarrySelectedTool('line-h')}
+                    className={`px-3 py-1 rounded-md border ${
+                      quarrySelectedTool === 'line-h'
+                        ? 'bg-emerald-600 text-white border-emerald-700'
+                        : 'bg-white text-gray-700 border-gray-300'
+                    }`}
+                  >
+                    Horizontal line
+                  </button>
+                  <button
+                    onClick={() => setQuarrySelectedTool('line-v')}
+                    className={`px-3 py-1 rounded-md border ${
+                      quarrySelectedTool === 'line-v'
+                        ? 'bg-emerald-600 text-white border-emerald-700'
+                        : 'bg-white text-gray-700 border-gray-300'
+                    }`}
+                  >
+                    Vertical line
+                  </button>
+                  <button
+                    onClick={() => setQuarrySelectedTool('node')}
+                    className={`px-3 py-1 rounded-md border ${
+                      quarrySelectedTool === 'node'
+                        ? 'bg-indigo-600 text-white border-indigo-700'
+                        : 'bg-white text-gray-700 border-gray-300'
+                    }`}
+                  >
+                    Node / Shape
+                  </button>
+                  <button
+                    onClick={() => setQuarrySelectedTool('text')}
+                    className={`px-3 py-1 rounded-md border ${
+                      quarrySelectedTool === 'text'
+                        ? 'bg-sky-600 text-white border-sky-700'
+                        : 'bg-white text-gray-700 border-gray-300'
+                    }`}
+                  >
+                    Text label
+                  </button>
+                </div>
+              </div>
+
+              {quarrySelectedTool === 'node' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Node character
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    value={quarryChar}
+                    onChange={e => setQuarryChar(e.target.value || '●')}
+                    className="border border-gray-300 rounded-md px-2 py-1 text-xs w-16 text-center"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Examples: ●, ○, □, △, ◎
+                  </p>
+                </div>
+              )}
+
+              {quarrySelectedTool === 'text' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Text to place
+                  </label>
+                  <input
+                    type="text"
+                    value={quarryCurrentLabel}
+                    onChange={e => setQuarryCurrentLabel(e.target.value)}
+                    className="border border-gray-300 rounded-md px-2 py-1 text-xs w-40"
+                    placeholder="Village name / note"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Click on grid cell to place starting character.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Chart body */}
+            <div className="px-6 pt-3 flex-1 overflow-auto">
+              <h3 className="text-sm font-semibold text-gray-800 mb-2">
+                {quarryTitle}
+              </h3>
+              <div className="inline-block border border-gray-300 bg-white">
+                <div className="font-mono text-[11px] leading-[1.1]">
+                  {quarryGrid.map((row, rIdx) => (
+                    <div key={rIdx} className="flex">
+                      {row.map((cell, cIdx) => (
+                        <button
+                          key={cIdx}
+                          type="button"
+                          onClick={() => handleQuarryCellClick(rIdx, cIdx)}
+                          className="w-4 h-4 flex items-center justify-center hover:bg-amber-50 focus:outline-none"
+                        >
+                          {cell}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="mt-2 text-[11px] text-gray-500">
+                Tip: Use horizontal/vertical line tools for routes, node
+                character for quarries/intersections, and text labels for
+                station names and distances.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 border-t bg-gray-50 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  resetQuarryGrid(quarryRows, quarryCols);
+                }}
+                className="px-4 py-1.5 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => setShowQuarryChartModal(false)}
+                className="px-4 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
