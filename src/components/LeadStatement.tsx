@@ -156,15 +156,15 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
         const options: { name: string; rate: string; unit: string }[] = [];
 
         const materialColumns = [
-          { key: 'Murrum, Building Rubish, Earth', unit: 'Cu. M' },
-          { key: 'Manure  Sludge', unit: 'Cu. M' },
-          { key: 'Excavated Rock soling stone', unit: 'Cu. M' },
-          { key: 'Sand, Stone below 40 mm, Normal Brick sider aggre. Timber', unit: 'Cu. M' },
-          { key: 'Stone aggregate 40mm Normal size and above', unit: 'Cu. M' },
-          { key: 'ConcreteBlock (FORM)', unit: 'Cu. M' },
-          { key: 'Cement, Lime, Stone Block, GI, CI, CC & AC Pipes / Sheet& Plate', unit: 'M.T.' },
-          { key: 'Bricks', unit: '1000 Nos' },
-          { key: 'Tiles Half Round Tiles /Roofing Tiles/Manlore Tiles', unit: '1000 Nos' },
+          { key: 'Murrum, Building Rubish, Earth', unit: 'cum' },
+          { key: 'Manure  Sludge', unit: 'cum' },
+          { key: 'Excavated Rock soling stone', unit: 'cum' },
+          { key: 'Sand, Stone below 40 mm, Normal Brick sider aggre. Timber', unit: 'cum' },
+          { key: 'Stone aggregate 40mm Normal size and above', unit: 'cum' },
+          { key: 'ConcreteBlock (FORM)', unit: 'cum' },
+          { key: 'Cement, Lime, Stone Block, GI, CI, CC & AC Pipes / Sheet& Plate, Glass in packs, Distemper, AC Sheet, Fitting Iron Sheet', unit: 'MT' },
+          { key: 'Bricks', unit: '1000/unit' },
+          { key: 'Tiles Half Round Tiles /Roofing Tiles/Manlore Tiles', unit: '1000/' },
           { key: 'Steel (MS, TMT, H.Y.S.D.) Structural Steel', unit: 'M.T.' },
           { key: 'Flooring Tiles Ceramic/ Marbonate', unit: 'Sq. M' },
           { key: 'Asphalt in Drum', unit: 'M.T.' }
