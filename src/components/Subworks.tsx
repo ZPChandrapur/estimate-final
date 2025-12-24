@@ -80,17 +80,8 @@ const Subworks: React.FC = () => {
     useState<{ id: string; name: string } | null>(null);
 
   // Quarry chart state
-  const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
-  const [quarryTitle, setQuarryTitle] = useState('Quarry Chart');
-  const [quarryRows, setQuarryRows] = useState(25);
-  const [quarryCols, setQuarryCols] = useState(40);
-  const [quarryGrid, setQuarryGrid] = useState<string[][]>(() =>
-    Array.from({ length: 25 }, () => Array(40).fill(' '))
-  );
-  const [quarrySelectedTool, setQuarrySelectedTool] =
-    useState<'line-h' | 'line-v' | 'node' | 'text'>('line-h');
-  const [quarryCurrentLabel, setQuarryCurrentLabel] = useState<string>('');
-  const [quarryChar, setQuarryChar] = useState<string>('●');
+const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
+
 
   useEffect(() => {
     fetchWorks();
