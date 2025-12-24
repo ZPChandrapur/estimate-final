@@ -897,7 +897,7 @@ const Subworks: React.FC = () => {
 
           {/* Sub Works card */}
           <div className="bg-gradient-to-br from-white to-slate-50 shadow-xl rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="px-6 py-4 bg-gradient-to-r from-emerald-400 to-teal-500">
+            <div className="px-6 py-4 bg-gradient-to-r from-emerald-400 to-teal-550">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className="p-2 bg-white/20 rounded-lg mr-3">
