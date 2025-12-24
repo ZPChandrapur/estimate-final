@@ -66,10 +66,13 @@ const Subworks: React.FC = () => {
   const [ssrData, setSSRData] = useState<any[]>([]);
   const [loadingSSR, setLoadingSSR] = useState(false);
 
-
   // Add state for Lead Statement modal
   const [showLeadStatementModal, setShowLeadStatementModal] = useState(false);
-  const [selectedWorkForLeadStatement, setSelectedWorkForLeadStatement] = useState<{ id: string; name: string } | null>(null);
+  const [selectedWorkForLeadStatement, setSelectedWorkForLeadStatement] =
+    useState<{ id: string; name: string } | null>(null);
+
+  // Optional: placeholder quarry chart modal state (UI only for now)
+  const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
 
   useEffect(() => {
     // Always fetch all works on selectedWorkId change, not just filtered
@@ -176,14 +179,12 @@ const Subworks: React.FC = () => {
         setSubworkTotals({});
         setSubworkItemCounts({});
       }
-
     } catch (error) {
       console.error('Error fetching subworks:', error);
     } finally {
       setLoading(false);
     }
   };
-
 
   const fetchItemCounts = async () => {
     try {
@@ -263,7 +264,6 @@ const Subworks: React.FC = () => {
       });
 
       // ✅ Step 5: Update all subworks’ subwork_amounts (same as your logic)
-      // → We’ll keep the same one-by-one updates to preserve exact functionality.
       for (const subworkId in totals) {
         await supabase
           .schema('estimate')
@@ -353,70 +353,84 @@ const Subworks: React.FC = () => {
     }
   };
 
-const fetchSSRData = async () => {
-  try {
-    setLoadingSSR(true);
+  const fetchSSRData = async () => {
+    try {
+      setLoadingSSR(true);
 
-    // Select all columns and normalize messy column names returned by Supabase
-    const { data, error } = await supabase
-      .schema('estimate')
-      .from('SSR_2022_23')
-      .select('*');
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('SSR_2022_23')
+        .select('*');
 
-    if (error) throw error;
+      if (error) throw error;
 
-    // Debug: log raw response to help diagnose empty results
-    console.debug('SSR raw response:', { length: (data || []).length, sample: (data || []).slice(0, 3) });
+      console.debug('SSR raw response:', {
+        length: (data || []).length,
+        sample: (data || []).slice(0, 3)
+      });
 
-    const mapped = (data || []).map((row: any) => {
-      const keys = Object.keys(row || {});
+      const mapped = (data || []).map((row: any) => {
+        const keys = Object.keys(row || {});
 
-      const findKey = (pred: (k: string) => boolean) => keys.find(k => pred(k)) ?? undefined;
+        const findKey = (pred: (k: string) => boolean) => keys.find(k => pred(k)) ?? undefined;
 
-      const srKey = findKey(k => k.replace(/\s|\.|\n|\r/gi, '').toLowerCase().includes('srno')) || 'id';
-      const chapterKey = findKey(k => k.toLowerCase().includes('chapter'));
-      const ssrItemKey = findKey(k => k.replace(/\s|\.|\n|\r/gi, '').toLowerCase().includes('ssritem'));
-      const referenceKey = findKey(k => k.toLowerCase().includes('reference'));
-      const descriptionKey = findKey(k => k.toLowerCase().includes('description'));
-      const additionalKey = findKey(k => k.toLowerCase().includes('additional'));
-      const unitKey = findKey(k => k.toLowerCase().includes('unit'));
-      const completedKey = findKey(k => /completed|proposed/i.test(k.replace(/\s|\n|\r/gi, '')) || k.toLowerCase().includes('completed'));
-      const labourKey = findKey(k => k.toLowerCase().includes('labour'));
+        const srKey =
+          findKey(k => k.replace(/\s|\.|\n|\r/gi, '').toLowerCase().includes('srno')) || 'id';
+        const chapterKey = findKey(k => k.toLowerCase().includes('chapter'));
+        const ssrItemKey = findKey(k =>
+          k.replace(/\s|\.|\n|\r/gi, '').toLowerCase().includes('ssritem')
+        );
+        const referenceKey = findKey(k => k.toLowerCase().includes('reference'));
+        const descriptionKey = findKey(k => k.toLowerCase().includes('description'));
+        const additionalKey = findKey(k => k.toLowerCase().includes('additional'));
+        const unitKey = findKey(k => k.toLowerCase().includes('unit'));
+        const completedKey = findKey(
+          k =>
+            /completed|proposed/i.test(k.replace(/\s|\n|\r/gi, '')) ||
+            k.toLowerCase().includes('completed')
+        );
+        const labourKey = findKey(k => k.toLowerCase().includes('labour'));
 
-      return {
-        id: row.id,
-        sr_no: row[srKey] ?? row.id,
-        chapter: chapterKey ? row[chapterKey] : null,
-        ssr_item_no: ssrItemKey ? row[ssrItemKey] : null,
-        reference_no: referenceKey ? row[referenceKey] : null,
-        description: descriptionKey ? row[descriptionKey] : null,
-        additional_specification: additionalKey ? row[additionalKey] : null,
-        unit: unitKey ? row[unitKey] : null,
-        completed_rate: completedKey ? row[completedKey] : null,
-        labour_rate: labourKey ? row[labourKey] : null,
-      };
-    });
+        return {
+          id: row.id,
+          sr_no: row[srKey] ?? row.id,
+          chapter: chapterKey ? row[chapterKey] : null,
+          ssr_item_no: ssrItemKey ? row[ssrItemKey] : null,
+          reference_no: referenceKey ? row[referenceKey] : null,
+          description: descriptionKey ? row[descriptionKey] : null,
+          additional_specification: additionalKey ? row[additionalKey] : null,
+          unit: unitKey ? row[unitKey] : null,
+          completed_rate: completedKey ? row[completedKey] : null,
+          labour_rate: labourKey ? row[labourKey] : null
+        };
+      });
 
-    // Sort by numeric sr_no when possible, otherwise by id
-    mapped.sort((a: any, b: any) => {
-      const aNum = parseInt(String(a.sr_no || a.id || '0').replace(/[^0-9]/g, '') || '0', 10);
-      const bNum = parseInt(String(b.sr_no || b.id || '0').replace(/[^0-9]/g, '') || '0', 10);
-      return aNum - bNum;
-    });
+      mapped.sort((a: any, b: any) => {
+        const aNum = parseInt(
+          String(a.sr_no || a.id || '0').replace(/[^0-9]/g, '') || '0',
+          10
+        );
+        const bNum = parseInt(
+          String(b.sr_no || b.id || '0').replace(/[^0-9]/g, '') || '0',
+          10
+        );
+        return aNum - bNum;
+      });
 
-    if (!mapped || mapped.length === 0) {
-      // Likely RLS / permission issue if the table contains rows but query returns empty
-      console.warn('SSR fetch returned 0 rows. If the table has data in Supabase console, check Row Level Security (RLS) policies for estimate.SSR_2022_23 and ensure the anon/public role has SELECT permission.');
+      if (!mapped || mapped.length === 0) {
+        console.warn(
+          'SSR fetch returned 0 rows. If the table has data in Supabase console, check Row Level Security (RLS) policies for estimate.SSR_2022_23 and ensure the anon/public role has SELECT permission.'
+        );
+      }
+
+      setSSRData(mapped);
+    } catch (error) {
+      console.error('Error fetching SSR data:', error);
+      alert('Error loading SSR 2022-23 data');
+    } finally {
+      setLoadingSSR(false);
     }
-
-    setSSRData(mapped);
-  } catch (error) {
-    console.error('Error fetching SSR data:', error);
-    alert('Error loading SSR 2022-23 data');
-  } finally {
-    setLoadingSSR(false);
-  }
-};
+  };
 
   const handleOpenLeadCharges = () => {
     setShowLeadChargesModal(true);
@@ -443,6 +457,11 @@ const fetchSSRData = async () => {
     }
   };
 
+  // Placeholder for Quarry Chart – hook your diagram modal here
+  const handleOpenQuarryChart = () => {
+    setShowQuarryChartModal(true);
+  };
+
   const handleDesignUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !selectedSubworkForDesign || !user) return;
@@ -450,7 +469,6 @@ const fetchSSRData = async () => {
     try {
       setUploadingDesign(true);
 
-      // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${selectedSubworkForDesign.subworks_id}_${Date.now()}.${fileExt}`;
       const filePath = `estimate-designs/${fileName}`;
@@ -461,28 +479,26 @@ const fetchSSRData = async () => {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('estimate-designs')
-        .getPublicUrl(filePath);
+      const {
+        data: { publicUrl }
+      } = supabase.storage.from('estimate-designs').getPublicUrl(filePath);
 
-      // Save to database
       const { error: dbError } = await supabase
         .schema('estimate')
         .from('subwork_design_photos')
-        .insert([{
-          subwork_id: selectedSubworkForDesign.subworks_id,
-          photo_url: publicUrl,
-          photo_name: file.name,
-          description: `Design/Diagram for ${selectedSubworkForDesign.subworks_name}`,
-          uploaded_by: user.id
-        }]);
+        .insert([
+          {
+            subwork_id: selectedSubworkForDesign.subworks_id,
+            photo_url: publicUrl,
+            photo_name: file.name,
+            description: `Design/Diagram for ${selectedSubworkForDesign.subworks_name}`,
+            uploaded_by: user.id
+          }
+        ]);
 
       if (dbError) throw dbError;
 
-      // Refresh photos
       fetchDesignPhotos(selectedSubworkForDesign.subworks_id);
-
     } catch (error) {
       console.error('Error uploading design photo:', error);
       alert('Error uploading design photo');
@@ -503,7 +519,6 @@ const fetchSSRData = async () => {
 
       if (error) throw error;
 
-      // Refresh photos
       if (selectedSubworkForDesign) {
         fetchDesignPhotos(selectedSubworkForDesign.subworks_id);
       }
@@ -554,12 +569,14 @@ const fetchSSRData = async () => {
       const { error } = await supabase
         .schema('estimate')
         .from('subworks')
-        .insert([{
-          works_id: selectedWorkId,
-          subworks_id: subworksId,
-          subworks_name: newSubwork.subworks_name,
-          created_by: user.id
-        }]);
+        .insert([
+          {
+            works_id: selectedWorkId,
+            subworks_id: subworksId,
+            subworks_name: newSubwork.subworks_name,
+            created_by: user.id
+          }
+        ]);
 
       if (error) throw error;
 
@@ -605,23 +622,25 @@ const fetchSSRData = async () => {
     }
   };
 
-  const handleDeleteSubwork = async (subwork: SubWork) => {
+  const handleDeleteSubwork = (subwork: SubWork) => {
     if (!confirm('Are you sure you want to delete this subwork? This action cannot be undone.')) {
       return;
     }
 
-    try {
-      const { error } = await supabase
-        .schema('estimate')
-        .from('subworks')
-        .delete()
-        .eq('sr_no', subwork.sr_no);
+    (async () => {
+      try {
+        const { error } = await supabase
+          .schema('estimate')
+          .from('subworks')
+          .delete()
+          .eq('sr_no', subwork.sr_no);
 
-      if (error) throw error;
-      fetchSubworks(selectedWorkId);
-    } catch (error) {
-      console.error('Error deleting subwork:', error);
-    }
+        if (error) throw error;
+        fetchSubworks(selectedWorkId);
+      } catch (error) {
+        console.error('Error deleting subwork:', error);
+      }
+    })();
   };
 
   const handleSubworkCheckbox = (subworkId: string) => {
@@ -642,7 +661,10 @@ const fetchSSRData = async () => {
 
     const firstSelected = subworks.find(sw => sw.subworks_id === selectedSubworkIds[0]);
     if (firstSelected) {
-      setCurrentSubworkForItems({ id: firstSelected.subworks_id, name: firstSelected.subworks_name });
+      setCurrentSubworkForItems({
+        id: firstSelected.subworks_id,
+        name: firstSelected.subworks_name
+      });
     }
     setShowItemsModal(true);
   };
@@ -650,7 +672,7 @@ const fetchSSRData = async () => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('hi-IN', {
       style: 'currency',
-      currency: 'INR',
+      currency: 'INR'
     }).format(amount);
   };
 
@@ -662,9 +684,10 @@ const fetchSSRData = async () => {
 
   const selectedWork = works.find(work => work.works_id === selectedWorkId);
 
-  const filteredSubworks = subworks.filter(subwork =>
-    subwork.subworks_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    subwork.subworks_id.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredSubworks = subworks.filter(
+    subwork =>
+      subwork.subworks_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      subwork.subworks_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -691,11 +714,11 @@ const fetchSSRData = async () => {
               </label>
               <select
                 value={selectedWorkId}
-                onChange={(e) => setSelectedWorkId(e.target.value)}
+                onChange={e => setSelectedWorkId(e.target.value)}
                 className="block w-full pl-2 pr-6 py-1.5 text-xs border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md"
               >
                 <option value="">Select Work ID...</option>
-                {works.map((work) => (
+                {works.map(work => (
                   <option key={work.works_id} value={work.works_id}>
                     {work.works_id}
                   </option>
@@ -708,14 +731,17 @@ const fetchSSRData = async () => {
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Search Sub Works
               </label>
-              <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none" style={{ top: '20px' }}>
+              <div
+                className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none"
+                style={{ top: '20px' }}
+              >
                 <Search className="h-3 w-3 text-gray-400" />
               </div>
               <input
                 type="text"
                 placeholder="Search sub works..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
                 className="block w-full pl-6 pr-2 py-1.5 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs"
               />
             </div>
@@ -759,74 +785,115 @@ const fetchSSRData = async () => {
                   </div>
                   <h3 className="text-lg font-semibold text-white">Sub Works</h3>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={handleOpenLeadCharges}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105">
-                    <FileText className="w-3 h-3 mr-1" />
-                    Lead Charges
-                  </button>
-                  <button
-                    onClick={handleOpenCSR}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105">
-                    <FileText className="w-3 h-3 mr-1" />
-                    CSR 22-23
-                  </button>
 
-                  <button
-                    onClick={() => {
-                      setShowSSRModal(true);
-                      fetchSSRData();
-                    }}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105">
-                    <FileText className="w-3 h-3 mr-1" />
-                    SSR 22-23
-                  </button>
+                {/* NEW grouped layout: 3 squares */}
+                <div className="flex flex-col lg:flex-row gap-3">
+                  {/* 1st square: CSR + SSR */}
+                  <div className="flex-1 rounded-xl bg-white/10 border border-white/30 px-3 py-2 flex flex-wrap gap-2">
+                    <button
+                      onClick={handleOpenCSR}
+                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105"
+                    >
+                      <FileText className="w-3 h-3 mr-1" />
+                      CSR 22-23
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowSSRModal(true);
+                        fetchSSRData();
+                      }}
+                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105"
+                    >
+                      <FileText className="w-3 h-3 mr-1" />
+                      SSR 22-23
+                    </button>
+                  </div>
 
-                  <button
-                    onClick={handleOpenLeadStatement}
-                    disabled={!selectedWorkId}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 disabled:opacity-50 hover:scale-105">
-                    <FileText className="w-3 h-3 mr-1" />
-                    Lead Statement
-                  </button>
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    disabled={!selectedWorkId}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 disabled:opacity-50 hover:scale-105">
-                    <Plus className="w-3 h-3 mr-1" />
-                    Add Sub Work
-                  </button>
-                  <button
-                    onClick={handleViewItems}
-                    disabled={selectedSubworkIds.length === 0}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 disabled:opacity-50 hover:scale-105"
-                  >
-                    <Eye className="w-3 h-3 mr-1" />
-                    View Items ({selectedSubworkIds.length > 0 ? `${getTotalItemsCount()} items` : '0 items'})
-                  </button>
+                  {/* 2nd square: Lead Charges + Lead Statement + Quarry Chart */}
+                  <div className="flex-1 rounded-xl bg-white/10 border border-white/30 px-3 py-2 flex flex-wrap gap-2">
+                    <button
+                      onClick={handleOpenLeadCharges}
+                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105"
+                    >
+                      <FileText className="w-3 h-3 mr-1" />
+                      Lead Charges
+                    </button>
+
+                    <button
+                      onClick={handleOpenLeadStatement}
+                      disabled={!selectedWorkId}
+                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 disabled:opacity-50 hover:scale-105"
+                    >
+                      <FileText className="w-3 h-3 mr-1" />
+                      Lead Statement
+                    </button>
+
+                    <button
+                      onClick={handleOpenQuarryChart}
+                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 hover:scale-105"
+                    >
+                      <FileText className="w-3 h-3 mr-1" />
+                      Quarry Chart
+                    </button>
+                  </div>
+
+                  {/* 3rd square: Sub Works actions */}
+                  <div className="flex-1 rounded-xl bg-white/10 border border-white/30 px-3 py-2 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      disabled={!selectedWorkId}
+                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 disabled:opacity-50 hover:scale-105"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add Sub Work
+                    </button>
+                    <button
+                      onClick={handleViewItems}
+                      disabled={selectedSubworkIds.length === 0}
+                      className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all duration-200 disabled:opacity-50 hover:scale-105"
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      View Items (
+                      {selectedSubworkIds.length > 0 ? `${getTotalItemsCount()} items` : '0 items'})
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
+
             {filteredSubworks.length > 0 ? (
               <div className="divide-y divide-gray-200">
-                {filteredSubworks.map((subwork) => (
+                {filteredSubworks.map(subwork => (
                   <div
                     key={subwork.sr_no}
                     onClick={() => handleSubworkCheckbox(subwork.subworks_id)}
-                    className={`p-4 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-teal-50 transition-all duration-200 cursor-pointer ${selectedSubworkIds.includes(subwork.subworks_id) ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-500' : ''
-                      }`}
+                    className={`p-4 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-teal-50 transition-all duration-200 cursor-pointer ${
+                      selectedSubworkIds.includes(subwork.subworks_id)
+                        ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-500'
+                        : ''
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-3">
-                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${selectedSubworkIds.includes(subwork.subworks_id)
-                            ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-600'
-                            : 'border-gray-300'
-                            }`}>
+                          <div
+                            className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                              selectedSubworkIds.includes(subwork.subworks_id)
+                                ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-600'
+                                : 'border-gray-300'
+                            }`}
+                          >
                             {selectedSubworkIds.includes(subwork.subworks_id) && (
-                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              <svg
+                                className="w-3 h-3 text-white"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
                               </svg>
                             )}
                           </div>
@@ -848,9 +915,12 @@ const fetchSSRData = async () => {
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={(e) => {
+                          onClick={e => {
                             e.stopPropagation();
-                            setCurrentSubworkForItems({ id: subwork.subworks_id, name: subwork.subworks_name });
+                            setCurrentSubworkForItems({
+                              id: subwork.subworks_id,
+                              name: subwork.subworks_name
+                            });
                             setShowItemsModal(true);
                           }}
                           className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-300"
@@ -859,7 +929,7 @@ const fetchSSRData = async () => {
                           <Plus className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={(e) => {
+                          onClick={e => {
                             e.stopPropagation();
                             handleViewDesigns(subwork);
                           }}
@@ -869,7 +939,7 @@ const fetchSSRData = async () => {
                           <Camera className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={(e) => {
+                          onClick={e => {
                             e.stopPropagation();
                             handleViewSubwork(subwork);
                           }}
@@ -879,7 +949,7 @@ const fetchSSRData = async () => {
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={(e) => {
+                          onClick={e => {
                             e.stopPropagation();
                             handleEditSubwork(subwork);
                           }}
@@ -889,7 +959,7 @@ const fetchSSRData = async () => {
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={(e) => {
+                          onClick={e => {
                             e.stopPropagation();
                             handleDeleteSubwork(subwork);
                           }}
@@ -916,7 +986,8 @@ const fetchSSRData = async () => {
                   <button
                     onClick={() => setShowAddModal(true)}
                     disabled={!selectedWorkId}
-                    className="inline-flex items-center px-6 py-3 border border-transparent shadow-lg text-sm font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300 transition-all duration-300">
+                    className="inline-flex items-center px-6 py-3 border border-transparent shadow-lg text-sm font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300 transition-all duration-300"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Sub Work
                   </button>
@@ -930,7 +1001,9 @@ const fetchSSRData = async () => {
           <div className="mx-auto w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 rounded-2xl flex items-center justify-center mb-4">
             <FileText className="h-10 w-10 text-gray-500" />
           </div>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Select a work to view sub works</h3>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">
+            Select a work to view sub works
+          </h3>
           <p className="mt-1 text-sm text-gray-500">
             Choose a main work item to manage its detailed sub work breakdown.
           </p>
@@ -973,11 +1046,13 @@ const fetchSSRData = async () => {
               <div className="mb-6 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                 <div className="text-center">
                   <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600 mb-3">Upload design drawings, diagrams, or photos</p>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Upload design drawings, diagrams, or photos
+                  </p>
                   <label className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 cursor-pointer">
                     {uploadingDesign ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                         Uploading...
                       </>
                     ) : (
@@ -1003,8 +1078,11 @@ const fetchSSRData = async () => {
               {/* Photos Grid */}
               {designPhotos.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {designPhotos.map((photo) => (
-                    <div key={photo.id} className="relative bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                  {designPhotos.map(photo => (
+                    <div
+                      key={photo.id}
+                      className="relative bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                    >
                       <div className="aspect-w-16 aspect-h-12 bg-gray-100">
                         {photo.photo_url.toLowerCase().includes('.pdf') ? (
                           <div className="flex items-center justify-center h-48">
@@ -1116,7 +1194,9 @@ const fetchSSRData = async () => {
                   <input
                     type="text"
                     value={newSubwork.subworks_name || ''}
-                    onChange={(e) => setNewSubwork({ ...newSubwork, subworks_name: e.target.value })}
+                    onChange={e =>
+                      setNewSubwork({ ...newSubwork, subworks_name: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Enter sub work name"
                   />
@@ -1162,26 +1242,42 @@ const fetchSSRData = async () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Sr No</label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{selectedSubwork.sr_no}</p>
+                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                    {selectedSubwork.sr_no}
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Works ID</label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{selectedSubwork.works_id}</p>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Works ID
+                  </label>
+                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                    {selectedSubwork.works_id}
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sub Works ID</label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{selectedSubwork.subworks_id}</p>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sub Works ID
+                  </label>
+                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                    {selectedSubwork.subworks_id}
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sub Works Name</label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{selectedSubwork.subworks_name}</p>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sub Works Name
+                  </label>
+                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
+                    {selectedSubwork.subworks_name}
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Created Date</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Created Date
+                  </label>
                   <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
                     {new Date(selectedSubwork.created_at).toLocaleDateString('en-IN')}
                   </p>
@@ -1249,7 +1345,9 @@ const fetchSSRData = async () => {
                   <input
                     type="text"
                     value={newSubwork.subworks_name || ''}
-                    onChange={(e) => setNewSubwork({ ...newSubwork, subworks_name: e.target.value })}
+                    onChange={e =>
+                      setNewSubwork({ ...newSubwork, subworks_name: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Enter sub work name"
                   />
@@ -1282,7 +1380,9 @@ const fetchSSRData = async () => {
           <div className="relative w-full max-w-7xl bg-white rounded-lg shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Lead Charges & Materials (2022-2023)</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Lead Charges &amp; Materials (2022-2023)
+                </h2>
                 <button
                   onClick={() => setShowLeadChargesModal(false)}
                   className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2 transition-colors"
@@ -1302,45 +1402,121 @@ const fetchSSRData = async () => {
                   <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Sr No</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Lead in KM</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Cost per Trip</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Murrum, Building Rubish, Earth</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Manure Sludge</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Excavated Rock</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Sand, Stone</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Stone Aggregate 40mm+</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">KM</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Cost per Trip 2</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">ConcreteBlock</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Cement, Lime, Stone Block</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Bricks</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Tiles</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Steel</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Flooring Tiles</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Asphalt in Drum</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Sr No
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Lead in KM
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Cost per Trip
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Murrum, Building Rubish, Earth
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Manure Sludge
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Excavated Rock
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Sand, Stone
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Stone Aggregate 40mm+
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          KM
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Cost per Trip 2
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          ConcreteBlock
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Cement, Lime, Stone Block
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Bricks
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Tiles
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Steel
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Flooring Tiles
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Asphalt in Drum
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {leadChargesData.map((row, idx) => (
                         <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['sr no']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Lead in KM']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Cost per Trip Lead Charges']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Murrum, Building Rubish, Earth']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Manure  Sludge']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Excavated Rock soling stone']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Sand, Stone below 40 mm, Normal Brick sider aggre. Timber']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Stone aggregate 40mm Normal size and above']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['KM']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Cost per Trip Lead Charges_1']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['ConcreteBlock (FORM)']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Cement, Lime, Stone Block, GI, CI, CC & AC Pipes / Sheet& Plate']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Bricks']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Tiles Half Round Tiles /Roofing Tiles/Manlore Tiles']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Steel (MS, TMT, H.Y.S.D.) Structural Steel']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Flooring Tiles Ceramic/ Marbonate']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{row['Asphalt in Drum']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['sr no']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Lead in KM']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Cost per Trip Lead Charges']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Murrum, Building Rubish, Earth']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Manure  Sludge']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Excavated Rock soling stone']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {
+                              row[
+                                'Sand, Stone below 40 mm, Normal Brick sider aggre. Timber'
+                              ]
+                            }
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Stone aggregate 40mm Normal size and above']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['KM']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Cost per Trip Lead Charges_1']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['ConcreteBlock (FORM)']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {
+                              row[
+                                'Cement, Lime, Stone Block, GI, CI, CC & AC Pipes / Sheet& Plate'
+                              ]
+                            }
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Bricks']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Tiles Half Round Tiles /Roofing Tiles/Manlore Tiles']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Steel (MS, TMT, H.Y.S.D.) Structural Steel']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Flooring Tiles Ceramic/ Marbonate']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {row['Asphalt in Drum']}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1391,36 +1567,66 @@ const fetchSSRData = async () => {
                   <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Sr No</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Item No</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Item</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Unit</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Completed Item</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Labour</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">Page No</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Reference</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Sr No
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Item No
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Item
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Unit
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Completed Item
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Labour
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-r">
+                          Page No
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                          Reference
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {csrData.map((row, idx) => (
                         <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Sr No']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Item No']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Item']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Unit']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Completed Item']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Labour']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900 border-r">{row['Page No']}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{row['Reference']}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Sr No']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Item No']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Item']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Unit']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Completed Item']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Labour']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 border-r">
+                            {row['Page No']}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {row['Reference']}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-12 text-gray-500">
-                  No CSR data available
-                </div>
+                <div className="text-center py-12 text-gray-500">No CSR data available</div>
               )}
             </div>
 
@@ -1440,13 +1646,9 @@ const fetchSSRData = async () => {
       {showSSRModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
           <div className="relative w-full max-w-7xl bg-white rounded-lg shadow-2xl max-h-[90vh] overflow-y-auto">
-
-            {/* Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  SSR 2022-2023
-                </h2>
+                <h2 className="text-2xl font-bold text-gray-900">SSR 2022-2023</h2>
                 <button
                   onClick={() => setShowSSRModal(false)}
                   className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-2"
@@ -1456,7 +1658,6 @@ const fetchSSRData = async () => {
               </div>
             </div>
 
-            {/* Body */}
             <div className="px-6 py-6">
               {loadingSSR ? (
                 <div className="flex justify-center py-12">
@@ -1472,9 +1673,13 @@ const fetchSSRData = async () => {
                         <th className="px-3 py-2 text-xs font-medium border-r">SSR Item No</th>
                         <th className="px-3 py-2 text-xs font-medium border-r">Reference No</th>
                         <th className="px-3 py-2 text-xs font-medium border-r">Description</th>
-                        <th className="px-3 py-2 text-xs font-medium border-r">Additional Spec</th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">
+                          Additional Spec
+                        </th>
                         <th className="px-3 py-2 text-xs font-medium border-r">Unit</th>
-                        <th className="px-3 py-2 text-xs font-medium border-r">Completed Rate</th>
+                        <th className="px-3 py-2 text-xs font-medium border-r">
+                          Completed Rate
+                        </th>
                         <th className="px-3 py-2 text-xs font-medium">Labour Rate</th>
                       </tr>
                     </thead>
@@ -1486,9 +1691,11 @@ const fetchSSRData = async () => {
                           <td className="px-3 py-2 text-sm border-r">{row.ssr_item_no}</td>
                           <td className="px-3 py-2 text-sm border-r">{row.reference_no}</td>
                           <td className="px-3 py-2 text-sm border-r">{row.description}</td>
-                          <td className="px-3 py-2 text-sm border-r">{row.additional_specification}</td>
+                          <td className="px-3 py-2 text-sm border-r">
+                            {row.additional_specification}
+                          </td>
                           <td className="px-3 py-2 text-sm border-r">{row.unit}</td>
-                            <td className="px-3 py-2 text-sm border-r">{row.completed_rate}</td>
+                          <td className="px-3 py-2 text-sm border-r">{row.completed_rate}</td>
                           <td className="px-3 py-2 text-sm">{row.labour_rate}</td>
                         </tr>
                       ))}
@@ -1496,13 +1703,10 @@ const fetchSSRData = async () => {
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-12 text-gray-500">
-                  No SSR data available
-                </div>
+                <div className="text-center py-12 text-gray-500">No SSR data available</div>
               )}
             </div>
 
-            {/* Footer */}
             <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
               <button
                 onClick={() => setShowSSRModal(false)}
@@ -1526,6 +1730,26 @@ const fetchSSRData = async () => {
             setSelectedWorkForLeadStatement(null);
           }}
         />
+      )}
+
+      {/* Optional Quarry Chart Modal – placeholder only */}
+      {showQuarryChartModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-11/12 max-w-4xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Quarry Chart</h2>
+              <button
+                onClick={() => setShowQuarryChartModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600">
+              Quarry chart diagram UI can be implemented here (similar to your Excel layout).
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );
