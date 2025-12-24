@@ -1812,26 +1812,24 @@ const Subworks: React.FC = () => {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {ssrData.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-3 py-
-                      {ssrData.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 text-sm border-r">{row.sr_no}</td>
-                          <td className="px-3 py-2 text-sm border-r">{row.chapter}</td>
-                          <td className="px-3 py-2 text-sm border-r">{row.ssr_item_no}</td>
-                          <td className="px-3 py-2 text-sm border-r">{row.reference_no}</td>
-                          <td className="px-3 py-2 text-sm border-r">{row.description}</td>
-                          <td className="px-3 py-2 text-sm border-r">
-                            {row.additional_specification}
-                          </td>
-                          <td className="px-3 py-2 text-sm border-r">{row.unit}</td>
-                          <td className="px-3 py-2 text-sm border-r">{row.completed_rate}</td>
-                          <td className="px-3 py-2 text-sm">{row.labour_rate}</td>
-                        </tr>
-                      ))}
-                    </tbody>
+                       <tbody className="bg-white divide-y divide-gray-200">
+                        {ssrData.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 text-sm border-r">{row.sr_no}</td>
+                            <td className="px-3 py-2 text-sm border-r">{row.chapter}</td>
+                            <td className="px-3 py-2 text-sm border-r">{row.ssr_item_no}</td>
+                            <td className="px-3 py-2 text-sm border-r">{row.reference_no}</td>
+                            <td className="px-3 py-2 text-sm border-r">{row.description}</td>
+                            <td className="px-3 py-2 text-sm border-r">
+                              {row.additional_specification}
+                            </td>
+                            <td className="px-3 py-2 text-sm border-r">{row.unit}</td>
+                            <td className="px-3 py-2 text-sm border-r">{row.completed_rate}</td>
+                            <td className="px-3 py-2 text-sm">{row.labour_rate}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+
                   </table>
                 </div>
               ) : (
