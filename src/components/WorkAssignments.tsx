@@ -92,7 +92,7 @@ const WorkAssignments: React.FC = () => {
         .schema('public')
         .from('user_roles')
         .select('user_id, name, role_id, roles!inner(application)')
-        .in('roles.application', ['estimate', 'mb']);
+        .in('roles.application', ['estimate', 'mb','estimate,mb']);
 
       if (usersError) {
         console.error('Users fetch error:', usersError);
