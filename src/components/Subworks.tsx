@@ -8,7 +8,6 @@ import LoadingSpinner from './common/LoadingSpinner';
 import SubworkItems from './SubworkItems';
 import LeadStatement from './LeadStatement';
 import QuarryChart from './QuarryChart';
-
 import {
   Plus,
   Search,
