@@ -840,15 +840,15 @@ const Subworks: React.FC = () => {
       {selectedWorkId ? (
         <div className="space-y-4">
           {/* Toolbar outside Sub Works card */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {/* Schedules square */}
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3 flex flex-wrap gap-2 items-center">
-              <span className="text-xs font-semibold text-slate-500 mr-2">
+            <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-500 to-teal-600 shadow-sm px-4 py-3 flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-semibold text-white mr-2">
                 Schedules
               </span>
               <button
                 onClick={handleOpenCSR}
-                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition"
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-100 transition"
               >
                 <FileText className="w-3 h-3 mr-1" />
                 CSR 22-23
@@ -858,7 +858,7 @@ const Subworks: React.FC = () => {
                   setShowSSRModal(true);
                   fetchSSRData();
                 }}
-                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition"
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-100 transition"
               >
                 <FileText className="w-3 h-3 mr-1" />
                 SSR 22-23
@@ -866,13 +866,13 @@ const Subworks: React.FC = () => {
             </div>
 
             {/* Leads + Quarry */}
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3 flex flex-wrap gap-2 items-center">
-              <span className="text-xs font-semibold text-slate-500 mr-2">
+            <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-500 to-teal-600 shadow-sm px-4 py-3 flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-semibold text-white mr-2">
                 Leads
               </span>
               <button
                 onClick={handleOpenLeadCharges}
-                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition"
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-100 transition"
               >
                 <FileText className="w-3 h-3 mr-1" />
                 Lead Charges
@@ -880,41 +880,17 @@ const Subworks: React.FC = () => {
               <button
                 onClick={handleOpenLeadStatement}
                 disabled={!selectedWorkId}
-                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition disabled:opacity-50"
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-100 transition disabled:opacity-50"
               >
                 <FileText className="w-3 h-3 mr-1" />
                 Lead Statement
               </button>
               <button
                 onClick={handleOpenQuarryChart}
-                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition"
+                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-100 transition"
               >
                 <FileText className="w-3 h-3 mr-1" />
                 Quarry Chart
-              </button>
-            </div>
-
-            {/* Sub Works actions */}
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 py-3 flex flex-wrap gap-2 items-center justify-start lg:justify-end">
-              <button
-                onClick={() => setShowAddModal(true)}
-                disabled={!selectedWorkId}
-                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition disabled:opacity-50"
-              >
-                <Plus className="w-3 h-3 mr-1" />
-                Add Sub Work
-              </button>
-              <button
-                onClick={handleViewItems}
-                disabled={selectedSubworkIds.length === 0}
-                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition disabled:opacity-50"
-              >
-                <Eye className="w-3 h-3 mr-1" />
-                View Items (
-                {selectedSubworkIds.length > 0
-                  ? `${getTotalItemsCount()} items`
-                  : '0 items'}
-                )
               </button>
             </div>
           </div>
@@ -922,11 +898,37 @@ const Subworks: React.FC = () => {
           {/* Sub Works card */}
           <div className="bg-gradient-to-br from-white to-slate-50 shadow-xl rounded-2xl border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600">
-              <div className="flex items-center">
-                <div className="p-2 bg-white/20 rounded-lg mr-3">
-                  <Calculator className="h-5 w-5 text-white" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="p-2 bg-white/20 rounded-lg mr-3">
+                    <Calculator className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">
+                    Sub Works
+                  </h3>
                 </div>
-                <h3 className="text-lg font-semibold text-white">Sub Works</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    disabled={!selectedWorkId}
+                    className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-100 shadow-sm disabled:opacity-50"
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add Sub Work
+                  </button>
+                  <button
+                    onClick={handleViewItems}
+                    disabled={selectedSubworkIds.length === 0}
+                    className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-100 shadow-sm disabled:opacity-50"
+                  >
+                    <Eye className="w-3 h-3 mr-1" />
+                    View Items (
+                    {selectedSubworkIds.length > 0
+                      ? `${getTotalItemsCount()} items`
+                      : '0 items'}
+                    )
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1585,7 +1587,11 @@ const Subworks: React.FC = () => {
                             }
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900 border-r">
-                            {row['Stone aggregate 40mm Normal size and above']}
+                            {
+                              row[
+                                'Stone aggregate 40mm Normal size and above'
+                              ]
+                            }
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900 border-r">
                             {row['KM']}
@@ -1812,28 +1818,45 @@ const Subworks: React.FC = () => {
                         </th>
                       </tr>
                     </thead>
-                       <tbody className="bg-white divide-y divide-gray-200">
-                        {ssrData.map((row, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 text-sm border-r">{row.sr_no}</td>
-                            <td className="px-3 py-2 text-sm border-r">{row.chapter}</td>
-                            <td className="px-3 py-2 text-sm border-r">{row.ssr_item_no}</td>
-                            <td className="px-3 py-2 text-sm border-r">{row.reference_no}</td>
-                            <td className="px-3 py-2 text-sm border-r">{row.description}</td>
-                            <td className="px-3 py-2 text-sm border-r">
-                              {row.additional_specification}
-                            </td>
-                            <td className="px-3 py-2 text-sm border-r">{row.unit}</td>
-                            <td className="px-3 py-2 text-sm border-r">{row.completed_rate}</td>
-                            <td className="px-3 py-2 text-sm">{row.labour_rate}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {ssrData.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-sm border-r">
+                            {row.sr_no}
+                          </td>
+                          <td className="px-3 py-2 text-sm border-r">
+                            {row.chapter}
+                          </td>
+                          <td className="px-3 py-2 text-sm border-r">
+                            {row.ssr_item_no}
+                          </td>
+                          <td className="px-3 py-2 text-sm border-r">
+                            {row.reference_no}
+                          </td>
+                          <td className="px-3 py-2 text-sm border-r">
+                            {row.description}
+                          </td>
+                          <td className="px-3 py-2 text-sm border-r">
+                            {row.additional_specification}
+                          </td>
+                          <td className="px-3 py-2 text-sm border-r">
+                            {row.unit}
+                          </td>
+                          <td className="px-3 py-2 text-sm border-r">
+                            {row.completed_rate}
+                          </td>
+                          <td className="px-3 py-2 text-sm">
+                            {row.labour_rate}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-12 text-gray-500">No SSR data available</div>
+                <div className="text-center py-12 text-gray-500">
+                  No SSR data available
+                </div>
               )}
             </div>
 
