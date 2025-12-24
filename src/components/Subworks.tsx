@@ -1863,7 +1863,7 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
         </div>
       )}
 
-      {/* Lead Statement Modal */}
+          {/* Lead Statement Modal */}
       {showLeadStatementModal && selectedWorkForLeadStatement && (
         <LeadStatement
           worksId={selectedWorkForLeadStatement.id}
@@ -1875,17 +1875,15 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
           }}
         />
       )}
-      
+
       {/* Quarry Chart Modal */}
-              <QuarryChart
-          isOpen={showQuarryChartModal}
-          onClose={() => setShowQuarryChartModal(false)}
-            />
-          </div>
-        </div>
-      )}
+      <QuarryChart
+        isOpen={showQuarryChartModal}
+        onClose={() => setShowQuarryChartModal(false)}
+      />
     </div>
   );
 };
 
 export default Subworks;
+
