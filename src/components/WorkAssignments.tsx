@@ -68,7 +68,7 @@ const WorkAssignments: React.FC = () => {
 
       const [worksRes, rolesRes] = await Promise.all([
         supabase.schema('estimate').from('works').select('works_id, work_name, division, status').order('sr_no', { ascending: false }),
-        supabase.schema('public').from('roles').select('*').in('application', ['estimate', 'mb']),
+        supabase.schema('public').from('roles').select('*').in('application', ['estimate', 'mb','estimate,mb']),
       ]);
 
       if (worksRes.error) {
