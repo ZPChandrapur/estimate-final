@@ -82,7 +82,6 @@ const Subworks: React.FC = () => {
   // Quarry chart state
 const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
 
-
   useEffect(() => {
     fetchWorks();
   }, [selectedWorkId]);
