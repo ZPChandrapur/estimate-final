@@ -1880,7 +1880,7 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
               <QuarryChart
           isOpen={showQuarryChartModal}
           onClose={() => setShowQuarryChartModal(false)}
-                  />
+            />
           </div>
         </div>
       )}
