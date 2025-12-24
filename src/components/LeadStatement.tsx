@@ -164,7 +164,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
           { key: 'ConcreteBlock (FORM)', unit: 'cum' },
           { key: 'Cement, Lime, Stone Block, GI, CI, CC & AC Pipes / Sheet& Plate, Glass in packs, Distemper, AC Sheet, Fitting Iron Sheet', unit: 'MT' },
           { key: 'Bricks', unit: '1000/unit' },
-          { key: 'Tiles Half Round Tiles /Roofing Tiles/Manlore Tiles', unit: '1000/' },
+          { key: 'Tiles Half Round Tiles /Roofing Tiles/Manlore Tiles', unit: '1000/unit' },
           { key: 'Steel (MS, TMT, H.Y.S.D.) Structural Steel', unit: 'M.T.' },
           { key: 'Flooring Tiles Ceramic/ Marbonate', unit: 'Sq. M' },
           { key: 'Asphalt in Drum', unit: 'M.T.' }
