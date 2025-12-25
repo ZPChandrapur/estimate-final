@@ -1,72 +1,83 @@
 import React, { useState, useRef } from 'react';
-import { Stage, Layer, Line, Circle, Text, Rect, Transformer } from 'react-konva';
-import type Konva from 'konva';
+import { Stage, Layer, Line, Circle, Rect, Text, Transformer } from 'react-konva';
+import Konva from 'konva';
+import jsPDF from 'jspdf';
 import { X } from 'lucide-react';
 
 interface QuarryChartProps {
   isOpen: boolean;
   onClose: () => void;
+  workId: string;        // chart is specific to this work id
 }
 
 type Tool =
   | 'select'
   | 'free-line'
   | 'straight-line'
-  | 'node'
+  | 'polyline'
+  | 'node-circle'
+  | 'node-square'
   | 'text'
-  | 'erase';
+  | 'eraser';
 
-type ShapeType = 'line' | 'node' | 'text';
+type ShapeKind = 'line' | 'node-circle' | 'node-square' | 'text';
 
 interface BaseShape {
   id: string;
-  type: ShapeType;
+  workId: string;
+  kind: ShapeKind;
 }
 
 interface LineShape extends BaseShape {
-  type: 'line';
-  points: number[]; // x1,y1,x2,y2,...
+  kind: 'line';
+  points: number[];
 }
 
-interface NodeShape extends BaseShape {
-  type: 'node';
+interface NodeCircleShape extends BaseShape {
+  kind: 'node-circle';
   x: number;
   y: number;
   radius: number;
 }
 
+interface NodeSquareShape extends BaseShape {
+  kind: 'node-square';
+  x: number;
+  y: number;
+  size: number;
+}
+
 interface TextShape extends BaseShape {
-  type: 'text';
+  kind: 'text';
   x: number;
   y: number;
   text: string;
 }
 
-type QuarryShape = LineShape | NodeShape | TextShape;
+type QuarryShape = LineShape | NodeCircleShape | NodeSquareShape | TextShape;
 
-const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
-  const [quarryTitle, setQuarryTitle] = useState('Quarry Chart');
-  const [quarryRows, setQuarryRows] = useState(25);
-  const [quarryCols, setQuarryCols] = useState(40);
-
-  const [tool, setTool] = useState<Tool>('free-line');
-  const [nodeChar, setNodeChar] = useState<string>('●');
-  const [textLabel, setTextLabel] = useState<string>('');
+const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) => {
+  const [title, setTitle] = useState('Quarry Chart');
+  const [rows, setRows] = useState(25);
+  const [cols, setCols] = useState(40);
+  const [tool, setTool] = useState<Tool>('select');
+  const [textLabel, setTextLabel] = useState('');
+  const [strokeColor, setStrokeColor] = useState('#111827');
+  const [strokeWidth, setStrokeWidth] = useState(2);
 
   const [shapes, setShapes] = useState<QuarryShape[]>([]);
   const [history, setHistory] = useState<QuarryShape[][]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
 
-  const isDrawingRef = useRef(false);
   const stageRef = useRef<Konva.Stage | null>(null);
-  const transformerRef = useRef<Konva.Transformer | null>(null);
-  const layerRef = useRef<Konva.Layer | null>(null);
+  const trRef = useRef<Konva.Transformer | null>(null);
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
 
   if (!isOpen) return null;
 
-  const gridWidth = quarryCols * 20;
-  const gridHeight = quarryRows * 20;
+  const width = cols * 20;
+  const height = rows * 20;
 
   const snapshot = () => {
     setHistory(prev => [...prev, JSON.parse(JSON.stringify(shapes))].slice(-50));
@@ -81,99 +92,63 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
     });
   };
 
-  const resetGrid = (rows: number, cols: number) => {
-    setQuarryRows(rows);
-    setQuarryCols(cols);
-    setShapes([]);
-    setHistory([]);
-    setSelectedId(null);
-  };
+  const filteredShapes = shapes.filter(s => s.workId === workId);
 
-  const exportAscii = () => {
-    const cellSize = 20;
-    const rows = quarryRows;
-    const cols = quarryCols;
-    const grid: string[][] = Array.from({ length: rows }, () =>
-      Array(cols).fill(' ')
-    );
-
-    shapes.forEach(s => {
-      if (s.type === 'node') {
-        const r = Math.floor((s.y ?? 0) / cellSize);
-        const c = Math.floor((s.x ?? 0) / cellSize);
-        if (r >= 0 && r < rows && c >= 0 && c < cols) {
-          grid[r][c] = nodeChar || '●';
-        }
-      } else if (s.type === 'text') {
-        const r = Math.floor((s.y ?? 0) / cellSize);
-        const c = Math.floor((s.x ?? 0) / cellSize);
-        if (r >= 0 && r < rows && c >= 0 && c < cols) {
-          s.text.split('').forEach((ch, idx) => {
-            const cc = c + idx;
-            if (cc < cols) grid[r][cc] = ch;
-          });
-        }
-      } else if (s.type === 'line') {
-        for (let i = 0; i < s.points.length - 2; i += 2) {
-          const x1 = s.points[i];
-          const y1 = s.points[i + 1];
-          const r = Math.floor(y1 / cellSize);
-          const c = Math.floor(x1 / cellSize);
-          if (r >= 0 && r < rows && c >= 0 && c < cols) {
-            grid[r][c] = '─';
-          }
-        }
-      }
-    });
-
-    return grid.map(r => r.join('')).join('\n');
-  };
-
-  const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const stage = e.target.getStage();
+  const handleMouseDown = (e: any) => {
+    const stage = stageRef.current;
     if (!stage) return;
-
     const pos = stage.getPointerPosition();
     if (!pos) return;
 
     if (tool === 'select') {
-      if (e.target === stage) {
-        setSelectedId(null);
-        return;
-      }
-      const clickedId = (e.target as any).attrs.id as string | undefined;
-      setSelectedId(clickedId || null);
+      const clickedOnEmpty = e.target === stage;
+      if (clickedOnEmpty) setSelectedId(null);
+      setIsDrawing(false);
       return;
     }
 
     snapshot();
-    isDrawingRef.current = true;
+    setIsDrawing(true);
 
     if (tool === 'free-line') {
       const id = `line-${Date.now()}`;
       const newLine: LineShape = {
         id,
-        type: 'line',
+        workId,
+        kind: 'line',
         points: [pos.x, pos.y, pos.x, pos.y]
       };
       setShapes(prev => [...prev, newLine]);
-    } else if (tool === 'straight-line') {
+    } else if (tool === 'straight-line' || tool === 'polyline') {
       startPointRef.current = { x: pos.x, y: pos.y };
       const id = `line-${Date.now()}`;
       const newLine: LineShape = {
         id,
-        type: 'line',
+        workId,
+        kind: 'line',
         points: [pos.x, pos.y, pos.x, pos.y]
       };
       setShapes(prev => [...prev, newLine]);
-    } else if (tool === 'node') {
-      const id = `node-${Date.now()}`;
-      const node: NodeShape = {
+    } else if (tool === 'node-circle') {
+      const id = `nodec-${Date.now()}`;
+      const node: NodeCircleShape = {
         id,
-        type: 'node',
+        workId,
+        kind: 'node-circle',
         x: pos.x,
         y: pos.y,
         radius: 4
+      };
+      setShapes(prev => [...prev, node]);
+    } else if (tool === 'node-square') {
+      const id = `nodes-${Date.now()}`;
+      const node: NodeSquareShape = {
+        id,
+        workId,
+        kind: 'node-square',
+        x: pos.x,
+        y: pos.y,
+        size: 8
       };
       setShapes(prev => [...prev, node]);
     } else if (tool === 'text') {
@@ -181,40 +156,42 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
       const id = `text-${Date.now()}`;
       const t: TextShape = {
         id,
-        type: 'text',
+        workId,
+        kind: 'text',
         x: pos.x,
         y: pos.y,
         text: textLabel
       };
       setShapes(prev => [...prev, t]);
-    } else if (tool === 'erase') {
+    } else if (tool === 'eraser') {
       const target = e.target;
-      if (target && target !== stage) {
-        const id = (target as any).attrs.id as string | undefined;
-        if (!id) return;
-        setShapes(prev => prev.filter(s => s.id !== id));
-      }
+      const id = target?.attrs?.id;
+      if (!id) return;
+      setShapes(prev => prev.filter(s => s.id !== id));
     }
   };
 
-  const handleStageMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (!isDrawingRef.current) return;
-    const stage = e.target.getStage();
+  const handleMouseMove = () => {
+    if (!isDrawing) return;
+    const stage = stageRef.current;
     if (!stage) return;
     const pos = stage.getPointerPosition();
     if (!pos) return;
 
     setShapes(prev => {
       const next = [...prev];
-      const last = next[next.length - 1];
-      if (!last || last.type !== 'line') return prev;
+      const idx = next.findIndex(
+        s => s.workId === workId && s.kind === 'line' && s.id === next[next.length - 1].id
+      );
+      if (idx === -1) return prev;
+      const last = next[idx] as LineShape;
 
       if (tool === 'free-line') {
         const updated: LineShape = {
           ...last,
           points: [...last.points, pos.x, pos.y]
         };
-        next[next.length - 1] = updated;
+        next[idx] = updated;
       } else if (tool === 'straight-line') {
         const sp = startPointRef.current;
         if (!sp) return prev;
@@ -222,35 +199,93 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
           ...last,
           points: [sp.x, sp.y, pos.x, pos.y]
         };
-        next[next.length - 1] = updated;
+        next[idx] = updated;
+      } else if (tool === 'polyline') {
+        const updated: LineShape = {
+          ...last,
+          points: [...last.points.slice(0, -2), pos.x, pos.y]
+        };
+        next[idx] = updated;
       }
       return next;
     });
   };
 
-  const handleStageMouseUp = () => {
-    isDrawingRef.current = false;
-    startPointRef.current = null;
+  const handleMouseUp = () => {
+    if (tool === 'polyline' && startPointRef.current) {
+      // keep polyline open; click again to extend
+    } else {
+      setIsDrawing(false);
+      startPointRef.current = null;
+    }
   };
 
-  const onDragShape = (id: string, x: number, y: number) => {
+  const handleStageDblClick = () => {
+    if (tool === 'polyline') {
+      setIsDrawing(false);
+      startPointRef.current = null;
+    }
+  };
+
+  const handleDragShape = (id: string, dx: number, dy: number) => {
     setShapes(prev =>
       prev.map(s => {
         if (s.id !== id) return s;
-        if (s.type === 'node' || s.type === 'text') {
-          return { ...s, x, y } as QuarryShape;
+        if (s.kind === 'node-circle') {
+          return { ...s, x: dx, y: dy };
+        }
+        if (s.kind === 'node-square') {
+          return { ...s, x: dx, y: dy };
+        }
+        if (s.kind === 'text') {
+          return { ...s, x: dx, y: dy };
         }
         return s;
       })
     );
   };
 
-  const textExport = exportAscii();
+  const attachTransformer = (nodeId: string | null) => {
+    const stage = stageRef.current;
+    const tr = trRef.current;
+    if (!stage || !tr) return;
+    if (!nodeId) {
+      tr.nodes([]);
+      return;
+    }
+    const node = stage.findOne(`#${nodeId}`);
+    if (node) {
+      tr.nodes([node as any]);
+    } else {
+      tr.nodes([]);
+    }
+  };
+
+  const handleExportPDF = () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const dataURL = stage.toDataURL({ pixelRatio: 2 }); // sharper export[web:93]
+    const pdf = new jsPDF('l', 'px', [stage.width(), stage.height()]); // landscape[web:94][web:95]
+    pdf.addImage(
+      dataURL,
+      'PNG',
+      0,
+      0,
+      stage.width(),
+      stage.height()
+    );
+    pdf.save(`quarry-chart-${workId}.pdf`);
+  };
 
   const handleInternalClose = () => {
-    isDrawingRef.current = false;
+    setIsDrawing(false);
     onClose();
   };
+
+  React.useEffect(() => {
+    attachTransformer(selectedId);
+  }, [selectedId, filteredShapes.length]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -262,7 +297,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
               Quarry Chart / Route Diagram
             </h2>
             <p className="text-xs text-gray-500">
-              Draw quarry routes with freehand lines, straight segments, nodes, text and Excel‑style selection.
+              Draw quarry routes with freehand lines, straight segments, nodes and text. Work ID: {workId}
             </p>
           </div>
           <button
@@ -282,8 +317,8 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
             </label>
             <input
               type="text"
-              value={quarryTitle}
-              onChange={e => setQuarryTitle(e.target.value)}
+              value={title}
+              onChange={e => setTitle(e.target.value)}
               className="border border-gray-300 rounded-md px-2 py-1 text-xs w-60"
             />
           </div>
@@ -298,11 +333,8 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
                 type="number"
                 min={10}
                 max={60}
-                value={quarryRows}
-                onChange={e => {
-                  const v = Number(e.target.value || 10);
-                  resetGrid(v, quarryCols);
-                }}
+                value={rows}
+                onChange={e => setRows(Number(e.target.value || 10))}
                 className="border border-gray-300 rounded-md px-2 py-1 w-16"
               />
               <span>×</span>
@@ -310,22 +342,29 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
                 type="number"
                 min={20}
                 max={100}
-                value={quarryCols}
-                onChange={e => {
-                  const v = Number(e.target.value || 20);
-                  resetGrid(quarryRows, v);
-                }}
+                value={cols}
+                onChange={e => setCols(Number(e.target.value || 20))}
                 className="border border-gray-300 rounded-md px-2 py-1 w-16"
               />
             </div>
           </div>
 
           {/* Tools */}
-          <div className="min-w-[260px]">
+          <div className="flex flex-col gap-1">
             <label className="block text-xs font-medium text-gray-600 mb-1">
               Tool
             </label>
             <div className="flex flex-wrap gap-1 text-xs">
+              <button
+                onClick={() => setTool('select')}
+                className={`px-3 py-1 rounded-md border ${
+                  tool === 'select'
+                    ? 'bg-slate-800 text-white border-slate-900'
+                    : 'bg-white text-gray-700 border-gray-300'
+                }`}
+              >
+                Select / Move
+              </button>
               <button
                 onClick={() => setTool('free-line')}
                 className={`px-3 py-1 rounded-md border ${
@@ -347,14 +386,34 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
                 Straight line
               </button>
               <button
-                onClick={() => setTool('node')}
+                onClick={() => setTool('polyline')}
                 className={`px-3 py-1 rounded-md border ${
-                  tool === 'node'
+                  tool === 'polyline'
+                    ? 'bg-emerald-600 text-white border-emerald-700'
+                    : 'bg-white text-gray-700 border-gray-300'
+                }`}
+              >
+                Route (polyline)
+              </button>
+              <button
+                onClick={() => setTool('node-circle')}
+                className={`px-3 py-1 rounded-md border ${
+                  tool === 'node-circle'
                     ? 'bg-indigo-600 text-white border-indigo-700'
                     : 'bg-white text-gray-700 border-gray-300'
                 }`}
               >
-                Node / Junction
+                Node ●
+              </button>
+              <button
+                onClick={() => setTool('node-square')}
+                className={`px-3 py-1 rounded-md border ${
+                  tool === 'node-square'
+                    ? 'bg-indigo-600 text-white border-indigo-700'
+                    : 'bg-white text-gray-700 border-gray-300'
+                }`}
+              >
+                Depot ■
               </button>
               <button
                 onClick={() => setTool('text')}
@@ -367,67 +426,56 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
                 Text label
               </button>
               <button
-                onClick={() => setTool('erase')}
+                onClick={() => setTool('eraser')}
                 className={`px-3 py-1 rounded-md border ${
-                  tool === 'erase'
+                  tool === 'eraser'
                     ? 'bg-rose-600 text-white border-rose-700'
                     : 'bg-white text-gray-700 border-gray-300'
                 }`}
               >
                 Eraser
               </button>
-              <button
-                onClick={() => setTool('select')}
-                className={`px-3 py-1 rounded-md border ${
-                  tool === 'select'
-                    ? 'bg-slate-700 text-white border-slate-800'
-                    : 'bg-white text-gray-700 border-gray-300'
-                }`}
-              >
-                Select / Resize
-              </button>
             </div>
           </div>
 
-          {/* Node config */}
-          {tool === 'node' && (
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Node character
-              </label>
-              <input
-                type="text"
-                maxLength={2}
-                value={nodeChar}
-                onChange={e => setNodeChar(e.target.value || '●')}
-                className="border border-gray-300 rounded-md px-2 py-1 text-xs w-16 text-center"
-              />
-              <p className="text-[10px] text-gray-500 mt-1">
-                Examples: ● ○ □ △ ◎ ▲ ■ ◆
-              </p>
-            </div>
-          )}
-
           {/* Text config */}
-          {tool === 'text' && (
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Text to place
-              </label>
-              <input
-                type="text"
-                value={textLabel}
-                onChange={e => setTextLabel(e.target.value)}
-                className="border border-gray-300 rounded-md px-2 py-1 text-xs w-48"
-                placeholder="Village name, distance, note..."
-              />
-              <p className="text-[10px] text-gray-500 mt-1">
-                Click on the canvas to drop the label.
-              </p>
-            </div>
-          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Text to place
+            </label>
+            <input
+              type="text"
+              value={textLabel}
+              onChange={e => setTextLabel(e.target.value)}
+              className="border border-gray-300 rounded-md px-2 py-1 text-xs w-48"
+              placeholder="Village, quarry, distance..."
+            />
+          </div>
 
-          {/* Undo */}
+          {/* Style */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Stroke
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={strokeColor}
+                onChange={e => setStrokeColor(e.target.value)}
+                className="w-8 h-6 border border-gray-300 rounded"
+              />
+              <input
+                type="number"
+                min={1}
+                max={8}
+                value={strokeWidth}
+                onChange={e => setStrokeWidth(Number(e.target.value || 1))}
+                className="border border-gray-300 rounded-md px-2 py-1 text-xs w-14"
+              />
+            </div>
+          </div>
+
+          {/* Undo / Export */}
           <div className="ml-auto flex flex-col gap-1 items-end">
             <button
               onClick={handleUndo}
@@ -436,79 +484,86 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
             >
               Undo
             </button>
+            <button
+              onClick={handleExportPDF}
+              className="px-3 py-1 rounded-md border border-emerald-600 text-xs font-medium text-emerald-700 bg-white hover:bg-emerald-50"
+            >
+              Export PDF
+            </button>
           </div>
         </div>
 
-        {/* Chart body */}
+        {/* Canvas */}
         <div className="px-6 pt-3 flex-1 overflow-auto">
           <h3 className="text-sm font-semibold text-gray-800 mb-2">
-            {quarryTitle}
+            {title}
           </h3>
 
           <div className="inline-block bg-white border border-gray-300 rounded-md shadow-inner">
             <Stage
-              width={gridWidth}
-              height={gridHeight}
-              ref={node => {
-                stageRef.current = node as any;
-              }}
-              onMouseDown={handleStageMouseDown}
-              onMouseMove={handleStageMouseMove}
-              onMouseUp={handleStageMouseUp}
+              width={width}
+              height={height}
+              ref={stageRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onDblClick={handleStageDblClick}
             >
-              <Layer ref={node => (layerRef.current = node as any)}>
-                {/* background grid */}
-                {Array.from({ length: quarryRows + 1 }).map((_, i) => (
+              <Layer>
+                {/* grid */}
+                {Array.from({ length: rows + 1 }).map((_, i) => (
                   <Line
                     key={`h-${i}`}
-                    points={[0, i * 20, gridWidth, i * 20]}
+                    points={[0, i * 20, width, i * 20]}
                     stroke="#e5e7eb"
                     strokeWidth={1}
                   />
                 ))}
-                {Array.from({ length: quarryCols + 1 }).map((_, i) => (
+                {Array.from({ length: cols + 1 }).map((_, i) => (
                   <Line
                     key={`v-${i}`}
-                    points={[i * 20, 0, i * 20, gridHeight]}
+                    points={[i * 20, 0, i * 20, height]}
                     stroke="#e5e7eb"
                     strokeWidth={1}
                   />
                 ))}
 
-                {/* shapes */}
-                {shapes.map(s => {
-                  if (s.type === 'line') {
+                {/* shapes for this work */}
+                {filteredShapes.map(s => {
+                  if (s.kind === 'line') {
                     return (
                       <Line
                         key={s.id}
                         id={s.id}
                         points={s.points}
-                        stroke="#111827"
-                        strokeWidth={2}
+                        stroke={strokeColor}
+                        strokeWidth={strokeWidth}
                         lineCap="round"
                         lineJoin="round"
                         draggable={tool === 'select'}
-                        onDragEnd={e =>
-                          setShapes(prev =>
-                            prev.map(sh =>
-                              sh.id === s.id
-                                ? {
-                                    ...sh,
-                                    points: s.points.map((p, idx) =>
-                                      idx % 2 === 0
-                                        ? p + e.target.x()
-                                        : p + e.target.y()
-                                    )
-                                  }
-                                : sh
-                            )
-                          )
-                        }
                         onClick={() => setSelectedId(s.id)}
+                        onDragEnd={e => {
+                          const dx = e.target.x();
+                          const dy = e.target.y();
+                          setShapes(prev =>
+                            prev.map(sh => {
+                              if (sh.id !== s.id || sh.kind !== 'line') return sh;
+                              const movedPoints: number[] = [];
+                              for (let i = 0; i < (sh as LineShape).points.length; i += 2) {
+                                movedPoints.push(
+                                  (sh as LineShape).points[i] + dx,
+                                  (sh as LineShape).points[i + 1] + dy
+                                );
+                              }
+                              return { ...(sh as LineShape), points: movedPoints };
+                            })
+                          );
+                          e.target.position({ x: 0, y: 0 });
+                        }}
                       />
                     );
                   }
-                  if (s.type === 'node') {
+                  if (s.kind === 'node-circle') {
                     return (
                       <Circle
                         key={s.id}
@@ -516,16 +571,34 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
                         x={s.x}
                         y={s.y}
                         radius={s.radius}
-                        fill="#111827"
+                        fill={strokeColor}
                         draggable={tool === 'select'}
-                        onDragEnd={e =>
-                          onDragShape(s.id, e.target.x(), e.target.y())
-                        }
                         onClick={() => setSelectedId(s.id)}
+                        onDragEnd={e =>
+                          handleDragShape(s.id, e.target.x(), e.target.y())
+                        }
                       />
                     );
                   }
-                  if (s.type === 'text') {
+                  if (s.kind === 'node-square') {
+                    return (
+                      <Rect
+                        key={s.id}
+                        id={s.id}
+                        x={s.x - s.size / 2}
+                        y={s.y - s.size / 2}
+                        width={s.size}
+                        height={s.size}
+                        fill={strokeColor}
+                        draggable={tool === 'select'}
+                        onClick={() => setSelectedId(s.id)}
+                        onDragEnd={e =>
+                          handleDragShape(s.id, e.target.x() + s.size / 2, e.target.y() + s.size / 2)
+                        }
+                      />
+                    );
+                  }
+                  if (s.kind === 'text') {
                     return (
                       <Text
                         key={s.id}
@@ -535,67 +608,21 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
                         text={s.text}
                         fontSize={11}
                         fontFamily="monospace"
-                        fill="#111827"
+                        fill={strokeColor}
                         draggable={tool === 'select'}
-                        onDragEnd={e =>
-                          onDragShape(s.id, e.target.x(), e.target.y())
-                        }
                         onClick={() => setSelectedId(s.id)}
+                        onDragEnd={e =>
+                          handleDragShape(s.id, e.target.x(), e.target.y())
+                        }
                       />
                     );
                   }
                   return null;
                 })}
 
-                {/* selection transformer */}
-                {selectedId && (
-                  <>
-                    {/* invisible rect so Transformer has a node */}
-                    <Rect
-                      id={`${selectedId}-handle`}
-                      x={0}
-                      y={0}
-                      visible={false}
-                    />
-                    <Transformer
-                      ref={node => {
-                        transformerRef.current = node as any;
-                        if (!node) return;
-                        const stage = node.getStage();
-                        if (!stage) return;
-                        const found = stage.findOne(`#${selectedId}`);
-                        if (found) {
-                          node.nodes([found]);
-                          node.getLayer()?.batchDraw();
-                        }
-                      }}
-                      rotateEnabled
-                      enabledAnchors={[
-                        'top-left',
-                        'top-right',
-                        'bottom-left',
-                        'bottom-right'
-                      ]}
-                      anchorSize={6}
-                      borderStroke="#10b981"
-                      anchorFill="#10b981"
-                    />
-                  </>
-                )}
+                <Transformer ref={trRef} rotateEnabled enabledAnchors={['top-left','top-right','bottom-left','bottom-right']} />
               </Layer>
             </Stage>
-          </div>
-
-          {/* Text export */}
-          <div className="mt-3">
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Plain text view (copy into reports)
-            </label>
-            <textarea
-              readOnly
-              value={textExport}
-              className="w-full h-32 border border-gray-300 rounded-md text-[11px] font-mono p-2 bg-gray-50"
-            />
           </div>
 
           <p className="mt-2 text-[11px] text-gray-500">
@@ -608,11 +635,12 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose }) => {
           <button
             onClick={() => {
               snapshot();
-              resetGrid(quarryRows, quarryCols);
+              setShapes(prev => prev.filter(s => s.workId !== workId));
+              setSelectedId(null);
             }}
             className="px-4 py-1.5 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100"
           >
-            Clear
+            Clear this work
           </button>
           <button
             onClick={handleInternalClose}
