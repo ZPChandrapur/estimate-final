@@ -215,8 +215,7 @@ const handleMeasurementExcelUpload = async (
     const { error: insertError } = await supabase
       .schema('estimate')
       .from('item_measurements')
-      .insert(insertRows)
-      .select();
+      .insert(insertRows);
 
     if (insertError) {
       console.error('Database insert error:', insertError);
@@ -330,7 +329,7 @@ const handleMeasurementExcelUpload = async (
         .from('item_measurements')
         .insert([{
           ...newMeasurement,
-          subwork_item_id: subworkItemId,
+          subwork_item_id: subworkItemId,   // 🔹 Corrected
           measurement_sr_no: nextSrNo,
           calculated_quantity: calculatedQuantity,
           line_amount: rateData?.rate * calculatedQuantity,
@@ -340,8 +339,7 @@ const handleMeasurementExcelUpload = async (
           manual_quantity: newMeasurement.is_manual_quantity ? (newMeasurement.manual_quantity || 0) : null,
           selected_rate_id: newMeasurement.selected_rate_id || null,
           rate_sr_no: rateSrNo
-        }])
-        .select();
+        }]);
 
       if (error) throw error;
 
@@ -604,7 +602,6 @@ const handleMeasurementExcelUpload = async (
   };
 
   const handleAddLead = async () => {
-    debugger;
     if (!newLead.material || !user) return;
 
     try {
@@ -617,8 +614,7 @@ const handleMeasurementExcelUpload = async (
           ...newLead,
           subwork_item_id: currentItem.sr_no,
           net_lead_charges: netLeadCharges
-        }])
-        .select();
+        }]);
 
       if (error) throw error;
 
@@ -636,7 +632,6 @@ const handleMeasurementExcelUpload = async (
   };
 
   const handleAddMaterial = async () => {
-    debugger
     if (!newMaterial.material_name || !user) return;
 
     try {
@@ -649,8 +644,7 @@ const handleMeasurementExcelUpload = async (
           ...newMaterial,
           subwork_item_id: currentItem.sr_no,
           total_material_cost: totalCost
-        }])
-        .select();
+        }]);
 
       if (error) throw error;
 
