@@ -220,69 +220,63 @@ const fetchWorkData = async () => {
     setSaved(false);
   };
 
-  const handleSave = async () => {
-    if (calculations && onSave) {
-      onSave(calculations, taxes);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    }
+const handleSave = async () => {
+  if (calculations && onSave) {
+    onSave(calculations, taxes);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
 
-    try {
-      // 🟢 Step 1: Fetch 'type' from works table
-      const { data: workTypeData, error: typeError } = await supabase
-        .schema('estimate')
-        .from('works')
-        .select('*')
-        .eq('works_id', workId)
-        .single();
+  try {
+    // 1️⃣ Fetch existing work (already allowed by SELECT policy)
+    const { data: workData, error: fetchError } = await supabase
+      .schema('estimate')
+      .from('works')
+      .select('type, work_name')
+      .eq('works_id', workId)
+      .single();
 
-      if (typeError) throw typeError;
+    if (fetchError) throw fetchError;
 
-      const fetchedType = workTypeData?.type ?? null;
-      const fetchedWorkName = workTypeData?.work_name ?? null;
+    const recapData = {
+      workId,
+      work,
+      type: workData.type,
+      work_name: workData.work_name,
+      subworks,
+      subworkItems,
+      taxes,
+      calculations,
+      unitInputs,
+      department,
+      savedAt: new Date().toISOString(),
+    };
 
-      // 🟢 Step 2: Prepare recap data with fetched type
-      const recapData = {
-        workId,
-        work,
-        type: fetchedType, // ✅ use fetched type here
-        work_name: fetchedWorkName,
-        subworks,
-        subworkItems,
-        taxes,
-        calculations,
-        unitInputs,
-        department,
-        savedAt: new Date().toISOString(),
-      };
+    // 2️⃣ UPDATE ONLY (no insert → no RLS violation)
+    const { error: updateError } = await supabase
+      .schema('estimate')
+      .from('works')
+      .update({
+        recap_json: JSON.stringify(recapData),
+        total_estimated_cost:
+          (calculations.partA.subtotal || 0) +
+          (calculations.partB.subtotal || 0),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('works_id', workId);
 
-      // 🟢 Step 3: Update works table with recap JSON
-      const { data, error } = await supabase
-        .schema('estimate')
-        .from('works')
-        .upsert(
-          [
-            {
-              works_id: workId,
-              type: fetchedType, // ✅ add this line
-              work_name: fetchedWorkName, // ✅ add this line
-              recap_json: JSON.stringify(recapData),
-              updated_at: new Date().toISOString(),
-            },
-          ],
-          { onConflict: 'works_id' }
-        );
+    if (updateError) throw updateError;
 
+    console.log('✅ Recap data updated successfully');
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    setShowPdfModal?.(false);
 
-      if (error) throw error;
-      console.log('✅ Recap data is updated');
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-      setShowPdfModal?.(false);
-    } catch (error) {
-      console.error('❌ Error saving recap data to Supabase:', error);
-    }
-  };
+  } catch (error) {
+    console.error('❌ Error saving recap data:', error);
+  }
+};
+
 
   const getPartASubworks = () => {
     return subworks.filter(subwork => {
