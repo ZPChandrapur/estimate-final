@@ -335,6 +335,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
 
     try {
       setSearchingLeads(true);
+      console.log('🔍 Searching lead statements for term:', searchTerm);
+      console.log('📋 Item subwork_id:', item.subwork_id);
 
       const { data: subworkData, error: subworkError } = await supabase
         .schema('estimate')
@@ -344,18 +346,20 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
         .maybeSingle();
 
       if (subworkError) {
-        console.error('Error fetching subwork data:', subworkError);
+        console.error('❌ Error fetching subwork data:', subworkError);
         setLeadStatements([]);
         setShowLeadDropdown(false);
         return;
       }
 
       if (!subworkData || !subworkData.works_id) {
-        console.log('No subwork data found for subwork_id:', item.subwork_id);
+        console.warn('⚠️ No subwork data found for subwork_id:', item.subwork_id);
         setLeadStatements([]);
         setShowLeadDropdown(false);
         return;
       }
+
+      console.log('✅ Found works_id:', subworkData.works_id);
 
       const { data, error } = await supabase
         .schema('estimate')
@@ -366,14 +370,16 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
         .limit(10);
 
       if (error) {
-        console.error('Error searching lead statements:', error);
+        console.error('❌ Error searching lead statements:', error);
         throw error;
       }
+
+      console.log(`✅ Found ${(data || []).length} lead statements:`, data);
 
       setLeadStatements(data || []);
       setShowLeadDropdown((data || []).length > 0);
     } catch (error) {
-      console.error('Error searching lead statements:', error);
+      console.error('❌ Error searching lead statements:', error);
       setLeadStatements([]);
       setShowLeadDropdown(false);
     } finally {
@@ -382,6 +388,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   };
 
   const handleSelectLeadStatement = (lead: any) => {
+    console.log('✅ Selected lead statement:', lead);
+    console.log('💰 Total rate:', lead.total_rate);
     setNewTax({
       ...newTax,
       label: lead.material,
@@ -836,30 +844,42 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                     <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
                   </div>
                 )}
+                {!searchingLeads && newTax.label.length >= 2 && leadStatements.length === 0 && !showLeadDropdown && (
+                  <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-3">
+                    <div className="text-xs text-gray-500 text-center">
+                      No materials found in Lead Statement. You can still enter manually.
+                    </div>
+                  </div>
+                )}
                 {showLeadDropdown && leadStatements.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  <div className="absolute z-[100] w-full mt-1 bg-white border-2 border-blue-400 rounded-md shadow-2xl max-h-60 overflow-y-auto">
+                    <div className="sticky top-0 bg-blue-50 px-3 py-1.5 border-b border-blue-200">
+                      <div className="text-xs font-semibold text-blue-800">
+                        {leadStatements.length} material{leadStatements.length !== 1 ? 's' : ''} found - Click to select
+                      </div>
+                    </div>
                     {leadStatements.map((lead, idx) => (
                       <div
                         key={idx}
                         onClick={() => handleSelectLeadStatement(lead)}
-                        className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                        className="px-3 py-2.5 hover:bg-blue-100 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
                       >
-                        <div className="flex justify-between items-start">
+                        <div className="flex justify-between items-start gap-3">
                           <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-900">{lead.material}</div>
+                            <div className="text-sm font-semibold text-gray-900">{lead.material}</div>
                             {lead.reference && (
-                              <div className="text-xs text-gray-500 mt-0.5">Ref: {lead.reference}</div>
+                              <div className="text-xs text-gray-600 mt-0.5">📍 Ref: {lead.reference}</div>
                             )}
                             {lead.lead_in_km && (
-                              <div className="text-xs text-gray-500">Lead: {lead.lead_in_km} km</div>
+                              <div className="text-xs text-gray-600">🚚 Lead: {lead.lead_in_km} km</div>
                             )}
                           </div>
-                          <div className="ml-3 text-right">
-                            <div className="text-sm font-semibold text-blue-600">
+                          <div className="ml-3 text-right flex-shrink-0">
+                            <div className="text-base font-bold text-green-600">
                               ₹{Number(lead.total_rate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </div>
                             {lead.unit && (
-                              <div className="text-xs text-gray-500">per {lead.unit}</div>
+                              <div className="text-xs text-gray-600 font-medium">per {lead.unit}</div>
                             )}
                           </div>
                         </div>
