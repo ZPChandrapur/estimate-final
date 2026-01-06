@@ -207,7 +207,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
       ...formData,
       material: option.name,
       lead_charges: rate,
-      total_rate: rate,
+      total_rate: rate, // Initialize with lead charges, but user can edit
       unit: option.unit
     });
     setShowMaterialOptions(false);
@@ -401,13 +401,16 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                         Lead in Km.
                       </th>
                       <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 uppercase border border-gray-300">
-                        Lead Charges
+                        Lead Charges<br />
+                        <span className="text-[10px] font-normal normal-case text-gray-500">(From Search)</span>
                       </th>
-                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 uppercase border border-gray-300">
-                        Total Rate
+                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 uppercase border border-gray-300 bg-blue-50">
+                        Total Rate<br />
+                        <span className="text-[10px] font-normal normal-case text-blue-600">(Editable)</span>
                       </th>
-                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 uppercase border border-gray-300">
-                        Unit
+                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 uppercase border border-gray-300 bg-blue-50">
+                        Unit<br />
+                        <span className="text-[10px] font-normal normal-case text-blue-600">(Editable)</span>
                       </th>
                       <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 uppercase border border-gray-300">
                         Actions
@@ -429,13 +432,13 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                         <td className="px-4 py-2 text-sm text-right text-gray-900 border border-gray-300">
                           {item.lead_in_km.toFixed(2)}
                         </td>
-                        <td className="px-4 py-2 text-sm text-right text-gray-900 border border-gray-300">
+                        <td className="px-4 py-2 text-sm text-right text-gray-600 border border-gray-300">
                           {item.lead_charges.toFixed(2)}
                         </td>
-                        <td className="px-4 py-2 text-sm text-right font-medium text-gray-900 border border-gray-300">
+                        <td className="px-4 py-2 text-sm text-right font-semibold text-blue-900 border border-gray-300 bg-blue-50">
                           {item.total_rate.toFixed(2)}
                         </td>
-                        <td className="px-4 py-2 text-sm text-center text-gray-900 border border-gray-300">
+                        <td className="px-4 py-2 text-sm text-center font-medium text-gray-900 border border-gray-300 bg-blue-50">
                           {item.unit || '-'}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-center border border-gray-300">
@@ -563,7 +566,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Lead Charges
+                      Lead Charges {showMaterialOptions && <span className="text-xs text-blue-600">(From search)</span>}
                     </label>
                     <input
                       type="number"
@@ -572,9 +575,9 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                       value={formData.lead_charges}
                       onChange={(e) => {
                         const charges = parseFloat(e.target.value) || 0;
-                        setFormData({ ...formData, lead_charges: charges, total_rate: charges });
+                        setFormData({ ...formData, lead_charges: charges });
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                       placeholder="0.00"
                       readOnly={showMaterialOptions}
                     />
@@ -611,29 +614,29 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Total Rate
+                      Total Rate * <span className="text-xs text-gray-500">(Editable - used for calculations)</span>
                     </label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={formData.total_rate}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
+                      onChange={(e) => setFormData({ ...formData, total_rate: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                       placeholder="0.00"
-                      readOnly
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Unit
+                      Unit * <span className="text-xs text-gray-500">(Editable)</span>
                     </label>
                     <input
                       type="text"
                       value={formData.unit}
                       onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="e.g., /Bag, /M.T., /Cum"
+                      placeholder="e.g., cum, MT, sqm"
                     />
                   </div>
                 </div>
