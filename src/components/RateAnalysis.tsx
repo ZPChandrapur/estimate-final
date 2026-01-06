@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 // removed unused useLocation
 import { supabase } from '../lib/supabase';
@@ -74,6 +74,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   const [leadStatements, setLeadStatements] = useState<any[]>([]);
   const [showLeadDropdown, setShowLeadDropdown] = useState(false);
   const [searchingLeads, setSearchingLeads] = useState(false);
+  const [searchCompleted, setSearchCompleted] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // NEW STATE FOR INLINE ADDING + EDITING
   const [rowBeingAddedBelow, setRowBeingAddedBelow] = useState<number | null>(null);
@@ -330,62 +332,77 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     if (!searchTerm || searchTerm.length < 2) {
       setLeadStatements([]);
       setShowLeadDropdown(false);
+      setSearchCompleted(false);
       return;
     }
 
-    try {
-      setSearchingLeads(true);
-      console.log('🔍 Searching lead statements for term:', searchTerm);
-      console.log('📋 Item subwork_id:', item.subwork_id);
-
-      const { data: subworkData, error: subworkError } = await supabase
-        .schema('estimate')
-        .from('subworks')
-        .select('works_id')
-        .eq('subworks_id', item.subwork_id)
-        .maybeSingle();
-
-      if (subworkError) {
-        console.error('❌ Error fetching subwork data:', subworkError);
-        setLeadStatements([]);
-        setShowLeadDropdown(false);
-        return;
-      }
-
-      if (!subworkData || !subworkData.works_id) {
-        console.warn('⚠️ No subwork data found for subwork_id:', item.subwork_id);
-        setLeadStatements([]);
-        setShowLeadDropdown(false);
-        return;
-      }
-
-      console.log('✅ Found works_id:', subworkData.works_id);
-      console.log('🔎 Executing query: SELECT * FROM estimate.lead_statements WHERE works_id =', subworkData.works_id, 'AND material ILIKE', `%${searchTerm}%`);
-
-      const { data, error } = await supabase
-        .schema('estimate')
-        .from('lead_statements')
-        .select('*')
-        .eq('works_id', subworkData.works_id)
-        .ilike('material', `%${searchTerm}%`)
-        .limit(10);
-
-      if (error) {
-        console.error('❌ Error searching lead statements:', error);
-        throw error;
-      }
-
-      console.log(`✅ Found ${(data || []).length} lead statements:`, data);
-
-      setLeadStatements(data || []);
-      setShowLeadDropdown((data || []).length > 0);
-    } catch (error) {
-      console.error('❌ Error searching lead statements:', error);
-      setLeadStatements([]);
-      setShowLeadDropdown(false);
-    } finally {
-      setSearchingLeads(false);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
+
+    setSearchingLeads(true);
+    setSearchCompleted(false);
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        console.log('🔍 Searching lead statements for term:', searchTerm);
+        console.log('📋 Item subwork_id:', item.subwork_id);
+
+        const { data: subworkData, error: subworkError } = await supabase
+          .schema('estimate')
+          .from('subworks')
+          .select('works_id')
+          .eq('subworks_id', item.subwork_id)
+          .maybeSingle();
+
+        if (subworkError) {
+          console.error('❌ Error fetching subwork data:', subworkError);
+          setLeadStatements([]);
+          setShowLeadDropdown(false);
+          setSearchCompleted(true);
+          setSearchingLeads(false);
+          return;
+        }
+
+        if (!subworkData || !subworkData.works_id) {
+          console.warn('⚠️ No subwork data found for subwork_id:', item.subwork_id);
+          setLeadStatements([]);
+          setShowLeadDropdown(false);
+          setSearchCompleted(true);
+          setSearchingLeads(false);
+          return;
+        }
+
+        console.log('✅ Found works_id:', subworkData.works_id);
+        console.log('🔎 Executing query: SELECT * FROM estimate.lead_statements WHERE works_id =', subworkData.works_id, 'AND material ILIKE', `%${searchTerm}%`);
+
+        const { data, error } = await supabase
+          .schema('estimate')
+          .from('lead_statements')
+          .select('*')
+          .eq('works_id', subworkData.works_id)
+          .ilike('material', `%${searchTerm}%`)
+          .limit(10);
+
+        if (error) {
+          console.error('❌ Error searching lead statements:', error);
+          throw error;
+        }
+
+        console.log(`✅ Found ${(data || []).length} lead statements:`, data);
+
+        setLeadStatements(data || []);
+        setShowLeadDropdown((data || []).length > 0);
+        setSearchCompleted(true);
+      } catch (error) {
+        console.error('❌ Error searching lead statements:', error);
+        setLeadStatements([]);
+        setShowLeadDropdown(false);
+        setSearchCompleted(true);
+      } finally {
+        setSearchingLeads(false);
+      }
+    }, 400);
   };
 
   const handleSelectLeadStatement = (lead: any) => {
@@ -398,6 +415,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     });
     setShowLeadDropdown(false);
     setLeadStatements([]);
+    setSearchCompleted(false);
   };
 
   const saveRateAnalysis = async () => {
@@ -845,7 +863,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                     <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
                   </div>
                 )}
-                {!searchingLeads && newTax.label.length >= 2 && leadStatements.length === 0 && !showLeadDropdown && (
+                {searchCompleted && !searchingLeads && newTax.label.length >= 2 && leadStatements.length === 0 && !showLeadDropdown && (
                   <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-3">
                     <div className="text-xs text-gray-500 text-center">
                       No materials found in Lead Statement. You can still enter manually.
