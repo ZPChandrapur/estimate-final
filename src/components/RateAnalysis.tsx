@@ -360,6 +360,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       }
 
       console.log('✅ Found works_id:', subworkData.works_id);
+      console.log('🔎 Executing query: SELECT * FROM estimate.lead_statements WHERE works_id =', subworkData.works_id, 'AND material ILIKE', `%${searchTerm}%`);
 
       const { data, error } = await supabase
         .schema('estimate')
@@ -834,7 +835,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                     }
                   }}
                   onBlur={() => {
-                    setTimeout(() => setShowLeadDropdown(false), 200);
+                    setTimeout(() => setShowLeadDropdown(false), 300);
                   }}
                   className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Search materials from Lead Statement or enter manually"
@@ -861,7 +862,10 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                     {leadStatements.map((lead, idx) => (
                       <div
                         key={idx}
-                        onClick={() => handleSelectLeadStatement(lead)}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectLeadStatement(lead);
+                        }}
                         className="px-3 py-2.5 hover:bg-blue-100 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
                       >
                         <div className="flex justify-between items-start gap-3">
