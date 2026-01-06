@@ -336,15 +336,24 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     try {
       setSearchingLeads(true);
 
-      const { data: subworkData } = await supabase
+      const { data: subworkData, error: subworkError } = await supabase
         .schema('estimate')
         .from('subworks')
         .select('works_id')
         .eq('subworks_id', item.subwork_id)
         .maybeSingle();
 
-      if (!subworkData) {
+      if (subworkError) {
+        console.error('Error fetching subwork data:', subworkError);
         setLeadStatements([]);
+        setShowLeadDropdown(false);
+        return;
+      }
+
+      if (!subworkData || !subworkData.works_id) {
+        console.log('No subwork data found for subwork_id:', item.subwork_id);
+        setLeadStatements([]);
+        setShowLeadDropdown(false);
         return;
       }
 
@@ -356,13 +365,17 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
         .ilike('material', `%${searchTerm}%`)
         .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error searching lead statements:', error);
+        throw error;
+      }
 
       setLeadStatements(data || []);
-      setShowLeadDropdown(true);
+      setShowLeadDropdown((data || []).length > 0);
     } catch (error) {
       console.error('Error searching lead statements:', error);
       setLeadStatements([]);
+      setShowLeadDropdown(false);
     } finally {
       setSearchingLeads(false);
     }
