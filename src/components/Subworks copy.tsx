@@ -155,8 +155,8 @@ const Subworks: React.FC = () => {
         const { data: itemsData, error: itemsError } = await supabase
           .schema('estimate')
           .from('subwork_items')
-          .select('subworks_id, subwork_amount')
-          .in('subworks_id', subworkIds);
+          .select('subwork_id, total_item_amount')
+          .in('subwork_id', subworkIds);
         if (itemsError) throw itemsError;
 
         // ✅ Compute totals and item counts locally
@@ -164,8 +164,8 @@ const Subworks: React.FC = () => {
         const counts: Record<string, number> = {};
 
         (itemsData || []).forEach(item => {
-          const id = item.subworks_id;
-          totals[id] = (totals[id] || 0) + (item.subwork_amount || 0);
+          const id = item.subwork_id;
+          totals[id] = (totals[id] || 0) + (item.total_item_amount || 0);
           counts[id] = (counts[id] || 0) + 1;
         });
 
