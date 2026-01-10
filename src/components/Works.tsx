@@ -28,7 +28,8 @@ const Works: React.FC = () => {
   const [selectedWorkForPdf, setSelectedWorkForPdf] = useState<Work | null>(null);
   const [savedCalculations, setSavedCalculations] = useState<{ [workId: string]: { calculations: RecapCalculations; taxes: TaxEntry[] } }>({});
   const [newWork, setNewWork] = useState<Partial<Work>>({
-    type: 'Technical Sanction'
+    type: 'Technical Sanction',
+    division: 'Z.P.(Works) Division, Chandrapur'
   });
 
   useEffect(() => {
@@ -84,7 +85,8 @@ const Works: React.FC = () => {
 
       setShowAddModal(false);
       setNewWork({
-        type: 'Technical Sanction'
+        type: 'Technical Sanction',
+        division: 'Z.P.(Works) Division, Chandrapur'
       });
       fetchWorks();
     } catch (error) {
@@ -583,10 +585,9 @@ const Works: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    value={newWork.division || ''}
-                    onChange={(e) => setNewWork({ ...newWork, division: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={t('addWork.enterDivision')}
+                    value="Z.P.(Works) Division, Chandrapur"
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
                   />
                 </div>
 
@@ -594,13 +595,20 @@ const Works: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t('addWork.subDivision')}
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={newWork.sub_division || ''}
                     onChange={(e) => setNewWork({ ...newWork, sub_division: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={t('addWork.enterSubDivision')}
-                  />
+                  >
+                    <option value="">Select Sub Division</option>
+                    <option value="Z.P.(Works) Sub-Division, Mul">Z.P.(Works) Sub-Division, Mul</option>
+                    <option value="Z.P.(Works) Sub-Division, Chimur">Z.P.(Works) Sub-Division, Chimur</option>
+                    <option value="Z.P.(Works) Sub-Division, Warora">Z.P.(Works) Sub-Division, Warora</option>
+                    <option value="Z.P.(Works) Sub-Division, Chandrapur">Z.P.(Works) Sub-Division, Chandrapur</option>
+                    <option value="Z.P.(Works) Sub-Division, Rajura">Z.P.(Works) Sub-Division, Rajura</option>
+                    <option value="Z.P.(Works) Sub-Division, Jiwati">Z.P.(Works) Sub-Division, Jiwati</option>
+                    <option value="Z.P.(Works) Sub-Division, Pombhurna">Z.P.(Works) Sub-Division, Pombhurna</option>
+                  </select>
                 </div>
 
                 <div>
@@ -743,13 +751,29 @@ const Works: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t('addWork.taluka')}
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={newWork.taluka || ''}
                     onChange={(e) => setNewWork({ ...newWork, taluka: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={t('addWork.entertaluka')}
-                  />
+                  >
+                    <option value="">Select Taluka</option>
+                    <option value="Pombhurna">Pombhurna</option>
+                    <option value="Korapna">Korapna</option>
+                    <option value="Gondpipri">Gondpipri</option>
+                    <option value="Chandrapur">Chandrapur</option>
+                    <option value="Chimur">Chimur</option>
+                    <option value="Jivati">Jivati</option>
+                    <option value="Dongargaon">Dongargaon</option>
+                    <option value="Nagbhid">Nagbhid</option>
+                    <option value="Ballarpur">Ballarpur</option>
+                    <option value="Bramhapuri">Bramhapuri</option>
+                    <option value="Bhadravati">Bhadravati</option>
+                    <option value="Mul">Mul</option>
+                    <option value="Rajura">Rajura</option>
+                    <option value="Warora">Warora</option>
+                    <option value="Sawali">Sawali</option>
+                    <option value="Sindewahi">Sindewahi</option>
+                  </select>
                 </div>
               </div>
 
@@ -939,10 +963,9 @@ const Works: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    value={newWork.division}
-                    onChange={(e) => setNewWork({ ...newWork, division: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter division"
+                    value="Z.P.(Works) Division, Chandrapur"
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
                   />
                 </div>
 
@@ -950,13 +973,20 @@ const Works: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Sub Division
                   </label>
-                  <input
-                    type="text"
-                    value={newWork.sub_division}
+                  <select
+                    value={newWork.sub_division || ''}
                     onChange={(e) => setNewWork({ ...newWork, sub_division: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter sub division"
-                  />
+                  >
+                    <option value="">Select Sub Division</option>
+                    <option value="Z.P.(Works) Sub-Division, Mul">Z.P.(Works) Sub-Division, Mul</option>
+                    <option value="Z.P.(Works) Sub-Division, Chimur">Z.P.(Works) Sub-Division, Chimur</option>
+                    <option value="Z.P.(Works) Sub-Division, Warora">Z.P.(Works) Sub-Division, Warora</option>
+                    <option value="Z.P.(Works) Sub-Division, Chandrapur">Z.P.(Works) Sub-Division, Chandrapur</option>
+                    <option value="Z.P.(Works) Sub-Division, Rajura">Z.P.(Works) Sub-Division, Rajura</option>
+                    <option value="Z.P.(Works) Sub-Division, Jiwati">Z.P.(Works) Sub-Division, Jiwati</option>
+                    <option value="Z.P.(Works) Sub-Division, Pombhurna">Z.P.(Works) Sub-Division, Pombhurna</option>
+                  </select>
                 </div>
 
                 <div>
@@ -1099,13 +1129,29 @@ const Works: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t('addWork.taluka')}
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={newWork.taluka || ''}
                     onChange={(e) => setNewWork({ ...newWork, taluka: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={t('addWork.entertaluka')}
-                  />
+                  >
+                    <option value="">Select Taluka</option>
+                    <option value="Pombhurna">Pombhurna</option>
+                    <option value="Korapna">Korapna</option>
+                    <option value="Gondpipri">Gondpipri</option>
+                    <option value="Chandrapur">Chandrapur</option>
+                    <option value="Chimur">Chimur</option>
+                    <option value="Jivati">Jivati</option>
+                    <option value="Dongargaon">Dongargaon</option>
+                    <option value="Nagbhid">Nagbhid</option>
+                    <option value="Ballarpur">Ballarpur</option>
+                    <option value="Bramhapuri">Bramhapuri</option>
+                    <option value="Bhadravati">Bhadravati</option>
+                    <option value="Mul">Mul</option>
+                    <option value="Rajura">Rajura</option>
+                    <option value="Warora">Warora</option>
+                    <option value="Sawali">Sawali</option>
+                    <option value="Sindewahi">Sindewahi</option>
+                  </select>
                 </div>
               </div>
 
