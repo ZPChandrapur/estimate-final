@@ -23,10 +23,11 @@ interface RateAnalysisProps {
   item: SubworkItem;
   baseRate?: number;
   parentSubworkSrNo: number; // ✅ REQUIRED
+  worksId: string; // ✅ REQUIRED - Current works_id for Lead Statement search
   onSaveRate?: (newRate: number, analysisPayload?: any) => void;
 }
 
-const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, baseRate: baseRateProp, parentSubworkSrNo, onSaveRate }) => {
+const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, baseRate: baseRateProp, parentSubworkSrNo, worksId, onSaveRate }) => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'measurements' | 'leads' | 'materials'>('measurements');
   const [measurements, setMeasurements] = useState<ItemMeasurement[]>([]);
@@ -347,17 +348,10 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         console.log('🔍 Searching lead statements for term:', searchTerm);
-        console.log('📋 Item subwork_id:', item.subwork_id);
+        console.log('📋 Current works_id:', worksId);
 
-        const { data: subworkData, error: subworkError } = await supabase
-          .schema('estimate')
-          .from('subworks')
-          .select('works_id')
-          .eq('subworks_id', item.subwork_id)
-          .maybeSingle();
-
-        if (subworkError) {
-          console.error('❌ Error fetching subwork data:', subworkError);
+        if (!worksId) {
+          console.error('❌ No works_id provided');
           setLeadStatements([]);
           setShowLeadDropdown(false);
           setSearchCompleted(true);
@@ -365,23 +359,13 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
           return;
         }
 
-        if (!subworkData || !subworkData.works_id) {
-          console.warn('⚠️ No subwork data found for subwork_id:', item.subwork_id);
-          setLeadStatements([]);
-          setShowLeadDropdown(false);
-          setSearchCompleted(true);
-          setSearchingLeads(false);
-          return;
-        }
-
-        console.log('✅ Found works_id:', subworkData.works_id);
-        console.log('🔎 Executing query: SELECT * FROM estimate.lead_statements WHERE works_id =', subworkData.works_id, 'AND material ILIKE', `%${searchTerm}%`);
+        console.log('🔎 Executing query: SELECT * FROM estimate.lead_statements WHERE works_id =', worksId, 'AND material ILIKE', `%${searchTerm}%`);
 
         const { data, error } = await supabase
           .schema('estimate')
           .from('lead_statements')
           .select('*')
-          .eq('works_id', subworkData.works_id)
+          .eq('works_id', worksId)
           .ilike('material', `%${searchTerm}%`)
           .limit(10);
 

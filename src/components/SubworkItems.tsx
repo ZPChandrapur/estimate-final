@@ -31,6 +31,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const [subworkItems, setSubworkItems] = useState<SubworkItem[]>([]);
   const [itemRatesMap, setItemRatesMap] = useState<{ [key: string]: ItemRate[] }>({});
   const [loading, setLoading] = useState(false);
+  const [worksId, setWorksId] = useState<string>('');
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [showMeasurementsModal, setShowMeasurementsModal] = useState(false);
@@ -90,6 +91,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
 
   useEffect(() => {
     if (isOpen && subworkId) {
+      fetchWorksId();
       fetchSubworkItems();
     }
   }, [isOpen, subworkId]);
@@ -377,6 +379,24 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
+    }
+  };
+
+  const fetchWorksId = async () => {
+    try {
+      const { data, error } = await supabase
+        .schema('estimate')
+        .from('subworks')
+        .select('works_id')
+        .eq('subworks_id', subworkId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        setWorksId(data.works_id);
+      }
+    } catch (error) {
+      console.error('Error fetching works_id:', error);
     }
   };
 
@@ -1197,6 +1217,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
           parentSubworkId={subworkId}
           subworkItemSrNo={rateAnalysisItemSrNo}
           parentSubworkSrNo={parentSubworkSrNo}
+          worksId={worksId}
           onSaveRate={(newRate: number, analysisPayload?: any) => {
             // Update local state immediately without refetch
             if (rateAnalysisContext?.source === 'main' && rateAnalysisContext.itemSrNo !== undefined) {
