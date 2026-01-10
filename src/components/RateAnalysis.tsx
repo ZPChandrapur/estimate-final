@@ -129,9 +129,10 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       if (entry.type === 'Tax') taxes += entry.amount;
     });
 
-    const finalRate = baseRate + additions - deletions + taxes;
+    const calculatedRate = baseRate + additions - deletions + taxes;
+    const finalRate = Math.ceil((calculatedRate - 0.025) / 0.05) * 0.05;
 
-    return { additions, deletions, taxes, finalRate, baseRate };
+    return { additions, deletions, taxes, finalRate, baseRate, calculatedRate };
   }, [entries, baseRateProp, item?.ssr_rate, selectedRateValue]);
 
   // Keep previous logic and API untouched
@@ -947,7 +948,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                 </label>
                 <input
                   type="number"
-                  step=""
+                  step="0.01"
                   value={newTax.value}
                   onChange={(e) => setNewTax({ ...newTax, value: e.target.value })}
                   className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -961,7 +962,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                 </label>
                 <input
                   type="number"
-                  step=""
+                  step="0.01"
                   value={newTax.factor}
                   onChange={(e) =>
                     setNewTax({ ...newTax, factor: Number(e.target.value) || 1 })
@@ -1342,7 +1343,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                   <label className="text-sm font-medium text-gray-700">Tax/Percentage:</label>
                   <input
                     type="number"
-                    step=""
+                    step="0.01"
                     value={finalTaxPercentInput}
                     onChange={(e) => setFinalTaxPercentInput(Number(e.target.value))}
                     className="w-24 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1399,7 +1400,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
             {/* Final Rate Display */}
             <div className="bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-300 rounded-lg p-5">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex-1">
                   <div className="text-sm font-medium text-green-800 mb-1">Final Rate</div>
                   <div className="text-3xl font-bold text-green-900">
                     {formatCurrency(totalRateWithFinalTax)}
@@ -1409,6 +1410,24 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                       (Including {finalTaxApplied.percent}% additional tax)
                     </div>
                   )}
+                  <div className="mt-3 pt-3 border-t border-green-200">
+                    <div className="text-xs font-medium text-green-800 mb-1.5">Calculation Formula:</div>
+                    <div className="text-xs text-green-700 space-y-1">
+                      <div>Base Rate: ₹{summary.baseRate.toFixed(2)}</div>
+                      <div>+ Additions: ₹{summary.additions.toFixed(2)}</div>
+                      <div>- Deletions: ₹{summary.deletions.toFixed(2)}</div>
+                      <div>+ Taxes: ₹{summary.taxes.toFixed(2)}</div>
+                      <div className="pt-1 border-t border-green-200">
+                        = Calculated Rate: ₹{summary.calculatedRate.toFixed(2)}
+                      </div>
+                      <div className="font-medium pt-1">
+                        Final Rate = CEILING((₹{summary.calculatedRate.toFixed(2)} - 0.025) / 0.05) × 0.05
+                      </div>
+                      <div className="font-semibold text-green-900">
+                        = ₹{summary.finalRate.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <Calculator className="w-12 h-12 text-green-600 opacity-50" />
               </div>
