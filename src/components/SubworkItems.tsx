@@ -13,6 +13,7 @@ import {
   Search,
   CheckCircle
 } from 'lucide-react';
+import RoyaltyTestingItems from './RoyaltyTestingItems';
 
 interface SubworkItemsProps {
   subworkId: string;
@@ -35,6 +36,8 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [showMeasurementsModal, setShowMeasurementsModal] = useState(false);
+  const [showRoyaltyModal, setShowRoyaltyModal] = useState(false);
+  const [showTestingModal, setShowTestingModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SubworkItem | null>(null);
   const [ssrSuggestions, setSsrSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -993,6 +996,20 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
               >
                 <Plus className="w-3 h-3 mr-1" />
                 Add Item
+              </button>
+              <button
+                onClick={() => setShowRoyaltyModal(true)}
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add Royalty
+              </button>
+              <button
+                onClick={() => setShowTestingModal(true)}
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add Testing
               </button>
               <button
                 onClick={onClose}
@@ -2220,6 +2237,22 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
           selectedSrNo={selectedSrNo}
         />
       )}
+
+      <RoyaltyTestingItems
+        subworkId={subworkId}
+        category="royalty"
+        isOpen={showRoyaltyModal}
+        onClose={() => setShowRoyaltyModal(false)}
+        onItemAdded={fetchSubworkItems}
+      />
+
+      <RoyaltyTestingItems
+        subworkId={subworkId}
+        category="testing"
+        isOpen={showTestingModal}
+        onClose={() => setShowTestingModal(false)}
+        onItemAdded={fetchSubworkItems}
+      />
     </div>
   );
 };
