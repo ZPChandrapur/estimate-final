@@ -212,7 +212,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
       editableUnit = '/BAG';
     }
     // Special conversion for Bricks - convert from per 1000 to per unit (NOS)
-    else if (option.name.toLowerCase().includes('brick')) {
+    else if (option.name.toLowerCase().includes('bricks')) {
       totalRate = parseFloat((rate / 1000).toFixed(2));
       editableUnit = 'NOS';
     }
