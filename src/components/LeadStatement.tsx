@@ -404,6 +404,10 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                         Lead Charges<br />
                         <span className="text-[10px] font-normal normal-case text-gray-500">(From Search)</span>
                       </th>
+                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 uppercase border border-gray-300 bg-green-50">
+                        Unit (leadchart)<br />
+                        <span className="text-[10px] font-normal normal-case text-green-600">(From Search)</span>
+                      </th>
                       <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 uppercase border border-gray-300 bg-blue-50">
                         Total Rate<br />
                         <span className="text-[10px] font-normal normal-case text-blue-600">(Editable)</span>
@@ -434,6 +438,9 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                         </td>
                         <td className="px-4 py-2 text-sm text-right text-gray-600 border border-gray-300">
                           {item.lead_charges.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-center font-medium text-green-800 border border-gray-300 bg-green-50">
+                          {item.unit_from_lead_chart || '-'}
                         </td>
                         <td className="px-4 py-2 text-sm text-right font-semibold text-blue-900 border border-gray-300 bg-blue-50">
                           {item.total_rate.toFixed(2)}
