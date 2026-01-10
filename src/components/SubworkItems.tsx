@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import RoyaltyTestingItems from './RoyaltyTestingItems';
 import RoyaltyMeasurements from './RoyaltyMeasurements';
+import TestingMeasurements from './TestingMeasurements';
 
 interface SubworkItemsProps {
   subworkId: string;
@@ -40,6 +41,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const [showRoyaltyModal, setShowRoyaltyModal] = useState(false);
   const [showTestingModal, setShowTestingModal] = useState(false);
   const [showRoyaltyMeasurementsModal, setShowRoyaltyMeasurementsModal] = useState(false);
+  const [showTestingMeasurementsModal, setShowTestingMeasurementsModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SubworkItem | null>(null);
   const [ssrSuggestions, setSsrSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -868,6 +870,64 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     }
   };
 
+  const handleTestingClick = async (item: SubworkItem) => {
+    try {
+      if (!item.sr_no) return;
+
+      // Get subwork sr_no
+      const { data: subworkData } = await supabase
+        .schema('estimate')
+        .from('subworks')
+        .select('sr_no')
+        .eq('subworks_id', subworkId)
+        .maybeSingle();
+
+      if (!subworkData) {
+        console.error('Subwork not found');
+        return;
+      }
+
+      // Get measurements for this item
+      const { data: measurements } = await supabase
+        .schema('estimate')
+        .from('item_measurements')
+        .select('calculated_quantity')
+        .eq('subwork_item_id', item.sr_no);
+
+      // Calculate total measurement
+      const totalMeasurement = measurements?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
+
+      // Check if testing measurement already exists
+      const { data: existing } = await supabase
+        .schema('estimate')
+        .from('testing_measurements')
+        .select('sr_no')
+        .eq('subwork_item_id', item.sr_no)
+        .maybeSingle();
+
+      // If doesn't exist, create it
+      if (!existing) {
+        await supabase
+          .schema('estimate')
+          .from('testing_measurements')
+          .insert({
+            works_id: worksId,
+            subwork_id: subworkData.sr_no,
+            subwork_item_id: item.sr_no,
+            quantity: totalMeasurement,
+            description: '',
+            required_tests: 0,
+            created_by: user?.id
+          });
+      }
+
+      // Open the testing measurements modal
+      setShowTestingMeasurementsModal(true);
+    } catch (error) {
+      console.error('Error handling testing click:', error);
+    }
+  };
+
   const handleDeleteItem = async (item: SubworkItem) => {
     if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
       return;
@@ -1298,6 +1358,15 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                                 title="Royalty Measurements"
                               >
                                 <Calculator className="w-4 h-4" />
+                              </button>
+                            )}
+                            {item.category === 'testing' && (
+                              <button
+                                onClick={() => handleTestingClick(item)}
+                                className="text-green-600 hover:text-green-900 p-1 rounded"
+                                title="Testing Measurements"
+                              >
+                                <CheckCircle className="w-4 h-4" />
                               </button>
                             )}
                             <button
@@ -2361,6 +2430,12 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         worksId={worksId}
         isOpen={showRoyaltyMeasurementsModal}
         onClose={() => setShowRoyaltyMeasurementsModal(false)}
+      />
+
+      <TestingMeasurements
+        subworkId={subworkId}
+        isOpen={showTestingMeasurementsModal}
+        onClose={() => setShowTestingMeasurementsModal(false)}
       />
     </div>
   );
