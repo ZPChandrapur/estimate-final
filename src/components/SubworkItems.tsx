@@ -14,6 +14,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import RoyaltyTestingItems from './RoyaltyTestingItems';
+import RoyaltyMeasurements from './RoyaltyMeasurements';
 
 interface SubworkItemsProps {
   subworkId: string;
@@ -38,6 +39,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const [showMeasurementsModal, setShowMeasurementsModal] = useState(false);
   const [showRoyaltyModal, setShowRoyaltyModal] = useState(false);
   const [showTestingModal, setShowTestingModal] = useState(false);
+  const [showRoyaltyMeasurementsModal, setShowRoyaltyMeasurementsModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SubworkItem | null>(null);
   const [ssrSuggestions, setSsrSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -1010,6 +1012,13 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
               >
                 <Plus className="w-3 h-3 mr-1" />
                 Add Testing
+              </button>
+              <button
+                onClick={() => setShowRoyaltyMeasurementsModal(true)}
+                className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <Calculator className="w-3 h-3 mr-1" />
+                Royalty
               </button>
               <button
                 onClick={onClose}
@@ -2252,6 +2261,13 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         isOpen={showTestingModal}
         onClose={() => setShowTestingModal(false)}
         onItemAdded={fetchSubworkItems}
+      />
+
+      <RoyaltyMeasurements
+        subworkId={subworkId}
+        worksId={worksId}
+        isOpen={showRoyaltyMeasurementsModal}
+        onClose={() => setShowRoyaltyMeasurementsModal(false)}
       />
     </div>
   );
