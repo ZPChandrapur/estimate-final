@@ -32,6 +32,8 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
   const { user } = useAuth();
   const [royaltyItems, setRoyaltyItems] = useState<RoyaltyItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     if (isOpen && subworkId && worksId) {
@@ -176,7 +178,7 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
     }
   };
 
-  const handleFactorChange = async (itemSrNo: number, field: string, value: number) => {
+  const handleFactorChange = (itemSrNo: number, field: string, value: number) => {
     // Update local state
     setRoyaltyItems(prev => prev.map(item => {
       if (item.sr_no === itemSrNo) {
@@ -198,62 +200,83 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
       return item;
     }));
 
-    // Get subwork sr_no
-    const { data: subworkData } = await supabase
-      .schema('estimate')
-      .from('subworks')
-      .select('sr_no')
-      .eq('subworks_id', subworkId)
-      .maybeSingle();
+    setHasChanges(true);
+  };
 
-    if (!subworkData) return;
+  const handleSave = async () => {
+    try {
+      setSaving(true);
 
-    // Find the item
-    const item = royaltyItems.find(i => i.sr_no === itemSrNo);
-    if (!item) return;
-
-    // Update with new value
-    const updatedItem = { ...item, [field]: value };
-
-    // Recalculate computed fields
-    const measurement = field === 'measurement' ? value : updatedItem.measurement;
-    const metal_factor = field === 'metal_factor' ? value : updatedItem.metal_factor;
-    const murum_factor = field === 'murum_factor' ? value : updatedItem.murum_factor;
-    const sand_factor = field === 'sand_factor' ? value : updatedItem.sand_factor;
-
-    // Check if record exists
-    const { data: existing } = await supabase
-      .schema('estimate')
-      .from('royalty_measurements')
-      .select('sr_no')
-      .eq('subwork_item_id', itemSrNo)
-      .maybeSingle();
-
-    const payload = {
-      works_id: worksId,
-      subwork_id: subworkData.sr_no,
-      subwork_item_id: itemSrNo,
-      measurement: measurement,
-      metal_factor: metal_factor,
-      murum_factor: murum_factor,
-      sand_factor: sand_factor,
-      created_by: user?.id
-    };
-
-    if (existing) {
-      // Update
-      await supabase
+      // Get subwork sr_no
+      const { data: subworkData, error: subworkError } = await supabase
         .schema('estimate')
-        .from('royalty_measurements')
-        .update(payload)
-        .eq('sr_no', existing.sr_no);
-    } else {
-      // Insert
-      await supabase
-        .schema('estimate')
-        .from('royalty_measurements')
-        .insert(payload);
+        .from('subworks')
+        .select('sr_no')
+        .eq('subworks_id', subworkId)
+        .maybeSingle();
+
+      if (subworkError) throw subworkError;
+      if (!subworkData) {
+        console.error('Subwork not found');
+        return;
+      }
+
+      // Save all royalty items
+      for (const item of royaltyItems) {
+        // Check if record exists
+        const { data: existing } = await supabase
+          .schema('estimate')
+          .from('royalty_measurements')
+          .select('sr_no')
+          .eq('subwork_item_id', item.sr_no)
+          .maybeSingle();
+
+        const payload = {
+          works_id: worksId,
+          subwork_id: subworkData.sr_no,
+          subwork_item_id: item.sr_no,
+          measurement: item.measurement,
+          metal_factor: item.metal_factor,
+          hb_metal: item.hb_metal,
+          murum_factor: item.murum_factor,
+          murum: item.murum,
+          sand_factor: item.sand_factor,
+          sand: item.sand,
+          created_by: user?.id
+        };
+
+        if (existing) {
+          // Update
+          await supabase
+            .schema('estimate')
+            .from('royalty_measurements')
+            .update(payload)
+            .eq('sr_no', existing.sr_no);
+        } else {
+          // Insert
+          await supabase
+            .schema('estimate')
+            .from('royalty_measurements')
+            .insert(payload);
+        }
+      }
+
+      setHasChanges(false);
+      alert('Royalty measurements saved successfully!');
+    } catch (error) {
+      console.error('Error saving royalty measurements:', error);
+      alert('Error saving royalty measurements. Please try again.');
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const handleClose = () => {
+    if (hasChanges) {
+      const confirm = window.confirm('You have unsaved changes. Are you sure you want to close without saving?');
+      if (!confirm) return;
+    }
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -265,12 +288,25 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
           <h3 className="text-lg font-medium text-gray-900">
             Royalty Measurements
           </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSave}
+              disabled={!hasChanges || saving}
+              className={`px-4 py-2 rounded-md text-sm font-medium ${
+                hasChanges && !saving
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -392,6 +428,26 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
                 </tr>
               </tfoot>
             </table>
+            {royaltyItems.length > 0 && (
+              <div className="mt-4 flex justify-end gap-3">
+                {hasChanges && (
+                  <span className="text-sm text-orange-600 flex items-center gap-1">
+                    <span>⚠</span> You have unsaved changes
+                  </span>
+                )}
+                <button
+                  onClick={handleSave}
+                  disabled={!hasChanges || saving}
+                  className={`px-6 py-2 rounded-md text-sm font-medium ${
+                    hasChanges && !saving
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
