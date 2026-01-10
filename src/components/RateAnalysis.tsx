@@ -89,6 +89,9 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   const [finalTaxPercentInput, setFinalTaxPercentInput] = useState<number>(0);
   const [finalTaxApplied, setFinalTaxApplied] = useState<{ percent: number; amount: number } | null>(null);
 
+  // STATE FOR MANUAL ADD CONFIRMATION
+  const [showManualAddConfirmation, setShowManualAddConfirmation] = useState(false);
+
   // Calculation helpers
   const calculateAmount = (
     type: string,
@@ -544,13 +547,13 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   if (!isOpen) return null;
 
   // Add entry handler
-  const handleAddEntry = () => {
+  const handleAddEntry = (forceManual: boolean = false) => {
     if (
       newTax.label &&
       newTax.type &&
       Number(newTax.value) > 0 &&
       Number(newTax.factor) > 0 &&
-      isFromLeadStatement
+      (isFromLeadStatement || forceManual)
     ) {
       const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
 
@@ -576,6 +579,26 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       setIsFromLeadStatement(false);
       setEditIndex(null);
     }
+  };
+
+  // Check if manual add confirmation is needed
+  const handleAddClick = () => {
+    if (!isFromLeadStatement && newTax.label && newTax.value && Number(newTax.value) > 0) {
+      setShowManualAddConfirmation(true);
+    } else {
+      handleAddEntry();
+    }
+  };
+
+  // Confirm manual add
+  const confirmManualAdd = () => {
+    handleAddEntry(true);
+    setShowManualAddConfirmation(false);
+  };
+
+  // Cancel manual add
+  const cancelManualAdd = () => {
+    setShowManualAddConfirmation(false);
   };
 
   // Edit handler
@@ -953,15 +976,15 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                   <div className="flex flex-col gap-1">
                     <button
                       type="button"
-                      onClick={handleAddEntry}
-                      disabled={!newTax.label || !newTax.value || !isFromLeadStatement}
+                      onClick={handleAddClick}
+                      disabled={!newTax.label || !newTax.value}
                       className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                     >
                       <Plus className="h-4 w-4" />
                       Add
                     </button>
                     {newTax.label && !isFromLeadStatement && (
-                      <p className="text-xs text-red-600 text-center">Select from dropdown</p>
+                      <p className="text-xs text-amber-600 text-center">Manual entry</p>
                     )}
                   </div>
                 ) : (
@@ -1417,6 +1440,33 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
           </div>
         </div>
       </div>
+
+      {showManualAddConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70]">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Manual Entry Confirmation</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Do you want to add this item manually? Items selected from the Lead Statement dropdown are preferred for consistency.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={cancelManualAdd}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmManualAdd}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+              >
+                Add Manually
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
