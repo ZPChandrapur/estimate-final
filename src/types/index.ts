@@ -215,3 +215,34 @@ export interface LanguageContextType {
   changeLanguage: (lang: string) => void;
   t: (key: string) => string;
 }
+
+export interface TaxEntry {
+  id: string;
+  name: string;
+  percentage: number;
+  applyTo: 'part_a' | 'part_b' | 'part_c' | 'both';
+}
+
+export interface RecapCalculations {
+  partA: {
+    subtotal: number;
+    taxes: { [taxId: string]: number };
+    total: number;
+  };
+  partB: {
+    subtotal: number;
+    taxes: { [taxId: string]: number };
+    total: number;
+  };
+  partC: {
+    subtotal: number;
+    taxes: { [taxId: string]: number };
+    total: number;
+  };
+  additionalCharges: {
+    contingencies: number;
+    inspectionCharges: number;
+    dprCharges: number;
+  };
+  grandTotal: number;
+}

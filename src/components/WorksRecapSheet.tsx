@@ -150,20 +150,24 @@ const fetchWorkData = async () => {
   const calculateRecap = () => {
     let partASubtotal = 0;
     let partBSubtotal = 0;
+    let partCSubtotal = 0;
 
     subworks.forEach(subwork => {
       const items = subworkItems[subwork.subworks_id] || [];
       const subworkTotal = items.reduce((sum, item) => sum + (item.total_item_amount || 0), 0);
       const inputUnit = unitInputs[subwork.subworks_id] ?? (Number(subwork.unit) || 1);
       const rowTotal = subworkTotal * inputUnit;
-      const isPartA = items.some(item => item.category === 'With GST' || item.category === 'materials');
-      const isPartB = items.some(item => item.category === 'Without GST' || !item.category);
+
+      const isPartA = items.some(item => !item.category || item.category === '');
+      const isPartB = items.some(item => item.category === 'royalty' || item.category === 'testing');
+      const isPartC = items.some(item => item.category === 'With GST' || item.category === 'materials' || item.category === 'purchasing');
 
       if (isPartA) partASubtotal += rowTotal;
       if (isPartB) partBSubtotal += rowTotal;
+      if (isPartC) partCSubtotal += rowTotal;
     });
 
-    const calculateTaxes = (subtotal: number, applyToPart: 'part_a' | 'part_b') => {
+    const calculateTaxes = (subtotal: number, applyToPart: 'part_a' | 'part_b' | 'part_c') => {
       const applicableTaxes = taxes.filter(
         tax => tax.applyTo === applyToPart || tax.applyTo === 'both'
       );
@@ -176,21 +180,25 @@ const fetchWorkData = async () => {
 
     const partATaxes = calculateTaxes(partASubtotal, 'part_a');
     const partBTaxes = calculateTaxes(partBSubtotal, 'part_b');
+    const partCTaxes = calculateTaxes(partCSubtotal, 'part_c');
     const partATaxTotal = Object.values(partATaxes).reduce((sum, val) => sum + val, 0);
     const partBTaxTotal = Object.values(partBTaxes).reduce((sum, val) => sum + val, 0);
+    const partCTaxTotal = Object.values(partCTaxes).reduce((sum, val) => sum + val, 0);
 
     const partATotal = partASubtotal + partATaxTotal;
     const partBTotal = partBSubtotal + partBTaxTotal;
+    const partCTotal = partCSubtotal + partCTaxTotal;
 
-    const contingencies = partBTotal * 0.005;
-    const inspectionCharges = partBTotal * 0.005;
-    const dprCharges = Math.min(partBTotal * 0.05, 100000);
+    const contingencies = partATotal * 0.005;
+    const inspectionCharges = partATotal * 0.005;
+    const dprCharges = Math.min(partATotal * 0.05, 100000);
 
-    const grandTotal = partBTotal + dprCharges + partATotal;
+    const grandTotal = partATotal + partBTotal + (department === 'pwd' ? 0 : partCTotal) + dprCharges;
 
     const calculationsResult: RecapCalculations = {
       partA: { subtotal: partASubtotal, taxes: partATaxes, total: partATotal },
       partB: { subtotal: partBSubtotal, taxes: partBTaxes, total: partBTotal },
+      partC: { subtotal: partCSubtotal, taxes: partCTaxes, total: partCTotal },
       additionalCharges: { contingencies, inspectionCharges, dprCharges },
       grandTotal,
     };
@@ -260,7 +268,8 @@ const handleSave = async () => {
         recap_json: JSON.stringify(recapData),
         total_estimated_cost:
           (calculations.partA.subtotal || 0) +
-          (calculations.partB.subtotal || 0),
+          (calculations.partB.subtotal || 0) +
+          (calculations.partC.subtotal || 0),
         updated_at: new Date().toISOString(),
       })
       .eq('works_id', workId);
@@ -281,14 +290,21 @@ const handleSave = async () => {
   const getPartASubworks = () => {
     return subworks.filter(subwork => {
       const items = subworkItems[subwork.subworks_id] || [];
-      return items.some(item => item.category === 'With GST' || item.category === 'materials');
+      return items.some(item => !item.category || item.category === '');
     });
   };
 
   const getPartBSubworks = () => {
     return subworks.filter(subwork => {
       const items = subworkItems[subwork.subworks_id] || [];
-      return items.some(item => !item.category || item.category === 'Without GST');
+      return items.some(item => item.category === 'royalty' || item.category === 'testing');
+    });
+  };
+
+  const getPartCSubworks = () => {
+    return subworks.filter(subwork => {
+      const items = subworkItems[subwork.subworks_id] || [];
+      return items.some(item => item.category === 'With GST' || item.category === 'materials' || item.category === 'purchasing');
     });
   };
 
@@ -430,7 +446,8 @@ const handleSave = async () => {
                 >
                   <option value="part_a">Part A Only</option>
                   <option value="part_b">Part B Only</option>
-                  <option value="both">Both Parts</option>
+                  <option value="part_c">Part C Only</option>
+                  <option value="both">All Parts</option>
                 </select>
                 <button
                   onClick={() => removeTax(tax.id)}
@@ -471,12 +488,12 @@ const handleSave = async () => {
                 {/* PART A Rows */}
                 <tr className="bg-gray-200 font-bold">
                   <td colSpan={totalColspan} className="border border-gray-300 p-3">
-                    PART-A: Purchasing Items including GST & all Taxes
+                    PART-A: Works
                   </td>
                 </tr>
                 {getPartASubworks().map((subwork, index) => {
                   const items = (subworkItems[subwork.subworks_id] || []).filter(
-                    item => item.category === 'With GST' || item.category === 'materials'
+                    item => !item.category || item.category === ''
                   );
                   const subworkTotalAmount = items.reduce(
                     (sum, item) => sum + (item.total_item_amount || 0),
@@ -556,12 +573,12 @@ const handleSave = async () => {
                 {/* PART B Rows */}
                 <tr className="bg-gray-200 font-bold">
                   <td colSpan={totalColspan} className="border border-gray-300 p-3">
-                    PART-B: Construction works for E-Tendering
+                    PART-B: Royalty and Testing
                   </td>
                 </tr>
                 {getPartBSubworks().map((subwork, index) => {
                   const items = (subworkItems[subwork.subworks_id] || []).filter(
-                    item => !item.category || item.category === 'Without GST'
+                    item => item.category === 'royalty' || item.category === 'testing'
                   );
                   const subworkTotalAmount = items.reduce(
                     (sum, item) => sum + (item.total_item_amount || 0),
@@ -637,6 +654,95 @@ const handleSave = async () => {
                     </>
                   )}
                 </tr>
+
+                {/* PART C Rows - Only show if not PWD */}
+                {department !== 'pwd' && (
+                  <>
+                    <tr className="bg-gray-200 font-bold">
+                      <td colSpan={totalColspan} className="border border-gray-300 p-3">
+                        PART-C: Purchasing Items including GST & all Taxes
+                      </td>
+                    </tr>
+                    {getPartCSubworks().map((subwork, index) => {
+                      const items = (subworkItems[subwork.subworks_id] || []).filter(
+                        item => item.category === 'With GST' || item.category === 'materials' || item.category === 'purchasing'
+                      );
+                      const subworkTotalAmount = items.reduce(
+                        (sum, item) => sum + (item.total_item_amount || 0),
+                        0
+                      );
+
+                      const inputUnit = unitInputs[subwork.subworks_id] ?? (Number(subwork.unit) || 1);
+                      const totalAmount = inputUnit * subworkTotalAmount;
+
+                      return (
+                        <tr key={`part-c-${subwork.subworks_id}`}>
+                          <td className="border border-gray-300 p-3 text-center">{index + 1}</td>
+                          <td className="border border-gray-300 p-3">Solid waste management</td>
+                          <td className="border border-gray-300 p-3">{subwork.subworks_name}</td>
+                          {readonly ? (
+                            <td className="border border-gray-300 p-3 text-right">{inputUnit}</td>
+                          ) : (
+                            <td className="border border-gray-300 p-3 text-right">
+                              <input
+                                type="number"
+                                className="w-20 px-1 py-1 border border-gray-300 rounded"
+                                value={inputUnit}
+                                min="0"
+                                step="any"
+                                onChange={(e) => handleUnitChange(subwork.subworks_id, e.target.value)}
+                              />
+                            </td>
+                          )}
+                          <td className="border border-gray-300 p-3 text-right">{subworkTotalAmount.toFixed(0)}</td>
+                          <td className="border border-gray-300 p-3 text-right">{totalAmount.toFixed(0)}</td>
+                          {showFundingCols && (
+                            <>
+                              <td className="border border-gray-300 p-3 text-right">{(totalAmount * 0.7).toFixed(0)}</td>
+                              <td className="border border-gray-300 p-3 text-right">{(totalAmount * 0.3).toFixed(0)}</td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })}
+                    <tr className="font-bold bg-purple-50">
+                      <td colSpan={5} className="border border-gray-300 p-3 text-right">Subtotal - Part C</td>
+                      <td className="border border-gray-300 p-3 text-right">{calculations.partC.subtotal.toFixed(0)}</td>
+                      {showFundingCols && (
+                        <>
+                          <td className="border border-gray-300 p-3 text-right">{(calculations.partC.subtotal * 0.7).toFixed(0)}</td>
+                          <td className="border border-gray-300 p-3 text-right">{(calculations.partC.subtotal * 0.3).toFixed(0)}</td>
+                        </>
+                      )}
+                    </tr>
+                    {taxes
+                      .filter((tax) => tax.applyTo === 'part_c' || tax.applyTo === 'both')
+                      .map((tax) => (
+                        <tr key={`part-c-tax-${tax.id}`} className="font-semibold">
+                          <td colSpan={5} className="border border-gray-300 p-3 text-right">
+                            Add {tax.percentage}% {tax.name}
+                          </td>
+                          <td className="border border-gray-300 p-3 text-right">{(calculations.partC.taxes[tax.id] || 0).toFixed(0)}</td>
+                          {showFundingCols && (
+                            <>
+                              <td className="border border-gray-300 p-3 text-right">{((calculations.partC.taxes[tax.id] || 0) * 0.7).toFixed(0)}</td>
+                              <td className="border border-gray-300 p-3 text-right">{((calculations.partC.taxes[tax.id] || 0) * 0.3).toFixed(0)}</td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    <tr className="font-bold bg-purple-100">
+                      <td colSpan={5} className="border border-gray-300 p-3 text-right">Total of PART - C</td>
+                      <td className="border border-gray-300 p-3 text-right">{calculations.partC.total.toFixed(0)}</td>
+                      {showFundingCols && (
+                        <>
+                          <td className="border border-gray-300 p-3 text-right">{(calculations.partC.total * 0.7).toFixed(0)}</td>
+                          <td className="border border-gray-300 p-3 text-right">{(calculations.partC.total * 0.3).toFixed(0)}</td>
+                        </>
+                      )}
+                    </tr>
+                  </>
+                )}
 
                 {/* Additional Charges & Grand Total */}
                 <tr className="font-semibold">
