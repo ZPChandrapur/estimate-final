@@ -208,7 +208,8 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
       material: option.name,
       lead_charges: rate,
       total_rate: rate, // Initialize with lead charges, but user can edit
-      unit: option.unit
+      unit_from_lead_chart: option.unit, // Store the unit from lead chart
+      unit: option.unit // Initialize editable unit with the lead chart unit
     });
     setShowMaterialOptions(false);
   };
