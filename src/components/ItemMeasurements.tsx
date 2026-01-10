@@ -760,67 +760,97 @@ const handleMeasurementExcelUpload = async (
       // Calculate final quantity with operation
       const finalQty = calculateItemFinalQuantity(totalQuantity);
 
+      // If operation is 'none', clear final_quantity and related fields
+      const updateData = itemOperation.operation_type === 'none'
+        ? {
+            operation_type: null,
+            operation_value: null,
+            unit_conversion_factor: 1,
+            final_unit: null,
+            final_quantity: null
+          }
+        : {
+            operation_type: itemOperation.operation_type,
+            operation_value: itemOperation.operation_value,
+            unit_conversion_factor: itemOperation.unit_conversion_factor || 1,
+            final_unit: itemOperation.final_unit || null,
+            final_quantity: finalQty
+          };
+
       // Update subwork_items
       const { error } = await supabase
         .schema('estimate')
         .from('subwork_items')
-        .update({
-          operation_type: itemOperation.operation_type,
-          operation_value: itemOperation.operation_value,
-          unit_conversion_factor: itemOperation.unit_conversion_factor || 1,
-          final_unit: itemOperation.final_unit || null,
-          final_quantity: finalQty
-        })
+        .update(updateData)
         .eq('sr_no', currentItem.sr_no);
 
-      if (error) throw error;
-
-      // Update item_rates to use final_quantity for amount calculations
-      const { data: rates, error: ratesError } = await supabase
-        .schema('estimate')
-        .from('item_rates')
-        .select('sr_no, rate')
-        .eq('subwork_item_sr_no', currentItem.sr_no);
-
-      if (ratesError) throw ratesError;
-
-      // Update each rate with new quantity and recalculated amount
-      let totalItemAmount = 0;
-      if (rates && rates.length > 0) {
-        for (const rate of rates) {
-          const rateAmount = rate.rate * finalQty;
-          totalItemAmount += rateAmount;
-
-          const { error: updateRateError } = await supabase
-            .schema('estimate')
-            .from('item_rates')
-            .update({
-              ssr_quantity: finalQty,
-              rate_total_amount: rateAmount
-            })
-            .eq('sr_no', rate.sr_no);
-
-          if (updateRateError) throw updateRateError;
-        }
-
-        // Update total_item_amount in subwork_items
-        const { error: totalAmountError } = await supabase
-          .schema('estimate')
-          .from('subwork_items')
-          .update({ total_item_amount: totalItemAmount })
-          .eq('sr_no', currentItem.sr_no);
-
-        if (totalAmountError) throw totalAmountError;
+      if (error) {
+        console.error('Error updating subwork_items:', error);
+        throw error;
       }
 
-      alert('Final quantity calculation saved successfully!');
+      // Only update item_rates if we have an operation (not 'none')
+      if (itemOperation.operation_type !== 'none') {
+        // Update item_rates to use final_quantity for amount calculations
+        const { data: rates, error: ratesError } = await supabase
+          .schema('estimate')
+          .from('item_rates')
+          .select('sr_no, rate')
+          .eq('subwork_item_sr_no', currentItem.sr_no);
+
+        if (ratesError) {
+          console.error('Error fetching rates:', ratesError);
+          throw ratesError;
+        }
+
+        // Update each rate with new quantity and recalculated amount
+        let totalItemAmount = 0;
+        if (rates && rates.length > 0) {
+          for (const rate of rates) {
+            const rateAmount = rate.rate * finalQty;
+            totalItemAmount += rateAmount;
+
+            const { error: updateRateError } = await supabase
+              .schema('estimate')
+              .from('item_rates')
+              .update({
+                ssr_quantity: finalQty,
+                rate_total_amount: rateAmount
+              })
+              .eq('sr_no', rate.sr_no);
+
+            if (updateRateError) {
+              console.error('Error updating rate:', updateRateError);
+              throw updateRateError;
+            }
+          }
+
+          // Update total_item_amount in subwork_items
+          const { error: totalAmountError } = await supabase
+            .schema('estimate')
+            .from('subwork_items')
+            .update({ total_item_amount: totalItemAmount })
+            .eq('sr_no', currentItem.sr_no);
+
+          if (totalAmountError) {
+            console.error('Error updating total amount:', totalAmountError);
+            throw totalAmountError;
+          }
+        }
+      }
 
       // Refresh data and notify parent
       await fetchData();
-      onSave();
+
+      if (onItemUpdated) {
+        onItemUpdated(currentItem.sr_no);
+      }
+
+      alert('Final quantity calculation saved successfully!');
     } catch (error) {
       console.error('Error saving item operations:', error);
-      alert('Failed to save final quantity calculation');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to save final quantity calculation: ${errorMessage}`);
     }
   };
 
