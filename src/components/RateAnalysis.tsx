@@ -156,12 +156,11 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     } else if (itemRates.length === 0) {
       setSelectedRateId(null);
       setSelectedRateValue(0);
-      fetchRateAnalysis();
     }
   }, [itemRates]);
 
   useEffect(() => {
-    if (selectedRateId !== null && isOpen && item?.sr_no) {
+    if (isOpen && item?.sr_no && selectedRateId !== undefined) {
       fetchRateAnalysis();
     }
   }, [selectedRateId, isOpen, item?.sr_no]);
