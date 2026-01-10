@@ -75,6 +75,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   const [showLeadDropdown, setShowLeadDropdown] = useState(false);
   const [searchingLeads, setSearchingLeads] = useState(false);
   const [searchCompleted, setSearchCompleted] = useState(false);
+  const [isFromLeadStatement, setIsFromLeadStatement] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // NEW STATE FOR INLINE ADDING + EDITING
@@ -413,6 +414,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       label: lead.material,
       value: lead.total_rate || '0'
     });
+    setIsFromLeadStatement(true);
     setShowLeadDropdown(false);
     setLeadStatements([]);
     setSearchCompleted(false);
@@ -563,7 +565,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       newTax.label &&
       newTax.type &&
       Number(newTax.value) > 0 &&
-      Number(newTax.factor) > 0
+      Number(newTax.factor) > 0 &&
+      isFromLeadStatement
     ) {
       const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
 
@@ -586,6 +589,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       ]);
 
       setNewTax({ label: '', value: '', factor: 1, type: 'Addition' });
+      setIsFromLeadStatement(false);
       setEditIndex(null);
     }
   };
@@ -839,12 +843,16 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
               <div className="flex-1 relative">
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">
                   Label <span className="text-red-500">*</span>
+                  {isFromLeadStatement && (
+                    <span className="ml-2 text-green-600 text-xs">✓ Selected from Lead Statement</span>
+                  )}
                 </label>
                 <input
                   type="text"
                   value={newTax.label}
                   onChange={(e) => {
                     setNewTax({ ...newTax, label: e.target.value });
+                    setIsFromLeadStatement(false);
                     searchLeadStatements(e.target.value);
                   }}
                   onFocus={(e) => {
@@ -855,8 +863,10 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                   onBlur={() => {
                     setTimeout(() => setShowLeadDropdown(false), 300);
                   }}
-                  className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Search materials from Lead Statement or enter manually"
+                  className={`w-full px-3 py-2.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    isFromLeadStatement ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                  }`}
+                  placeholder="Type to search and select material from Lead Statement"
                 />
                 {searchingLeads && (
                   <div className="absolute right-3 top-9 text-gray-400">
@@ -864,9 +874,9 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                   </div>
                 )}
                 {searchCompleted && !searchingLeads && newTax.label.length >= 2 && leadStatements.length === 0 && !showLeadDropdown && (
-                  <div className="absolute z-[100] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-3">
-                    <div className="text-xs text-gray-500 text-center">
-                      No materials found in Lead Statement. You can still enter manually.
+                  <div className="absolute z-[100] w-full mt-1 bg-white border border-red-300 rounded-md shadow-lg p-3">
+                    <div className="text-xs text-red-600 text-center font-medium">
+                      No materials found in Lead Statement. Please add the material to Lead Statement first.
                     </div>
                   </div>
                 )}
@@ -956,15 +966,20 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
               </div>
               <div>
                 {editIndex === null ? (
-                  <button
-                    type="button"
-                    onClick={handleAddEntry}
-                    disabled={!newTax.label || !newTax.value}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add
-                  </button>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={handleAddEntry}
+                      disabled={!newTax.label || !newTax.value || !isFromLeadStatement}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add
+                    </button>
+                    {newTax.label && !isFromLeadStatement && (
+                      <p className="text-xs text-red-600 text-center">Select from dropdown</p>
+                    )}
+                  </div>
                 ) : (
                   <button
                     type="button"
