@@ -926,22 +926,18 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const selectRateItem = (index: number, item: any) => {
     if (searchSource === 'CSR') {
       const baseRate = parseFloat(item['Completed Item']) || 0;
-      const unit = item['Unit'] || '';
       const description = item['Item'] || '';
 
       updateRateEntry(index, 'description', description);
       updateRateEntry(index, 'rate', baseRate);
-      updateRateEntry(index, 'unit', unit);
 
       setRateSearchQueries(prev => ({ ...prev, [index]: description }));
     } else {
       const completedRate = parseInt(item['Proposed Completed Rate for 2022-23\nexcluding GST\nIn Rs.']) || 0;
-      const unit = item['Unit'] || '';
       const description = item['Description of the item'] || '';
 
       updateRateEntry(index, 'description', description);
       updateRateEntry(index, 'rate', completedRate);
-      updateRateEntry(index, 'unit', unit);
 
       setRateSearchQueries(prev => ({ ...prev, [index]: description }));
     }
@@ -1733,13 +1729,19 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                               />
                             </td>
                             <td className="px-3 py-2">
-                              <input
-                                type="text"
+                              <select
                                 value={rate.unit}
                                 onChange={(e) => updateRateEntry(index, 'unit', e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="sqm, cum, nos"
-                              />
+                              >
+                                <option value="">Select Unit</option>
+                                <option value="CUM">CUM</option>
+                                <option value="/BAG">/BAG</option>
+                                <option value="MT">MT</option>
+                                <option value="NOS">NOS</option>
+                                <option value="SQM">SQM</option>
+                                <option value="RMT">RMT</option>
+                              </select>
                             </td>
                             <td className="px-3 py-2">
                               <button
@@ -2094,13 +2096,19 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                               />
                             </td>
                             <td className="px-3 py-2">
-                              <input
-                                type="text"
+                              <select
                                 value={rate.unit}
                                 onChange={(e) => updateRateEntry(index, 'unit', e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="sqm, cum, nos"
-                              />
+                              >
+                                <option value="">Select Unit</option>
+                                <option value="CUM">CUM</option>
+                                <option value="/BAG">/BAG</option>
+                                <option value="MT">MT</option>
+                                <option value="NOS">NOS</option>
+                                <option value="SQM">SQM</option>
+                                <option value="RMT">RMT</option>
+                              </select>
                             </td>
                             <td className="px-3 py-2">
                               {itemRates.length > 1 && (
