@@ -498,11 +498,14 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         .schema('estimate')
         .from('royalty_measurements')
         .select('subwork_item_id, hb_metal, murum, sand')
-        .in('subwork_item_id', itemSrNos);
+        .in('subwork_item_id', itemSrNos)
+        .eq('works_id', worksId)
+        .eq('subwork_id', subworkId);
 
       if (error) throw error;
 
       console.log('Royalty measurements fetched:', measurements);
+      console.log('Query params - worksId:', worksId, 'subworkId:', subworkId, 'itemSrNos:', itemSrNos);
 
       const measurementsMap: { [key: string]: { hb_metal: number; murum: number; sand: number } } = {};
       (measurements || []).forEach(measurement => {
