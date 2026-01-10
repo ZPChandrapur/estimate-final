@@ -92,6 +92,9 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   // STATE FOR MANUAL ADD CONFIRMATION
   const [showManualAddConfirmation, setShowManualAddConfirmation] = useState(false);
 
+  // STATE FOR SAVED BASE RATE (from existing rate analysis)
+  const [savedBaseRate, setSavedBaseRate] = useState<number | null>(null);
+
   // Calculation helpers
   const calculateAmount = (
     type: string,
@@ -118,10 +121,11 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     let deletions = 0;
     let taxes = 0;
 
-    const baseRate =
-      selectedRateValue > 0
+    const baseRate = savedBaseRate !== null
+      ? savedBaseRate
+      : (selectedRateValue > 0
         ? selectedRateValue
-        : (baseRateProp ?? item?.ssr_rate ?? 0);
+        : (baseRateProp ?? item?.ssr_rate ?? 0));
 
     entries.forEach((entry) => {
       if (entry.type === 'Addition') additions += entry.amount;
@@ -133,7 +137,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     const finalRate = Math.ceil((calculatedRate - 0.025) / 0.05) * 0.05;
 
     return { additions, deletions, taxes, finalRate, baseRate, calculatedRate };
-  }, [entries, baseRateProp, item?.ssr_rate, selectedRateValue]);
+  }, [entries, baseRateProp, item?.ssr_rate, selectedRateValue, savedBaseRate]);
 
   // Keep previous logic and API untouched
   const getSelectedRate = () => {
@@ -177,6 +181,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       setItemRates([]);
       setEntries([]);
       setFinalTaxApplied(null);
+      setSavedBaseRate(null);
     }
   }, [isOpen]);
 
@@ -315,6 +320,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
 
       if (data) {
         setEntries(data.entries || []);
+        setSavedBaseRate(data.base_rate || null);
         if (data.final_tax_percent && data.final_tax_amount) {
           setFinalTaxApplied({
             percent: data.final_tax_percent,
@@ -325,11 +331,13 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
         }
       } else {
         setEntries([]);
+        setSavedBaseRate(null);
         setFinalTaxApplied(null);
       }
     } catch (error) {
       console.error('Error fetching rate analysis:', error);
       setEntries([]);
+      setSavedBaseRate(null);
       setFinalTaxApplied(null);
     }
   };
@@ -556,7 +564,11 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       Number(newTax.factor) > 0 &&
       (isFromLeadStatement || forceManual)
     ) {
-      const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
+      const baseRate = savedBaseRate !== null
+        ? savedBaseRate
+        : (selectedRateValue > 0
+          ? selectedRateValue
+          : (baseRateProp ?? item?.ssr_rate ?? 0));
 
       const amount = calculateAmount(
         newTax.type,
@@ -618,7 +630,11 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       Number(newTax.value) > 0 &&
       Number(newTax.factor) > 0
     ) {
-      const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
+      const baseRate = savedBaseRate !== null
+        ? savedBaseRate
+        : (selectedRateValue > 0
+          ? selectedRateValue
+          : (baseRateProp ?? item?.ssr_rate ?? 0));
 
       const amount = calculateAmount(
         newTax.type,
@@ -653,7 +669,11 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
 
   // INLINE SAVE FOR NEW ROW (Option A behavior)
   const saveNewRow = (index: number) => {
-    const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
+    const baseRate = savedBaseRate !== null
+      ? savedBaseRate
+      : (selectedRateValue > 0
+        ? selectedRateValue
+        : (baseRateProp ?? item?.ssr_rate ?? 0));
     const amount = calculateAmount(
       tempRow.type,
       baseRate,
@@ -678,7 +698,11 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
 
   // INLINE SAVE FOR EDITED ROW
   const saveEditedRow = (index: number) => {
-    const baseRate = baseRateProp ?? item?.ssr_rate ?? 0;
+    const baseRate = savedBaseRate !== null
+      ? savedBaseRate
+      : (selectedRateValue > 0
+        ? selectedRateValue
+        : (baseRateProp ?? item?.ssr_rate ?? 0));
     const amount = calculateAmount(
       tempRow.type,
       baseRate,
