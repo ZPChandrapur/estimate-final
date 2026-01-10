@@ -73,6 +73,9 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
     required_quantity: 0,
     rate_per_unit: 0
   });
+  const [availableItems, setAvailableItems] = useState<Array<{ sr_no: number, item_number: string, description: string, total_quantity: number, unit: string }>>([]);
+  const [isReferencing, setIsReferencing] = useState(false);
+  const [selectedReferenceItem, setSelectedReferenceItem] = useState<number | null>(null);
 
   // Get the selected rate for calculations
   const getSelectedRate = () => {
@@ -86,6 +89,7 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
   useEffect(() => {
     if (isOpen && item.sr_no) {
       fetchData();
+      fetchAvailableItems();
     }
   }, [isOpen, item.sr_no, activeTab]);
 
@@ -280,6 +284,63 @@ const handleMeasurementExcelUpload = async (
     }
   };
 
+  const fetchAvailableItems = async () => {
+    try {
+      // Get all items from the same subwork
+      const { data: items, error: itemsError } = await supabase
+        .schema('estimate')
+        .from('subwork_items')
+        .select('sr_no, item_number, description_of_item, ssr_unit')
+        .eq('subwork_id', currentItem.subwork_id)
+        .neq('sr_no', currentItem.sr_no) // Exclude the current item
+        .order('item_number', { ascending: true });
+
+      if (itemsError) throw itemsError;
+
+      // For each item, get the total calculated quantity from measurements
+      const itemsWithQuantities = await Promise.all(
+        (items || []).map(async (item) => {
+          const { data: measurements, error: measurementsError } = await supabase
+            .schema('estimate')
+            .from('item_measurements')
+            .select('calculated_quantity, is_deduction')
+            .eq('subwork_item_id', item.sr_no);
+
+          if (measurementsError) {
+            console.error('Error fetching measurements for item:', item.sr_no, measurementsError);
+            return null;
+          }
+
+          // Calculate total quantity (accounting for deductions)
+          const totalQuantity = (measurements || []).reduce((sum, m) => {
+            if (m.is_deduction) {
+              return sum - Math.abs(m.calculated_quantity);
+            } else {
+              return sum + m.calculated_quantity;
+            }
+          }, 0);
+
+          // Only include items that have measurements
+          if (measurements && measurements.length > 0) {
+            return {
+              sr_no: item.sr_no,
+              item_number: item.item_number,
+              description: item.description_of_item,
+              total_quantity: totalQuantity,
+              unit: item.ssr_unit || ''
+            };
+          }
+          return null;
+        })
+      );
+
+      // Filter out null values and set the state
+      setAvailableItems(itemsWithQuantities.filter(item => item !== null) as Array<{ sr_no: number, item_number: string, description: string, total_quantity: number, unit: string }>);
+    } catch (error) {
+      console.error('Error fetching available items:', error);
+    }
+  };
+
   const getNextMeasurementSrNo = async (): Promise<number> => {
     try {
       const { data, error } = await supabase
@@ -378,6 +439,8 @@ const handleMeasurementExcelUpload = async (
         selected_rate_id: 0
       });
       setSelectedRate(0);
+      setIsReferencing(false);
+      setSelectedReferenceItem(null);
 
       // Refresh data first, then update SSR quantity
       fetchData();
@@ -403,6 +466,38 @@ const handleMeasurementExcelUpload = async (
         length: lastMeasurement.length,
         width_breadth: lastMeasurement.width_breadth,
         height_depth: lastMeasurement.height_depth
+      });
+    }
+  };
+
+  const handleReferenceItemChange = (itemSrNo: number) => {
+    setSelectedReferenceItem(itemSrNo);
+    const referencedItem = availableItems.find(item => item.sr_no === itemSrNo);
+    if (referencedItem) {
+      setNewMeasurement({
+        ...newMeasurement,
+        is_manual_quantity: true,
+        manual_quantity: referencedItem.total_quantity,
+        unit: referencedItem.unit,
+        description_of_items: `Reference from Item ${referencedItem.item_number}`
+      });
+    }
+  };
+
+  const handleReferencingToggle = (checked: boolean) => {
+    setIsReferencing(checked);
+    if (!checked) {
+      setSelectedReferenceItem(null);
+      setNewMeasurement({
+        ...newMeasurement,
+        is_manual_quantity: false,
+        manual_quantity: 0
+      });
+    } else {
+      // Enable manual quantity when referencing
+      setNewMeasurement({
+        ...newMeasurement,
+        is_manual_quantity: true
       });
     }
   };
@@ -1053,7 +1148,11 @@ const handleMeasurementExcelUpload = async (
                     </button>
                   )}
                   <button
-                    onClick={() => setShowAddModal(false)}
+                    onClick={() => {
+                      setShowAddModal(false);
+                      setIsReferencing(false);
+                      setSelectedReferenceItem(null);
+                    }}
                     className="text-gray-400 hover:text-gray-600"
                   >
                     <X className="w-5 h-5" />
@@ -1126,129 +1225,184 @@ const handleMeasurementExcelUpload = async (
 
                 </div>
 
-                {/* Dimensions */}
-                <div className="grid grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">No of Units</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={newMeasurement.no_of_units || ''}
-                      onChange={(e) => setNewMeasurement({ ...newMeasurement, no_of_units: parseInt(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Length</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={newMeasurement.length || ''}
-                      onChange={(e) => setNewMeasurement({ ...newMeasurement, length: e.target.value || 0 })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Width/Breadth</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={newMeasurement.width_breadth || ''}
-                      onChange={(e) => setNewMeasurement({ ...newMeasurement, width_breadth: e.target.value || 0 })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Height/Depth</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={newMeasurement.height_depth || ''}
-                      onChange={(e) => setNewMeasurement({ ...newMeasurement, height_depth: e.target.value || 0 })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center">
-                    <input
-                      id="edit-manual-quantity"
-                      type="checkbox"
-                      checked={newMeasurement.is_manual_quantity || false}
-                      onChange={(e) => setNewMeasurement({
-                        ...newMeasurement,
-                        is_manual_quantity: e.target.checked,
-                        manual_quantity: e.target.checked ? (newMeasurement.manual_quantity || 0) : 0
-                      })}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="edit-manual-quantity" className="ml-2 block text-sm text-gray-900">
-                      Enter quantity manually (don't calculate from L×B×H)
-                    </label>
-                  </div>
-                  <p className="text-xs text-gray-500 ml-6">
-                    Check this if you want to enter a specific quantity instead of calculating from dimensions
-                  </p>
-
-                  {newMeasurement.is_manual_quantity && (
-                    <div className="ml-6">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Manual Quantity
+                {/* Reference Another Item */}
+                {availableItems.length > 0 && (
+                  <div className="border-t pt-4 space-y-3">
+                    <div className="flex items-center">
+                      <input
+                        id="reference-item-checkbox"
+                        type="checkbox"
+                        checked={isReferencing}
+                        onChange={(e) => handleReferencingToggle(e.target.checked)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="reference-item-checkbox" className="ml-2 block text-sm font-medium text-gray-900">
+                        Reference quantity from another item
                       </label>
+                    </div>
+                    <p className="text-xs text-gray-500 ml-6">
+                      Pull the final calculated quantity from an existing item in this subwork
+                    </p>
+
+                    {isReferencing && (
+                      <div className="ml-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Select Item to Reference
+                        </label>
+                        <select
+                          value={selectedReferenceItem || ''}
+                          onChange={(e) => handleReferenceItemChange(Number(e.target.value))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">Select an item</option>
+                          {availableItems.map((item) => (
+                            <option key={item.sr_no} value={item.sr_no}>
+                              Item {item.item_number} - {item.description.substring(0, 60)}
+                              {item.description.length > 60 ? '...' : ''} ({item.total_quantity.toFixed(3)} {item.unit})
+                            </option>
+                          ))}
+                        </select>
+                        {selectedReferenceItem && (
+                          <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
+                            <p className="text-blue-800 font-medium">
+                              Referenced Quantity: {availableItems.find(item => item.sr_no === selectedReferenceItem)?.total_quantity.toFixed(3)} {availableItems.find(item => item.sr_no === selectedReferenceItem)?.unit}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Dimensions */}
+                {!isReferencing && (
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">No of Units</label>
                       <input
                         type="number"
                         min="0"
-                        step="0.001"
-                        value={newMeasurement.manual_quantity || ''}
-                        onChange={(e) => setNewMeasurement({
-                          ...newMeasurement,
-                          manual_quantity: parseFloat(e.target.value) || 0
-                        })}
+                        step="1"
+                        value={newMeasurement.no_of_units || ''}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, no_of_units: parseInt(e.target.value) || 0 })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Enter manual quantity"
                       />
                     </div>
-                  )}
-                </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Length</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={newMeasurement.length || ''}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, length: e.target.value || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Width/Breadth</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={newMeasurement.width_breadth || ''}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, width_breadth: e.target.value || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Height/Depth</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={newMeasurement.height_depth || ''}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, height_depth: e.target.value || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {!isReferencing && (
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <input
+                        id="edit-manual-quantity"
+                        type="checkbox"
+                        checked={newMeasurement.is_manual_quantity || false}
+                        onChange={(e) => setNewMeasurement({
+                          ...newMeasurement,
+                          is_manual_quantity: e.target.checked,
+                          manual_quantity: e.target.checked ? (newMeasurement.manual_quantity || 0) : 0
+                        })}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="edit-manual-quantity" className="ml-2 block text-sm text-gray-900">
+                        Enter quantity manually (don't calculate from L×B×H)
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500 ml-6">
+                      Check this if you want to enter a specific quantity instead of calculating from dimensions
+                    </p>
+
+                    {newMeasurement.is_manual_quantity && (
+                      <div className="ml-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Manual Quantity
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.001"
+                          value={newMeasurement.manual_quantity || ''}
+                          onChange={(e) => setNewMeasurement({
+                            ...newMeasurement,
+                            manual_quantity: parseFloat(e.target.value) || 0
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Enter manual quantity"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Excel Upload */}
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Or Upload Measurement Excel
-                    </label>
+                {!isReferencing && (
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Or Upload Measurement Excel
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Upload Excel with quantity calculations. File will be attached for reference.
+                    </p>
+
+                    <input
+                      type="file"
+                      id="measurement-excel-upload"
+                      accept=".xlsx,.xls"
+                      onChange={handleMeasurementExcelUpload}
+                      className="hidden"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        document.getElementById('measurement-excel-upload')?.click()
+                      }
+                      disabled={uploadingExcel}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md
+                 border border-blue-300 text-blue-700 bg-blue-50
+                 hover:bg-blue-100 disabled:opacity-50"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {uploadingExcel ? 'Uploading...' : 'Upload Measurement Excel'}
+                    </button>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    Upload Excel with quantity calculations. File will be attached for reference.
-                  </p>
-
-                  <input
-                    type="file"
-                    id="measurement-excel-upload"
-                    accept=".xlsx,.xls"
-                    onChange={handleMeasurementExcelUpload}
-                    className="hidden"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      document.getElementById('measurement-excel-upload')?.click()
-                    }
-                    disabled={uploadingExcel}
-                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md
-               border border-blue-300 text-blue-700 bg-blue-50
-               hover:bg-blue-100 disabled:opacity-50"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {uploadingExcel ? 'Uploading...' : 'Upload Measurement Excel'}
-                  </button>
-                </div>
+                )}
 
                 <div className="space-y-2">
                   <div className="flex items-center">
@@ -1291,7 +1445,11 @@ const handleMeasurementExcelUpload = async (
 
               <div className="flex justify-end space-x-3 mt-6">
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setIsReferencing(false);
+                    setSelectedReferenceItem(null);
+                  }}
                   className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
