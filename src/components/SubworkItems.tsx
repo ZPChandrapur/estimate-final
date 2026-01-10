@@ -34,6 +34,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const [subworkItems, setSubworkItems] = useState<SubworkItem[]>([]);
   const [itemRatesMap, setItemRatesMap] = useState<{ [key: string]: ItemRate[] }>({});
   const [royaltyMeasurementsMap, setRoyaltyMeasurementsMap] = useState<{ [key: string]: { hb_metal: number; murum: number; sand: number } }>({});
+  const [testingMeasurementsMap, setTestingMeasurementsMap] = useState<{ [key: string]: { quantity: number; required_tests: number } }>({});
   const [loading, setLoading] = useState(false);
   const [worksId, setWorksId] = useState<string>('');
   const [showAddItemModal, setShowAddItemModal] = useState(false);
@@ -425,6 +426,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       if (data && data.length > 0) {
         await fetchItemRates(data);
         await fetchRoyaltyMeasurements(data);
+        await fetchTestingMeasurements(data);
       }
     } catch (error) {
       console.error('Error fetching subwork items:', error);
@@ -522,6 +524,43 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       setRoyaltyMeasurementsMap(measurementsMap);
     } catch (error) {
       console.error('Error fetching royalty measurements:', error);
+    }
+  };
+
+  const fetchTestingMeasurements = async (items: SubworkItem[]) => {
+    try {
+      const testingItems = items.filter(item => item.category === 'testing');
+      console.log('Testing items found:', testingItems.length, testingItems);
+      if (testingItems.length === 0) return;
+
+      const itemSrNos = testingItems.map(item => item.sr_no);
+      console.log('Fetching testing measurements for item sr_nos:', itemSrNos);
+
+      const { data: measurements, error } = await supabase
+        .schema('estimate')
+        .from('testing_measurements')
+        .select('subwork_item_id, quantity, required_tests')
+        .in('subwork_item_id', itemSrNos)
+        .eq('works_id', worksId)
+        .eq('subwork_id', subworkId);
+
+      if (error) throw error;
+
+      console.log('Testing measurements fetched:', measurements);
+
+      const measurementsMap: { [key: string]: { quantity: number; required_tests: number } } = {};
+      (measurements || []).forEach(measurement => {
+        const key = measurement.subwork_item_id.toString();
+        measurementsMap[key] = {
+          quantity: measurement.quantity || 0,
+          required_tests: measurement.required_tests || 0
+        };
+      });
+
+      console.log('Testing measurements map:', measurementsMap);
+      setTestingMeasurementsMap(measurementsMap);
+    } catch (error) {
+      console.error('Error fetching testing measurements:', error);
     }
   };
 
@@ -1283,16 +1322,29 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                           {itemRatesMap[item.sr_no.toString()] && itemRatesMap[item.sr_no.toString()].length > 0 ? (
                             <div className="space-y-1">
                               {itemRatesMap[item.sr_no.toString()].map((rate, index) => {
-                                // Use final_quantity if available, otherwise ssr_quantity
-                                const displayQuantity = item.final_quantity !== undefined && item.final_quantity !== null
-                                  ? item.final_quantity
-                                  : rate.ssr_quantity;
+                                // For testing items, use testing measurements
+                                let displayQuantity, displayLabel;
+                                if (item.category === 'testing' && testingMeasurementsMap[item.sr_no?.toString() || '']) {
+                                  displayQuantity = testingMeasurementsMap[item.sr_no?.toString() || ''].quantity;
+                                  displayLabel = 'Testing Qty';
+                                } else if (item.category === 'royalty' && royaltyMeasurementsMap[item.sr_no?.toString() || '']) {
+                                  // For royalty, sum up metal, murum, and sand
+                                  const royaltyData = royaltyMeasurementsMap[item.sr_no?.toString() || ''];
+                                  displayQuantity = royaltyData.hb_metal + royaltyData.murum + royaltyData.sand;
+                                  displayLabel = 'Total Royalty';
+                                } else {
+                                  // Use final_quantity if available, otherwise ssr_quantity
+                                  displayQuantity = item.final_quantity !== undefined && item.final_quantity !== null
+                                    ? item.final_quantity
+                                    : rate.ssr_quantity;
+                                  displayLabel = item.final_quantity !== undefined && item.final_quantity !== null ? 'Calculated' : null;
+                                }
                                 const displayUnit = item.final_unit || rate.ssr_unit || item.ssr_unit;
                                 return (
                                   <div key={index} className="bg-gray-50 px-2 py-1 rounded text-xs">
                                     <div className="text-gray-900 font-medium">{displayQuantity.toFixed(3)} {displayUnit}</div>
-                                    {item.final_quantity !== undefined && item.final_quantity !== null && (
-                                      <div className="text-xs text-green-600">(Calculated)</div>
+                                    {displayLabel && (
+                                      <div className="text-xs text-green-600">({displayLabel})</div>
                                     )}
                                   </div>
                                 );
@@ -1319,8 +1371,22 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                             </div>
                           ) : (
                             <div>
-                              {/* Use final_quantity if available, otherwise ssr_quantity */}
-                              {item.final_quantity !== undefined && item.final_quantity !== null ? (
+                              {/* For testing items, use testing measurements */}
+                              {item.category === 'testing' && testingMeasurementsMap[item.sr_no?.toString() || ''] ? (
+                                <div>
+                                  <div className="font-medium">{testingMeasurementsMap[item.sr_no?.toString() || ''].quantity.toFixed(3)} {item.ssr_unit}</div>
+                                  <div className="text-xs text-green-600">(Testing Qty)</div>
+                                </div>
+                              ) : item.category === 'royalty' && royaltyMeasurementsMap[item.sr_no?.toString() || ''] ? (
+                                <div>
+                                  <div className="font-medium">
+                                    {(royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal +
+                                      royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum +
+                                      royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand).toFixed(3)} {item.ssr_unit}
+                                  </div>
+                                  <div className="text-xs text-green-600">(Total Royalty)</div>
+                                </div>
+                              ) : item.final_quantity !== undefined && item.final_quantity !== null ? (
                                 <div>
                                   <div className="font-medium">{Number(item.final_quantity).toFixed(3)} {item.final_unit || item.ssr_unit}</div>
                                   <div className="text-xs text-green-600">(Calculated)</div>
@@ -2518,7 +2584,10 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       <TestingMeasurements
         subworkId={subworkId}
         isOpen={showTestingMeasurementsModal}
-        onClose={() => setShowTestingMeasurementsModal(false)}
+        onClose={() => {
+          setShowTestingMeasurementsModal(false);
+          fetchSubworkItems();
+        }}
       />
     </div>
   );
