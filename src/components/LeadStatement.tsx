@@ -203,13 +203,27 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
 
   const selectMaterialOption = (option: { name: string; rate: string; unit: string }) => {
     const rate = parseFloat(option.rate);
+    let totalRate = rate;
+    let editableUnit = option.unit.toUpperCase();
+
+    // Special conversion for Cement, Lime, etc. - convert from metric ton to per bag
+    if (option.name.includes('Cement, Lime, Stone Block, GI, CI, CC & AC Pipes / Sheet& Plate')) {
+      totalRate = parseFloat((rate / 20).toFixed(2));
+      editableUnit = 'per bag';
+    }
+    // Special conversion for Bricks - convert from per 1000 to per unit (NOS)
+    else if (option.name.toLowerCase().includes('brick')) {
+      totalRate = parseFloat((rate / 1000).toFixed(2));
+      editableUnit = 'NOS';
+    }
+
     setFormData({
       ...formData,
       material: option.name,
       lead_charges: rate,
-      total_rate: rate, // Initialize with lead charges, but user can edit
-      unit_from_lead_chart: option.unit, // Store the unit from lead chart
-      unit: option.unit // Initialize editable unit with the lead chart unit
+      total_rate: totalRate,
+      unit_from_lead_chart: option.unit, // Store the original unit from lead chart
+      unit: editableUnit // Converted/uppercase unit for editing
     });
     setShowMaterialOptions(false);
   };
@@ -645,9 +659,9 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                     <input
                       type="text"
                       value={formData.unit}
-                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, unit: e.target.value.toUpperCase() })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="e.g., cum, MT, sqm"
+                      placeholder="e.g., CUM, MT, SQM"
                     />
                   </div>
                 </div>
