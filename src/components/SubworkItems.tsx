@@ -804,6 +804,38 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       // Calculate total measurement
       const totalMeasurement = measurements?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
 
+      // Get rate analysis to extract factors
+      const { data: analysis } = await supabase
+        .schema('estimate')
+        .from('item_rate_analysis')
+        .select('entries, factor')
+        .eq('subwork_item_id', item.sr_no)
+        .maybeSingle();
+
+      // Extract factors from rate analysis entries based on material type
+      let metalFactor = 0;
+      let murumFactor = 0;
+      let sandFactor = 0;
+
+      if (analysis && analysis.entries && Array.isArray(analysis.entries)) {
+        analysis.entries.forEach((entry: any) => {
+          const label = entry.label?.toLowerCase() || '';
+          const factor = entry.factor || 0;
+
+          if (label.includes('metal') || label.includes('murum') || label.includes('murrum')) {
+            if (label.includes('metal')) {
+              metalFactor = factor;
+            }
+            if (label.includes('murum') || label.includes('murrum')) {
+              murumFactor = factor;
+            }
+          }
+          if (label.includes('sand')) {
+            sandFactor = factor;
+          }
+        });
+      }
+
       // Check if royalty measurement already exists
       const { data: existing } = await supabase
         .schema('estimate')
@@ -812,7 +844,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         .eq('subwork_item_id', item.sr_no)
         .maybeSingle();
 
-      // If doesn't exist, create it
+      // If doesn't exist, create it with factors from rate analysis
       if (!existing) {
         await supabase
           .schema('estimate')
@@ -822,9 +854,9 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
             subwork_id: subworkData.sr_no,
             subwork_item_id: item.sr_no,
             measurement: totalMeasurement,
-            metal_factor: 0,
-            murum_factor: 0,
-            sand_factor: 0,
+            metal_factor: metalFactor,
+            murum_factor: murumFactor,
+            sand_factor: sandFactor,
             created_by: user?.id
           });
       }

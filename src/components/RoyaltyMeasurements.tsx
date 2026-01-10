@@ -117,6 +117,28 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
             // Calculate total measurement
             const totalMeasurement = measurements?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
 
+            // Extract factors from rate analysis entries based on material type
+            let metalFactor = 0;
+            let murumFactor = 0;
+            let sandFactor = 0;
+
+            if (analysis.entries && Array.isArray(analysis.entries)) {
+              analysis.entries.forEach((entry: any) => {
+                const label = entry.label?.toLowerCase() || '';
+                const factor = entry.factor || 0;
+
+                if (label.includes('metal')) {
+                  metalFactor = factor;
+                }
+                if (label.includes('murum') || label.includes('murrum')) {
+                  murumFactor = factor;
+                }
+                if (label.includes('sand')) {
+                  sandFactor = factor;
+                }
+              });
+            }
+
             // Check if royalty measurement already exists
             const { data: existingRoyalty } = await supabase
               .schema('estimate')
@@ -125,17 +147,22 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
               .eq('subwork_item_id', item.sr_no)
               .maybeSingle();
 
+            // Use existing factors if available, otherwise use factors from rate analysis
+            const finalMetalFactor = existingRoyalty?.metal_factor !== undefined ? existingRoyalty.metal_factor : metalFactor;
+            const finalMurumFactor = existingRoyalty?.murum_factor !== undefined ? existingRoyalty.murum_factor : murumFactor;
+            const finalSandFactor = existingRoyalty?.sand_factor !== undefined ? existingRoyalty.sand_factor : sandFactor;
+
             itemsWithLeadAnalysis.push({
               sr_no: item.sr_no,
               item_number: item.item_number,
               description_of_item: item.description_of_item,
               measurement: existingRoyalty?.measurement || totalMeasurement,
-              metal_factor: existingRoyalty?.metal_factor || 0,
-              hb_metal: existingRoyalty?.hb_metal || 0,
-              murum_factor: existingRoyalty?.murum_factor || 0,
-              murum: existingRoyalty?.murum || 0,
-              sand_factor: existingRoyalty?.sand_factor || 0,
-              sand: existingRoyalty?.sand || 0
+              metal_factor: finalMetalFactor,
+              hb_metal: existingRoyalty?.hb_metal || (totalMeasurement * finalMetalFactor),
+              murum_factor: finalMurumFactor,
+              murum: existingRoyalty?.murum || (totalMeasurement * finalMurumFactor),
+              sand_factor: finalSandFactor,
+              sand: existingRoyalty?.sand || (totalMeasurement * finalSandFactor)
             });
           }
         }
