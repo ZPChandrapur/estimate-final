@@ -1071,20 +1071,35 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                           {itemRatesMap[item.sr_no.toString()] && itemRatesMap[item.sr_no.toString()].length > 0 ? (
                             <div className="space-y-1">
                               {itemRatesMap[item.sr_no.toString()].map((rate, index) => {
-                                // Use ssr_quantity from the rate fetched from database
-                                const rateQuantity = rate.ssr_quantity;
+                                // Use final_quantity if available, otherwise ssr_quantity
+                                const displayQuantity = item.final_quantity !== undefined && item.final_quantity !== null
+                                  ? item.final_quantity
+                                  : rate.ssr_quantity;
+                                const displayUnit = item.final_unit || rate.ssr_unit || item.ssr_unit;
                                 return (
                                   <div key={index} className="bg-gray-50 px-2 py-1 rounded text-xs">
-                                    <div className="text-gray-900 font-medium">{rateQuantity.toFixed(3)} {rate.ssr_unit || item.ssr_unit}</div>
+                                    <div className="text-gray-900 font-medium">{displayQuantity.toFixed(3)} {displayUnit}</div>
+                                    {item.final_quantity !== undefined && item.final_quantity !== null && (
+                                      <div className="text-xs text-green-600">(Calculated)</div>
+                                    )}
                                   </div>
                                 );
                               })}
                             </div>
                           ) : (
                             <div>
-                              {/* Fallback, if no rates found, show quantity from item */}
-                              <div className="font-medium">{Number(item.ssr_quantity).toFixed(3)} {item.ssr_unit}</div>
-                              <div className="text-xs text-gray-500">(Auto-calculated)</div>
+                              {/* Use final_quantity if available, otherwise ssr_quantity */}
+                              {item.final_quantity !== undefined && item.final_quantity !== null ? (
+                                <div>
+                                  <div className="font-medium">{Number(item.final_quantity).toFixed(3)} {item.final_unit || item.ssr_unit}</div>
+                                  <div className="text-xs text-green-600">(Calculated)</div>
+                                </div>
+                              ) : (
+                                <div>
+                                  <div className="font-medium">{Number(item.ssr_quantity).toFixed(3)} {item.ssr_unit}</div>
+                                  <div className="text-xs text-gray-500">(Auto-calculated)</div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </td>
