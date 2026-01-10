@@ -7,7 +7,7 @@ import { X } from 'lucide-react';
 interface QuarryChartProps {
   isOpen: boolean;
   onClose: () => void;
-  workId: string;        // chart is specific to this work id
+  worksId: string;        // chart is specific to this works_id
 }
 
 type Tool =
@@ -24,7 +24,7 @@ type ShapeKind = 'line' | 'node-circle' | 'node-square' | 'text';
 
 interface BaseShape {
   id: string;
-  workId: string;
+  worksId: string;
   kind: ShapeKind;
 }
 
@@ -56,7 +56,7 @@ interface TextShape extends BaseShape {
 
 type QuarryShape = LineShape | NodeCircleShape | NodeSquareShape | TextShape;
 
-const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) => {
+const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) => {
   const [title, setTitle] = useState('Quarry Chart');
   const [rows, setRows] = useState(25);
   const [cols, setCols] = useState(40);
@@ -92,7 +92,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) =>
     });
   };
 
-  const filteredShapes = shapes.filter(s => s.workId === workId);
+  const filteredShapes = shapes.filter(s => s.worksId === worksId);
 
   const handleMouseDown = (e: any) => {
     const stage = stageRef.current;
@@ -114,7 +114,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) =>
       const id = `line-${Date.now()}`;
       const newLine: LineShape = {
         id,
-        workId,
+        worksId,
         kind: 'line',
         points: [pos.x, pos.y, pos.x, pos.y]
       };
@@ -124,7 +124,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) =>
       const id = `line-${Date.now()}`;
       const newLine: LineShape = {
         id,
-        workId,
+        worksId,
         kind: 'line',
         points: [pos.x, pos.y, pos.x, pos.y]
       };
@@ -133,7 +133,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) =>
       const id = `nodec-${Date.now()}`;
       const node: NodeCircleShape = {
         id,
-        workId,
+        worksId,
         kind: 'node-circle',
         x: pos.x,
         y: pos.y,
@@ -144,7 +144,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) =>
       const id = `nodes-${Date.now()}`;
       const node: NodeSquareShape = {
         id,
-        workId,
+        worksId,
         kind: 'node-square',
         x: pos.x,
         y: pos.y,
@@ -156,7 +156,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) =>
       const id = `text-${Date.now()}`;
       const t: TextShape = {
         id,
-        workId,
+        worksId,
         kind: 'text',
         x: pos.x,
         y: pos.y,
@@ -181,7 +181,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) =>
     setShapes(prev => {
       const next = [...prev];
       const idx = next.findIndex(
-        s => s.workId === workId && s.kind === 'line' && s.id === next[next.length - 1].id
+        s => s.worksId === worksId && s.kind === 'line' && s.id === next[next.length - 1].id
       );
       if (idx === -1) return prev;
       const last = next[idx] as LineShape;
@@ -275,7 +275,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) =>
       stage.width(),
       stage.height()
     );
-    pdf.save(`quarry-chart-${workId}.pdf`);
+    pdf.save(`quarry-chart-${worksId}.pdf`);
   };
 
   const handleInternalClose = () => {
@@ -297,7 +297,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) =>
               Quarry Chart / Route Diagram
             </h2>
             <p className="text-xs text-gray-500">
-              Draw quarry routes with freehand lines, straight segments, nodes and text. Work ID: {workId}
+              Draw quarry routes with freehand lines, straight segments, nodes and text. Work ID: {worksId}
             </p>
           </div>
           <button
@@ -635,7 +635,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, workId }) =>
           <button
             onClick={() => {
               snapshot();
-              setShapes(prev => prev.filter(s => s.workId !== workId));
+              setShapes(prev => prev.filter(s => s.worksId !== worksId));
               setSelectedId(null);
             }}
             className="px-4 py-1.5 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100"
