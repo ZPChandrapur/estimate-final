@@ -488,9 +488,11 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const fetchRoyaltyMeasurements = async (items: SubworkItem[]) => {
     try {
       const royaltyItems = items.filter(item => item.category === 'royalty');
+      console.log('Royalty items found:', royaltyItems.length, royaltyItems);
       if (royaltyItems.length === 0) return;
 
       const itemSrNos = royaltyItems.map(item => item.sr_no);
+      console.log('Fetching royalty measurements for item sr_nos:', itemSrNos);
 
       const { data: measurements, error } = await supabase
         .schema('estimate')
@@ -499,6 +501,8 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         .in('subwork_item_id', itemSrNos);
 
       if (error) throw error;
+
+      console.log('Royalty measurements fetched:', measurements);
 
       const measurementsMap: { [key: string]: { hb_metal: number; murum: number; sand: number } } = {};
       (measurements || []).forEach(measurement => {
@@ -511,6 +515,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         measurementsMap[key].sand += measurement.sand || 0;
       });
 
+      console.log('Royalty measurements map:', measurementsMap);
       setRoyaltyMeasurementsMap(measurementsMap);
     } catch (error) {
       console.error('Error fetching royalty measurements:', error);
@@ -1289,22 +1294,22 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                                   </div>
                                 );
                               })}
-                              {item.category === 'royalty' && royaltyMeasurementsMap[item.sr_no?.toString() || ''] && (
-                                <div className="mt-2 space-y-1 text-xs">
-                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal > 0 && (
-                                    <div className="text-gray-700">
-                                      <span className="font-medium">METAL</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal.toFixed(3)} CUM
-                                    </div>
-                                  )}
-                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum > 0 && (
-                                    <div className="text-gray-700">
-                                      <span className="font-medium">MURRUM</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum.toFixed(3)} CUM
-                                    </div>
-                                  )}
-                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand > 0 && (
-                                    <div className="text-gray-700">
-                                      <span className="font-medium">SAND</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand.toFixed(3)} CUM
-                                    </div>
+                              {item.category === 'royalty' && (
+                                <div className="mt-2 space-y-1 text-xs border-t border-gray-200 pt-2">
+                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''] ? (
+                                    <>
+                                      <div className="text-gray-700">
+                                        <span className="font-medium">METAL</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal.toFixed(3)} CUM
+                                      </div>
+                                      <div className="text-gray-700">
+                                        <span className="font-medium">MURRUM</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum.toFixed(3)} CUM
+                                      </div>
+                                      <div className="text-gray-700">
+                                        <span className="font-medium">SAND</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand.toFixed(3)} CUM
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="text-gray-500 italic">No royalty measurements saved</div>
                                   )}
                                 </div>
                               )}
@@ -1323,22 +1328,22 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                                   <div className="text-xs text-gray-500">(Auto-calculated)</div>
                                 </div>
                               )}
-                              {item.category === 'royalty' && royaltyMeasurementsMap[item.sr_no?.toString() || ''] && (
-                                <div className="mt-2 space-y-1 text-xs">
-                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal > 0 && (
-                                    <div className="text-gray-700">
-                                      <span className="font-medium">METAL</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal.toFixed(3)} CUM
-                                    </div>
-                                  )}
-                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum > 0 && (
-                                    <div className="text-gray-700">
-                                      <span className="font-medium">MURRUM</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum.toFixed(3)} CUM
-                                    </div>
-                                  )}
-                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand > 0 && (
-                                    <div className="text-gray-700">
-                                      <span className="font-medium">SAND</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand.toFixed(3)} CUM
-                                    </div>
+                              {item.category === 'royalty' && (
+                                <div className="mt-2 space-y-1 text-xs border-t border-gray-200 pt-2">
+                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''] ? (
+                                    <>
+                                      <div className="text-gray-700">
+                                        <span className="font-medium">METAL</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal.toFixed(3)} CUM
+                                      </div>
+                                      <div className="text-gray-700">
+                                        <span className="font-medium">MURRUM</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum.toFixed(3)} CUM
+                                      </div>
+                                      <div className="text-gray-700">
+                                        <span className="font-medium">SAND</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand.toFixed(3)} CUM
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="text-gray-500 italic">No royalty measurements saved</div>
                                   )}
                                 </div>
                               )}

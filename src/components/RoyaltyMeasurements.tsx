@@ -223,6 +223,8 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
 
       // Save all royalty items
       for (const item of royaltyItems) {
+        console.log('Saving royalty item:', item);
+
         // Check if record exists
         const { data: existing } = await supabase
           .schema('estimate')
@@ -245,19 +247,33 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
           created_by: user?.id
         };
 
+        console.log('Payload to save:', payload);
+
         if (existing) {
           // Update
-          await supabase
+          console.log('Updating existing record:', existing.sr_no);
+          const { error: updateError } = await supabase
             .schema('estimate')
             .from('royalty_measurements')
             .update(payload)
             .eq('sr_no', existing.sr_no);
+
+          if (updateError) {
+            console.error('Update error:', updateError);
+            throw updateError;
+          }
         } else {
           // Insert
-          await supabase
+          console.log('Inserting new record');
+          const { error: insertError } = await supabase
             .schema('estimate')
             .from('royalty_measurements')
             .insert(payload);
+
+          if (insertError) {
+            console.error('Insert error:', insertError);
+            throw insertError;
+          }
         }
       }
 
