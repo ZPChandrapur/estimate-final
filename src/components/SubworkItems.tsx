@@ -33,6 +33,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   const { user } = useAuth();
   const [subworkItems, setSubworkItems] = useState<SubworkItem[]>([]);
   const [itemRatesMap, setItemRatesMap] = useState<{ [key: string]: ItemRate[] }>({});
+  const [royaltyMeasurementsMap, setRoyaltyMeasurementsMap] = useState<{ [key: string]: { hb_metal: number; murum: number; sand: number } }>({});
   const [loading, setLoading] = useState(false);
   const [worksId, setWorksId] = useState<string>('');
   const [showAddItemModal, setShowAddItemModal] = useState(false);
@@ -423,6 +424,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       // Fetch rates for all items
       if (data && data.length > 0) {
         await fetchItemRates(data);
+        await fetchRoyaltyMeasurements(data);
       }
     } catch (error) {
       console.error('Error fetching subwork items:', error);
@@ -480,6 +482,38 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       setItemRatesMap(ratesMap);
     } catch (error) {
       console.error('Error fetching item rates:', error);
+    }
+  };
+
+  const fetchRoyaltyMeasurements = async (items: SubworkItem[]) => {
+    try {
+      const royaltyItems = items.filter(item => item.category === 'royalty');
+      if (royaltyItems.length === 0) return;
+
+      const itemSrNos = royaltyItems.map(item => item.sr_no);
+
+      const { data: measurements, error } = await supabase
+        .schema('estimate')
+        .from('royalty_measurements')
+        .select('subwork_item_id, hb_metal, murum, sand')
+        .in('subwork_item_id', itemSrNos);
+
+      if (error) throw error;
+
+      const measurementsMap: { [key: string]: { hb_metal: number; murum: number; sand: number } } = {};
+      (measurements || []).forEach(measurement => {
+        const key = measurement.subwork_item_id.toString();
+        if (!measurementsMap[key]) {
+          measurementsMap[key] = { hb_metal: 0, murum: 0, sand: 0 };
+        }
+        measurementsMap[key].hb_metal += measurement.hb_metal || 0;
+        measurementsMap[key].murum += measurement.murum || 0;
+        measurementsMap[key].sand += measurement.sand || 0;
+      });
+
+      setRoyaltyMeasurementsMap(measurementsMap);
+    } catch (error) {
+      console.error('Error fetching royalty measurements:', error);
     }
   };
 
@@ -1255,6 +1289,25 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                                   </div>
                                 );
                               })}
+                              {item.category === 'royalty' && royaltyMeasurementsMap[item.sr_no?.toString() || ''] && (
+                                <div className="mt-2 space-y-1 text-xs">
+                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal > 0 && (
+                                    <div className="text-gray-700">
+                                      <span className="font-medium">METAL</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal.toFixed(3)} CUM
+                                    </div>
+                                  )}
+                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum > 0 && (
+                                    <div className="text-gray-700">
+                                      <span className="font-medium">MURRUM</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum.toFixed(3)} CUM
+                                    </div>
+                                  )}
+                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand > 0 && (
+                                    <div className="text-gray-700">
+                                      <span className="font-medium">SAND</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand.toFixed(3)} CUM
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div>
@@ -1268,6 +1321,25 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                                 <div>
                                   <div className="font-medium">{Number(item.ssr_quantity).toFixed(3)} {item.ssr_unit}</div>
                                   <div className="text-xs text-gray-500">(Auto-calculated)</div>
+                                </div>
+                              )}
+                              {item.category === 'royalty' && royaltyMeasurementsMap[item.sr_no?.toString() || ''] && (
+                                <div className="mt-2 space-y-1 text-xs">
+                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal > 0 && (
+                                    <div className="text-gray-700">
+                                      <span className="font-medium">METAL</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal.toFixed(3)} CUM
+                                    </div>
+                                  )}
+                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum > 0 && (
+                                    <div className="text-gray-700">
+                                      <span className="font-medium">MURRUM</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum.toFixed(3)} CUM
+                                    </div>
+                                  )}
+                                  {royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand > 0 && (
+                                    <div className="text-gray-700">
+                                      <span className="font-medium">SAND</span>: {royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand.toFixed(3)} CUM
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -2429,7 +2501,10 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         subworkId={subworkId}
         worksId={worksId}
         isOpen={showRoyaltyMeasurementsModal}
-        onClose={() => setShowRoyaltyMeasurementsModal(false)}
+        onClose={() => {
+          setShowRoyaltyMeasurementsModal(false);
+          fetchSubworkItems();
+        }}
       />
 
       <TestingMeasurements

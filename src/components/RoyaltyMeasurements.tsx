@@ -373,6 +373,24 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="bg-gray-100 border-t-2 border-gray-300">
+                <tr>
+                  <td colSpan={4} className="px-3 py-4 text-sm font-bold text-gray-900 text-right">
+                    Total:
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right bg-yellow-50">
+                    {royaltyItems.reduce((sum, item) => sum + item.hb_metal, 0).toFixed(2)}
+                  </td>
+                  <td className="px-3 py-4"></td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right bg-yellow-50">
+                    {royaltyItems.reduce((sum, item) => sum + item.murum, 0).toFixed(2)}
+                  </td>
+                  <td className="px-3 py-4"></td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right bg-yellow-50">
+                    {royaltyItems.reduce((sum, item) => sum + item.sand, 0).toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
