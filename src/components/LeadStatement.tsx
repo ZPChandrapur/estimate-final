@@ -209,7 +209,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
     // Special conversion for Cement, Lime, etc. - convert from metric ton to per bag
     if (option.name.includes('Cement, Lime, Stone Block, GI, CI, CC & AC Pipes / Sheet& Plate')) {
       totalRate = parseFloat((rate / 20).toFixed(2));
-      editableUnit = 'per bag';
+      editableUnit = '/BAG';
     }
     // Special conversion for Bricks - convert from per 1000 to per unit (NOS)
     else if (option.name.toLowerCase().includes('brick')) {
