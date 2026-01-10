@@ -94,6 +94,7 @@ export interface SubworkItem {
   csr_unit?: string;
   operation_type?: 'none' | 'multiply' | 'divide' | 'add' | 'subtract';
   operation_value?: number;
+  unit_conversion_factor?: number;
   final_unit?: string;
   final_quantity?: number;
 }

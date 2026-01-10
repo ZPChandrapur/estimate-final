@@ -71,12 +71,12 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
   const [itemOperation, setItemOperation] = useState<{
     operation_type: 'none' | 'multiply' | 'divide' | 'add' | 'subtract';
     operation_value: number;
-    intermediate_unit: string;
+    unit_conversion_factor: number;
     final_unit: string;
   }>({
     operation_type: 'none',
     operation_value: 0,
-    intermediate_unit: '',
+    unit_conversion_factor: 1,
     final_unit: ''
   });
 
@@ -102,7 +102,7 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
     setItemOperation({
       operation_type: item.operation_type || 'none',
       operation_value: item.operation_value || 0,
-      intermediate_unit: item.intermediate_unit || '',
+      unit_conversion_factor: item.unit_conversion_factor || 1,
       final_unit: item.final_unit || ''
     });
   }, [item]);
@@ -150,6 +150,12 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
       default:
         finalQty = totalQuantity;
         break;
+    }
+
+    // Apply unit conversion factor (like dividing by 1000 to convert KG to MT)
+    const conversionFactor = itemOperation.unit_conversion_factor || 1;
+    if (conversionFactor !== 1) {
+      finalQty = finalQty / conversionFactor;
     }
 
     return finalQty;
@@ -739,7 +745,7 @@ const handleMeasurementExcelUpload = async (
         .update({
           operation_type: itemOperation.operation_type,
           operation_value: itemOperation.operation_value,
-          intermediate_unit: itemOperation.intermediate_unit || null,
+          unit_conversion_factor: itemOperation.unit_conversion_factor || 1,
           final_unit: itemOperation.final_unit || null,
           final_quantity: finalQty
         })
@@ -1096,7 +1102,7 @@ const handleMeasurementExcelUpload = async (
                     </p>
 
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Apply Operation
@@ -1130,61 +1136,48 @@ const handleMeasurementExcelUpload = async (
                             />
                           </div>
                         )}
+
+                        {itemOperation.operation_type !== 'none' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Unit Conversion (Divide by)
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={itemOperation.unit_conversion_factor}
+                              onChange={(e) => setItemOperation({ ...itemOperation, unit_conversion_factor: parseFloat(e.target.value) || 1 })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="e.g., 1000"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">e.g., 1000 for KG to MT</p>
+                          </div>
+                        )}
                       </div>
 
                       {itemOperation.operation_type !== 'none' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Intermediate Unit (After Operation)
-                            </label>
-                            <select
-                              value={itemOperation.intermediate_unit}
-                              onChange={(e) => setItemOperation({ ...itemOperation, intermediate_unit: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                            >
-                              <option value="">Select unit</option>
-                              <option value="CUM">CUM</option>
-                              <option value="/BAG">/BAG</option>
-                              <option value="MT">MT</option>
-                              <option value="NOS">NOS</option>
-                              <option value="SQM">SQM</option>
-                              <option value="RMT">RMT</option>
-                              <option value="/LITRE">/LITRE</option>
-                              <option value="/SET">/SET</option>
-                              <option value="KG">KG</option>
-                              <option value="TONNE">TONNE</option>
-                            </select>
-                            <p className="text-xs text-gray-500 mt-1">
-                              The unit after applying the operation (e.g., CUM → KG)
-                            </p>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Final Unit (Optional Conversion)
-                            </label>
-                            <select
-                              value={itemOperation.final_unit}
-                              onChange={(e) => setItemOperation({ ...itemOperation, final_unit: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                            >
-                              <option value="">Same as intermediate</option>
-                              <option value="CUM">CUM</option>
-                              <option value="/BAG">/BAG</option>
-                              <option value="MT">MT</option>
-                              <option value="NOS">NOS</option>
-                              <option value="SQM">SQM</option>
-                              <option value="RMT">RMT</option>
-                              <option value="/LITRE">/LITRE</option>
-                              <option value="/SET">/SET</option>
-                              <option value="KG">KG</option>
-                              <option value="TONNE">TONNE</option>
-                            </select>
-                            <p className="text-xs text-gray-500 mt-1">
-                              Additional unit conversion if needed (e.g., KG → MT)
-                            </p>
-                          </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Final Unit
+                          </label>
+                          <select
+                            value={itemOperation.final_unit}
+                            onChange={(e) => setItemOperation({ ...itemOperation, final_unit: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="">Select final unit</option>
+                            <option value="CUM">CUM</option>
+                            <option value="/BAG">/BAG</option>
+                            <option value="MT">MT</option>
+                            <option value="NOS">NOS</option>
+                            <option value="SQM">SQM</option>
+                            <option value="RMT">RMT</option>
+                            <option value="/LITRE">/LITRE</option>
+                            <option value="/SET">/SET</option>
+                            <option value="KG">KG</option>
+                            <option value="TONNE">TONNE</option>
+                          </select>
                         </div>
                       )}
 
@@ -1200,7 +1193,26 @@ const handleMeasurementExcelUpload = async (
                             ? measurements[0].unit
                             : currentItem.ssr_unit;
 
-                          const afterOperation = calculateItemFinalQuantity(totalQty);
+                          // Calculate intermediate quantity (after operation, before conversion)
+                          let intermediateQty = totalQty;
+                          if (itemOperation.operation_type !== 'none') {
+                            switch (itemOperation.operation_type) {
+                              case 'multiply':
+                                intermediateQty = totalQty * (itemOperation.operation_value || 0);
+                                break;
+                              case 'divide':
+                                intermediateQty = (itemOperation.operation_value || 0) !== 0 ? totalQty / (itemOperation.operation_value || 0) : totalQty;
+                                break;
+                              case 'add':
+                                intermediateQty = totalQty + (itemOperation.operation_value || 0);
+                                break;
+                              case 'subtract':
+                                intermediateQty = totalQty - (itemOperation.operation_value || 0);
+                                break;
+                            }
+                          }
+
+                          const finalQty = calculateItemFinalQuantity(totalQty);
 
                           return (
                             <>
@@ -1213,34 +1225,32 @@ const handleMeasurementExcelUpload = async (
 
                               {itemOperation.operation_type !== 'none' && (
                                 <>
-                                  <div className="flex justify-between items-center text-sm border-t pt-2">
-                                    <span className="text-gray-700">
-                                      After {itemOperation.operation_type === 'multiply' ? 'multiplying by' :
-                                            itemOperation.operation_type === 'divide' ? 'dividing by' :
-                                            itemOperation.operation_type === 'add' ? 'adding' : 'subtracting'} {itemOperation.operation_value}:
+                                  <div className="flex justify-between items-center text-sm text-gray-600 border-t pt-2">
+                                    <span>
+                                      After {itemOperation.operation_type === 'multiply' ? 'multiply by' :
+                                            itemOperation.operation_type === 'divide' ? 'divide by' :
+                                            itemOperation.operation_type === 'add' ? 'add' : 'subtract'} {itemOperation.operation_value}:
                                     </span>
-                                    <span className="font-semibold text-gray-900">
-                                      {afterOperation.toFixed(3)} {itemOperation.intermediate_unit || measurementUnit}
+                                    <span className="font-medium text-gray-900">
+                                      {intermediateQty.toFixed(3)}
                                     </span>
                                   </div>
 
-                                  {itemOperation.final_unit && itemOperation.final_unit !== (itemOperation.intermediate_unit || measurementUnit) && (
-                                    <div className="flex justify-between items-center border-t pt-2">
-                                      <span className="text-lg font-semibold text-blue-600">Final Quantity (With Conversion):</span>
-                                      <span className="text-lg font-bold text-blue-900">
-                                        {afterOperation.toFixed(3)} {itemOperation.final_unit}
+                                  {itemOperation.unit_conversion_factor && itemOperation.unit_conversion_factor !== 1 && (
+                                    <div className="flex justify-between items-center text-sm text-gray-600">
+                                      <span>Unit conversion (÷{itemOperation.unit_conversion_factor}):</span>
+                                      <span className="font-medium text-gray-900">
+                                        {finalQty.toFixed(3)}
                                       </span>
                                     </div>
                                   )}
 
-                                  {(!itemOperation.final_unit || itemOperation.final_unit === (itemOperation.intermediate_unit || measurementUnit)) && (
-                                    <div className="flex justify-between items-center border-t pt-2">
-                                      <span className="text-lg font-semibold text-blue-600">Final Quantity:</span>
-                                      <span className="text-lg font-bold text-blue-900">
-                                        {afterOperation.toFixed(3)} {itemOperation.intermediate_unit || measurementUnit}
-                                      </span>
-                                    </div>
-                                  )}
+                                  <div className="flex justify-between items-center border-t pt-2">
+                                    <span className="text-lg font-semibold text-blue-600">Final Quantity:</span>
+                                    <span className="text-lg font-bold text-blue-900">
+                                      {finalQty.toFixed(3)} {itemOperation.final_unit || measurementUnit}
+                                    </span>
+                                  </div>
                                 </>
                               )}
                             </>
