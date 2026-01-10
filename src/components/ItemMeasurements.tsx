@@ -396,6 +396,7 @@ const handleMeasurementExcelUpload = async (
     if (measurements.length > 0) {
       const lastMeasurement = measurements[measurements.length - 1];
       setNewMeasurement({
+        header: lastMeasurement.header,
         description_of_items: lastMeasurement.description_of_items,
         no_of_units: lastMeasurement.no_of_units,
         is_deduction: lastMeasurement.is_deduction || false,
@@ -460,6 +461,7 @@ const handleMeasurementExcelUpload = async (
   const handleEditMeasurement = (measurement: ItemMeasurement) => {
     setSelectedMeasurement(measurement);
     setNewMeasurement({
+      header: measurement.header,
       description_of_items: measurement.description_of_items,
       no_of_units: measurement.no_of_units,
       length: measurement.length,
@@ -512,6 +514,7 @@ const handleMeasurementExcelUpload = async (
         .schema('estimate')
         .from('item_measurements')
         .update({
+          header: newMeasurement.header,
           description_of_items: newMeasurement.description_of_items,
           unit: newMeasurement.unit,
           no_of_units: newMeasurement.no_of_units,
@@ -1060,6 +1063,17 @@ const handleMeasurementExcelUpload = async (
 
               <div className="space-y-4">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Header</label>
+                  <input
+                    type="text"
+                    value={newMeasurement.header || ''}
+                    onChange={(e) => setNewMeasurement({ ...newMeasurement, header: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter header (optional)"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <input
                     type="text"
@@ -1074,13 +1088,21 @@ const handleMeasurementExcelUpload = async (
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Unit
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={newMeasurement.unit || ''}
                     onChange={(e) => setNewMeasurement({ ...newMeasurement, unit: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter unit (sqm, cum, nos, etc.)"
-                  />
+                  >
+                    <option value="">Select Unit</option>
+                    <option value="CUM">CUM</option>
+                    <option value="/BAG">/BAG</option>
+                    <option value="MT">MT</option>
+                    <option value="NOS">NOS</option>
+                    <option value="SQM">SQM</option>
+                    <option value="RMT">RMT</option>
+                    <option value="/LITRE">/LITRE</option>
+                    <option value="/SET">/SET</option>
+                  </select>
                 </div>
 
                 {/* Rate Selection */}
@@ -1491,6 +1513,19 @@ const handleMeasurementExcelUpload = async (
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Header
+                  </label>
+                  <input
+                    type="text"
+                    value={newMeasurement.header || ''}
+                    onChange={(e) => setNewMeasurement({ ...newMeasurement, header: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter header (optional)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Description
                   </label>
                   <input
@@ -1506,13 +1541,21 @@ const handleMeasurementExcelUpload = async (
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Unit
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={newMeasurement.unit || ''}
                     onChange={(e) => setNewMeasurement({ ...newMeasurement, unit: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter unit (e.g., sqm, cum, nos)"
-                  />
+                  >
+                    <option value="">Select Unit</option>
+                    <option value="CUM">CUM</option>
+                    <option value="/BAG">/BAG</option>
+                    <option value="MT">MT</option>
+                    <option value="NOS">NOS</option>
+                    <option value="SQM">SQM</option>
+                    <option value="RMT">RMT</option>
+                    <option value="/LITRE">/LITRE</option>
+                    <option value="/SET">/SET</option>
+                  </select>
                 </div>
 
                 {/* Rate Selection */}

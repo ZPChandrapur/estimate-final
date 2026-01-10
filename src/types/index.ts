@@ -102,6 +102,7 @@ export interface ItemMeasurement {
   work_id?: string;
   subwork_id?: string;
   item_id?: string;
+  header?: string;
   description_of_items?: string;
   no_of_units: number;
   length: number;
