@@ -954,7 +954,10 @@ const handleMeasurementExcelUpload = async (
     }).format(amount);
   };
 
-  const totalMeasurementQuantity = measurements.reduce((sum, m) => sum + m.calculated_quantity, 0);
+  const totalMeasurementQuantity = measurements.reduce((sum, m) => {
+    const qty = m.is_deduction ? -m.calculated_quantity : m.calculated_quantity;
+    return sum + qty;
+  }, 0);
   const totalMeasurementAmount = measurements.reduce((sum, m) => sum + m.line_amount, 0);
   const totalLeadCharges = leads.reduce((sum, l) => sum + l.net_lead_charges, 0);
   const totalMaterialCost = materials.reduce((sum, m) => sum + m.total_material_cost, 0);
