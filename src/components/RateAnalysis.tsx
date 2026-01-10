@@ -94,6 +94,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
 
   // STATE FOR SAVED BASE RATE (from existing rate analysis)
   const [savedBaseRate, setSavedBaseRate] = useState<number | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Calculation helpers
   const calculateAmount = (
@@ -161,6 +162,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       const firstRateValue = itemRates[0].rate;
       setSelectedRateId(firstRateId);
       setSelectedRateValue(firstRateValue);
+      // Immediately fetch rate analysis for the first rate
+      fetchRateAnalysisForRate(firstRateId);
     } else if (itemRates.length === 0 && isOpen && item?.sr_no) {
       setSelectedRateId(null);
       setSelectedRateValue(0);
@@ -170,7 +173,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
 
   useEffect(() => {
     if (isOpen && item?.sr_no && selectedRateId !== null && selectedRateId !== undefined) {
-      fetchRateAnalysis();
+      fetchRateAnalysisForRate(selectedRateId);
     }
   }, [selectedRateId, isOpen, item?.sr_no]);
 
@@ -182,6 +185,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       setEntries([]);
       setFinalTaxApplied(null);
       setSavedBaseRate(null);
+      setIsEditMode(false);
     }
   }, [isOpen]);
 
@@ -298,9 +302,11 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     }
   };
 
-  const fetchRateAnalysis = async () => {
+  const fetchRateAnalysisForRate = async (rateId: number | null) => {
     try {
       if (!item?.sr_no) return;
+
+      console.log('🔍 Fetching rate analysis for item:', item.sr_no, 'rate:', rateId);
 
       let query = supabase
         .schema('estimate')
@@ -308,8 +314,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
         .select('*')
         .eq('subwork_item_id', item.sr_no);
 
-      if (selectedRateId !== null && selectedRateId !== undefined) {
-        query = query.eq('item_rate_id', selectedRateId);
+      if (rateId !== null && rateId !== undefined) {
+        query = query.eq('item_rate_id', rateId);
       } else {
         query = query.is('item_rate_id', null);
       }
@@ -318,9 +324,13 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
 
       if (error) throw error;
 
+      console.log('📊 Rate analysis data:', data);
+
       if (data) {
+        console.log('✅ Loading entries:', data.entries);
         setEntries(data.entries || []);
         setSavedBaseRate(data.base_rate || null);
+        setIsEditMode(true);
         if (data.final_tax_percent && data.final_tax_amount) {
           setFinalTaxApplied({
             percent: data.final_tax_percent,
@@ -330,16 +340,23 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
           setFinalTaxApplied(null);
         }
       } else {
+        console.log('⚠️ No existing analysis found - resetting entries');
         setEntries([]);
         setSavedBaseRate(null);
+        setIsEditMode(false);
         setFinalTaxApplied(null);
       }
     } catch (error) {
-      console.error('Error fetching rate analysis:', error);
+      console.error('❌ Error fetching rate analysis:', error);
       setEntries([]);
       setSavedBaseRate(null);
+      setIsEditMode(false);
       setFinalTaxApplied(null);
     }
+  };
+
+  const fetchRateAnalysis = async () => {
+    await fetchRateAnalysisForRate(selectedRateId);
   };
 
   const searchLeadStatements = async (searchTerm: string) => {
@@ -497,6 +514,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
           throw error;
         }
         console.log('Rate analysis updated successfully');
+        setIsEditMode(true);
       } else {
         // ✅ INSERT
         console.log('Inserting new rate analysis');
@@ -510,6 +528,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
           throw error;
         }
         console.log('Rate analysis inserted successfully');
+        setIsEditMode(true);
       }
 
       // ✅ Update item_rates only when rate exists
@@ -1478,7 +1497,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
               onClick={saveRateAnalysis}
               disabled={loading}
             >
-              {loading ? 'Saving...' : 'Save Analysis'}
+              {loading ? 'Saving...' : (isEditMode ? 'Update Analysis' : 'Save Analysis')}
             </button>
           </div>
         </div>
