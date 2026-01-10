@@ -1075,7 +1075,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                                 const rateQuantity = rate.ssr_quantity;
                                 return (
                                   <div key={index} className="bg-gray-50 px-2 py-1 rounded text-xs">
-                                    <div className="text-gray-900 font-medium">{rateQuantity.toFixed(0)} {rate.ssr_unit || item.ssr_unit}</div>
+                                    <div className="text-gray-900 font-medium">{rateQuantity.toFixed(3)} {rate.ssr_unit || item.ssr_unit}</div>
                                   </div>
                                 );
                               })}
@@ -1083,7 +1083,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                           ) : (
                             <div>
                               {/* Fallback, if no rates found, show quantity from item */}
-                              <div className="font-medium">{item.ssr_quantity} {item.ssr_unit}</div>
+                              <div className="font-medium">{Number(item.ssr_quantity).toFixed(3)} {item.ssr_unit}</div>
                               <div className="text-xs text-gray-500">(Auto-calculated)</div>
                             </div>
                           )}
