@@ -54,6 +54,7 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
   const [selectedDescription, setSelectedDescription] = useState<string>('');
   const [uploadingExcel, setUploadingExcel] = useState(false);
   const [newMeasurement, setNewMeasurement] = useState<Partial<ItemMeasurement>>({
+    factor: 1,
     no_of_units: 0,
     length: 0,
     width_breadth: 0,
@@ -107,8 +108,9 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
       return newMeasurement.manual_quantity;
     }
 
-    // Otherwise calculate from dimensions
-    return (newMeasurement.no_of_units || 0) *
+    // Otherwise calculate from dimensions including factor
+    return (newMeasurement.factor || 1) *
+      (newMeasurement.no_of_units || 0) *
       (newMeasurement.length || 0) *
       (newMeasurement.width_breadth || 0) *
       (newMeasurement.height_depth || 0);
@@ -200,6 +202,7 @@ const handleMeasurementExcelUpload = async (
         measurement_sr_no: nextSrNo + index,
         description_of_items: row.Description || row.description || null,
         unit: currentItem.ssr_unit,
+        factor: 1,
         no_of_units: 1,
         length: 1,
         width_breadth: 1,
@@ -364,10 +367,7 @@ const handleMeasurementExcelUpload = async (
     if (!user) return;
     try {
       const nextSrNo = await getNextMeasurementSrNo();
-      const calculatedQuantity = (newMeasurement.no_of_units || 0) *
-        (newMeasurement.length || 0) *
-        (newMeasurement.width_breadth || 0) *
-        (newMeasurement.height_depth || 0);
+      const calculatedQuantity = calculateQuantity();
 
       // Use the selected rate
       const rate = selectedRate;
@@ -392,6 +392,7 @@ const handleMeasurementExcelUpload = async (
           ...newMeasurement,
           subwork_item_id: subworkItemId,   // 🔹 Corrected
           measurement_sr_no: nextSrNo,
+          factor: newMeasurement.factor || 1,
           calculated_quantity: calculatedQuantity,
           line_amount: rateData?.rate * calculatedQuantity,
           unit: newMeasurement.unit || null,
@@ -432,6 +433,7 @@ const handleMeasurementExcelUpload = async (
 
       setShowAddModal(false);
       setNewMeasurement({
+        factor: 1,
         no_of_units: 0,
         length: 0,
         width_breadth: 0,
@@ -461,6 +463,7 @@ const handleMeasurementExcelUpload = async (
       setNewMeasurement({
         header: lastMeasurement.header,
         description_of_items: lastMeasurement.description_of_items,
+        factor: lastMeasurement.factor || 1,
         no_of_units: lastMeasurement.no_of_units,
         is_deduction: lastMeasurement.is_deduction || false,
         length: lastMeasurement.length,
@@ -476,6 +479,11 @@ const handleMeasurementExcelUpload = async (
     if (referencedItem) {
       setNewMeasurement({
         ...newMeasurement,
+        factor: 1,
+        no_of_units: 1,
+        length: 1,
+        width_breadth: 1,
+        height_depth: 1,
         is_manual_quantity: true,
         manual_quantity: referencedItem.total_quantity,
         unit: referencedItem.unit,
@@ -558,6 +566,7 @@ const handleMeasurementExcelUpload = async (
     setNewMeasurement({
       header: measurement.header,
       description_of_items: measurement.description_of_items,
+      factor: measurement.factor || 1,
       no_of_units: measurement.no_of_units,
       length: measurement.length,
       width_breadth: measurement.width_breadth,
@@ -585,10 +594,7 @@ const handleMeasurementExcelUpload = async (
     }
 
     try {
-      const calculatedQuantity = (newMeasurement.no_of_units || 0) *
-        (newMeasurement.length || 0) *
-        (newMeasurement.width_breadth || 0) *
-        (newMeasurement.height_depth || 0);
+      const calculatedQuantity = calculateQuantity();
 
       const rate = selectedRate;
 
@@ -612,6 +618,7 @@ const handleMeasurementExcelUpload = async (
           header: newMeasurement.header,
           description_of_items: newMeasurement.description_of_items,
           unit: newMeasurement.unit,
+          factor: newMeasurement.factor || 1,
           no_of_units: newMeasurement.no_of_units,
           length: newMeasurement.length,
           width_breadth: newMeasurement.width_breadth,
@@ -656,6 +663,7 @@ const handleMeasurementExcelUpload = async (
       setShowEditModal(false);
       setSelectedMeasurement(null);
       setNewMeasurement({
+        factor: 1,
         no_of_units: 0,
         length: 0,
         width_breadth: 0,
@@ -917,6 +925,7 @@ const handleMeasurementExcelUpload = async (
                         <tr>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Sr No</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Factor</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Units</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Length</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Width</th>
@@ -935,6 +944,7 @@ const handleMeasurementExcelUpload = async (
                           <tr key={measurement.id} className="hover:bg-gray-50">
                             <td className="px-3 py-2 text-sm text-gray-900">{measurement.measurement_sr_no}</td>
                             <td className="px-3 py-2 text-sm text-gray-900">{measurement.description_of_items || '-'}</td>
+                            <td className="px-3 py-2 text-sm text-gray-900">{measurement.factor || 1}</td>
                             <td className="px-3 py-2 text-sm text-gray-900">{measurement.no_of_units}</td>
                             <td className="px-3 py-2 text-sm text-gray-900">{measurement.length}</td>
                             <td className="px-3 py-2 text-sm text-gray-900">{measurement.width_breadth}</td>
@@ -1276,7 +1286,18 @@ const handleMeasurementExcelUpload = async (
 
                 {/* Dimensions */}
                 {!isReferencing && (
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-5 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Factor</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={newMeasurement.factor || 1}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, factor: parseFloat(e.target.value) || 1 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">No of Units</label>
                       <input
@@ -1742,7 +1763,18 @@ const handleMeasurementExcelUpload = async (
                 </div>
 
                 {/* Dimensions */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Factor</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={newMeasurement.factor || 1}
+                      onChange={(e) => setNewMeasurement({ ...newMeasurement, factor: parseFloat(e.target.value) || 1 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">No of Units</label>
                     <input

@@ -104,6 +104,7 @@ export interface ItemMeasurement {
   item_id?: string;
   header?: string;
   description_of_items?: string;
+  factor: number;
   no_of_units: number;
   length: number;
   width_breadth: number;
