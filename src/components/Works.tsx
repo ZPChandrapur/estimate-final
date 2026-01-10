@@ -73,15 +73,39 @@ const Works: React.FC = () => {
     if (!newWork.work_name || !user) return;
 
     try {
-      const { error } = await supabase
+      const { data: insertedWork, error: workError } = await supabase
         .schema('estimate')
         .from('works')
         .insert([{
           ...newWork,
           created_by: user.id
-        }]);
+        }])
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (workError) throw workError;
+
+      if (insertedWork?.works_id) {
+        const { data: userRole } = await supabase
+          .schema('public')
+          .from('user_roles')
+          .select('role_id, roles!inner(application)')
+          .eq('user_id', user.id)
+          .in('roles.application', ['estimate', 'mb', 'estimate,mb'])
+          .maybeSingle();
+
+        if (userRole?.role_id) {
+          await supabase
+            .schema('estimate')
+            .from('work_assignments')
+            .insert([{
+              work_id: insertedWork.works_id,
+              user_id: user.id,
+              role_id: userRole.role_id,
+              assigned_by: user.id
+            }]);
+        }
+      }
 
       setShowAddModal(false);
       setNewWork({
