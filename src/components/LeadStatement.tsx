@@ -235,6 +235,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
           reference: formData.reference,
           lead_in_km: formData.lead_in_km,
           lead_charges: formData.lead_charges,
+          unit_from_lead_chart: formData.unit_from_lead_chart,
           total_rate: formData.total_rate,
           unit: formData.unit,
           created_by: user.id
@@ -263,6 +264,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
       reference: item.reference,
       lead_in_km: item.lead_in_km,
       lead_charges: item.lead_charges,
+      unit_from_lead_chart: item.unit_from_lead_chart,
       total_rate: item.total_rate,
       unit: item.unit
     });
@@ -286,6 +288,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
           reference: formData.reference,
           lead_in_km: formData.lead_in_km,
           lead_charges: formData.lead_charges,
+          unit_from_lead_chart: formData.unit_from_lead_chart,
           total_rate: formData.total_rate,
           unit: formData.unit,
           updated_at: new Date().toISOString()
