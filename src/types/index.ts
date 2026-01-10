@@ -92,6 +92,10 @@ export interface SubworkItem {
   csr_reference?: string;
   csr_labour_cost?: number;
   csr_unit?: string;
+  operation_type?: 'none' | 'multiply' | 'divide' | 'add' | 'subtract';
+  operation_value?: number;
+  final_unit?: string;
+  final_quantity?: number;
 }
 
 export interface ItemMeasurement {
@@ -110,10 +114,6 @@ export interface ItemMeasurement {
   width_breadth: number;
   height_depth: number;
   calculated_quantity: number;
-  operation_type?: 'none' | 'multiply' | 'divide' | 'add' | 'subtract';
-  operation_value?: number;
-  final_unit?: string;
-  final_quantity?: number;
   estimated_quantity?: number;
   actual_quantity?: number;
   variance?: number;

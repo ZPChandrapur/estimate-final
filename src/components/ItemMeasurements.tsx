@@ -60,11 +60,7 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
     width_breadth: 0,
     height_depth: 0,
     is_manual_quantity: false,
-    selected_rate_id: 0,
-    operation_type: 'none',
-    operation_value: 0,
-    final_unit: '',
-    final_quantity: 0
+    selected_rate_id: 0
   });
   const [selectedRate, setSelectedRate] = useState<number>(0);
   const [newLead, setNewLead] = useState<Partial<ItemLead>>({
@@ -81,6 +77,17 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
   const [availableItems, setAvailableItems] = useState<Array<{ sr_no: number, item_number: string, description: string, total_quantity: number, unit: string }>>([]);
   const [isReferencing, setIsReferencing] = useState(false);
   const [selectedReferenceItem, setSelectedReferenceItem] = useState<number | null>(null);
+
+  // Item-level operation state
+  const [itemOperation, setItemOperation] = useState<{
+    operation_type: 'none' | 'multiply' | 'divide' | 'add' | 'subtract';
+    operation_value: number;
+    final_unit: string;
+  }>({
+    operation_type: 'none',
+    operation_value: 0,
+    final_unit: ''
+  });
 
   // Get the selected rate for calculations
   const getSelectedRate = () => {
@@ -100,6 +107,12 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
 
   useEffect(() => {
     setCurrentItem(item);
+    // Load item operation settings
+    setItemOperation({
+      operation_type: item.operation_type || 'none',
+      operation_value: item.operation_value || 0,
+      final_unit: item.final_unit || item.ssr_unit || ''
+    });
   }, [item]);
 
   useEffect(() => {
@@ -120,30 +133,30 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
       (newMeasurement.height_depth || 0);
   };
 
-  const calculateFinalQuantity = () => {
-    const calculatedQty = calculateQuantity();
-    const operationType = newMeasurement.operation_type || 'none';
-    const operationValue = newMeasurement.operation_value || 0;
+  // Calculate final quantity for the entire item based on total of all measurements
+  const calculateItemFinalQuantity = (totalQuantity: number) => {
+    const operationType = itemOperation.operation_type || 'none';
+    const operationValue = itemOperation.operation_value || 0;
 
-    let finalQty = calculatedQty;
+    let finalQty = totalQuantity;
 
     // Apply operation
     switch (operationType) {
       case 'multiply':
-        finalQty = calculatedQty * operationValue;
+        finalQty = totalQuantity * operationValue;
         break;
       case 'divide':
-        finalQty = operationValue !== 0 ? calculatedQty / operationValue : calculatedQty;
+        finalQty = operationValue !== 0 ? totalQuantity / operationValue : totalQuantity;
         break;
       case 'add':
-        finalQty = calculatedQty + operationValue;
+        finalQty = totalQuantity + operationValue;
         break;
       case 'subtract':
-        finalQty = calculatedQty - operationValue;
+        finalQty = totalQuantity - operationValue;
         break;
       case 'none':
       default:
-        finalQty = calculatedQty;
+        finalQty = totalQuantity;
         break;
     }
 
@@ -419,8 +432,6 @@ const handleMeasurementExcelUpload = async (
       const subworkItemId = rateData?.subwork_item_sr_no;
       const rateSrNo = rateData?.sr_no;
 
-      const finalQuantity = calculateFinalQuantity();
-
       const { error } = await supabase
         .schema('estimate')
         .from('item_measurements')
@@ -430,10 +441,6 @@ const handleMeasurementExcelUpload = async (
           measurement_sr_no: nextSrNo,
           factor: newMeasurement.factor || 1,
           calculated_quantity: calculatedQuantity,
-          operation_type: newMeasurement.operation_type || 'none',
-          operation_value: newMeasurement.operation_value || 0,
-          final_quantity: finalQuantity,
-          final_unit: newMeasurement.final_unit || newMeasurement.unit || null,
           line_amount: rateData?.rate * calculatedQuantity,
           unit: newMeasurement.unit || null,
           is_deduction: newMeasurement.is_deduction || false,
@@ -614,11 +621,7 @@ const handleMeasurementExcelUpload = async (
       unit: measurement.unit || '',
       is_deduction: measurement.is_deduction || false,
       is_manual_quantity: measurement.is_manual_quantity || false,
-      manual_quantity: measurement.manual_quantity || 0,
-      operation_type: measurement.operation_type || 'none',
-      operation_value: measurement.operation_value || 0,
-      final_unit: measurement.final_unit || '',
-      final_quantity: measurement.final_quantity || 0
+      manual_quantity: measurement.manual_quantity || 0
     });
 
     // Set selectedRate to the rate_sr_no or selected_rate_id for dropdown selection
@@ -639,7 +642,6 @@ const handleMeasurementExcelUpload = async (
 
     try {
       const calculatedQuantity = calculateQuantity();
-      const finalQuantity = calculateFinalQuantity();
 
       const rate = selectedRate;
 
@@ -669,10 +671,6 @@ const handleMeasurementExcelUpload = async (
           width_breadth: newMeasurement.width_breadth,
           height_depth: newMeasurement.height_depth,
           calculated_quantity: calculatedQuantity,
-          operation_type: newMeasurement.operation_type || 'none',
-          operation_value: newMeasurement.operation_value || 0,
-          final_quantity: finalQuantity,
-          final_unit: newMeasurement.final_unit || newMeasurement.unit || null,
           line_amount: rateData?.rate * calculatedQuantity,
           is_manual_quantity: newMeasurement.is_manual_quantity || false,
           manual_quantity: newMeasurement.manual_quantity || 0,
@@ -727,6 +725,40 @@ const handleMeasurementExcelUpload = async (
       }, 100);
     } catch (error) {
       console.error('Error updating measurement:', error);
+    }
+  };
+
+  const handleSaveItemOperations = async () => {
+    if (!user) return;
+
+    try {
+      // Calculate total quantity from all measurements
+      const totalQuantity = measurements.reduce((sum, m) => {
+        const qty = m.is_deduction ? -m.calculated_quantity : m.calculated_quantity;
+        return sum + qty;
+      }, 0);
+
+      // Calculate final quantity with operation
+      const finalQty = calculateItemFinalQuantity(totalQuantity);
+
+      const { error } = await supabase
+        .schema('estimate')
+        .from('subwork_items')
+        .update({
+          operation_type: itemOperation.operation_type,
+          operation_value: itemOperation.operation_value,
+          final_unit: itemOperation.final_unit || currentItem.ssr_unit,
+          final_quantity: finalQty
+        })
+        .eq('sr_no', currentItem.sr_no);
+
+      if (error) throw error;
+
+      alert('Final quantity calculation saved successfully!');
+      fetchData();
+    } catch (error) {
+      console.error('Error saving item operations:', error);
+      alert('Failed to save final quantity calculation');
     }
   };
 
@@ -1059,6 +1091,110 @@ const handleMeasurementExcelUpload = async (
                     <Calculator className="mx-auto h-12 w-12 text-gray-300" />
                     <h3 className="mt-2 text-sm font-medium text-gray-900">No measurements found</h3>
                     <p className="mt-1 text-sm text-gray-500">Add detailed measurements for this item.</p>
+                  </div>
+                )}
+
+                {/* Final Quantity Calculation - Item Level */}
+                {measurements.length > 0 && (
+                  <div className="mt-6 border-t pt-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Final Quantity Calculation</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Apply operations to the total calculated quantity from all measurements
+                    </p>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Apply Operation
+                          </label>
+                          <select
+                            value={itemOperation.operation_type}
+                            onChange={(e) => setItemOperation({ ...itemOperation, operation_type: e.target.value as any })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="none">None</option>
+                            <option value="multiply">Multiply by</option>
+                            <option value="divide">Divide by</option>
+                            <option value="add">Add</option>
+                            <option value="subtract">Subtract</option>
+                          </select>
+                        </div>
+
+                        {itemOperation.operation_type !== 'none' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Value
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.001"
+                              value={itemOperation.operation_value}
+                              onChange={(e) => setItemOperation({ ...itemOperation, operation_value: parseFloat(e.target.value) || 0 })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="Enter value"
+                            />
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Final Unit
+                          </label>
+                          <select
+                            value={itemOperation.final_unit}
+                            onChange={(e) => setItemOperation({ ...itemOperation, final_unit: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value={currentItem.ssr_unit}>Same as original ({currentItem.ssr_unit})</option>
+                            <option value="CUM">CUM</option>
+                            <option value="/BAG">/BAG</option>
+                            <option value="MT">MT</option>
+                            <option value="NOS">NOS</option>
+                            <option value="SQM">SQM</option>
+                            <option value="RMT">RMT</option>
+                            <option value="/LITRE">/LITRE</option>
+                            <option value="/SET">/SET</option>
+                            <option value="KG">KG</option>
+                            <option value="TONNE">TONNE</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-md p-4 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Total from Measurements:</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {measurements.reduce((sum, m) => {
+                              const qty = m.is_deduction ? -m.calculated_quantity : m.calculated_quantity;
+                              return sum + qty;
+                            }, 0).toFixed(3)} {currentItem.ssr_unit}
+                          </span>
+                        </div>
+
+                        {itemOperation.operation_type !== 'none' && (
+                          <div className="flex justify-between items-center border-t pt-2">
+                            <span className="text-lg font-semibold text-blue-600">Final Quantity:</span>
+                            <span className="text-lg font-bold text-blue-900">
+                              {calculateItemFinalQuantity(
+                                measurements.reduce((sum, m) => {
+                                  const qty = m.is_deduction ? -m.calculated_quantity : m.calculated_quantity;
+                                  return sum + qty;
+                                }, 0)
+                              ).toFixed(3)} {itemOperation.final_unit || currentItem.ssr_unit}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={handleSaveItemOperations}
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+                      >
+                        Save Final Quantity Calculation
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1492,92 +1628,15 @@ const handleMeasurementExcelUpload = async (
                   </p>
                 </div>
 
-                {/* Operation and Unit Conversion */}
-                <div className="border-t pt-4 space-y-4">
-                  <h4 className="text-sm font-medium text-gray-900">Final Quantity Calculation</h4>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Apply Operation
-                      </label>
-                      <select
-                        value={newMeasurement.operation_type || 'none'}
-                        onChange={(e) => setNewMeasurement({ ...newMeasurement, operation_type: e.target.value as any })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="none">None</option>
-                        <option value="multiply">Multiply by</option>
-                        <option value="divide">Divide by</option>
-                        <option value="add">Add</option>
-                        <option value="subtract">Subtract</option>
-                      </select>
-                    </div>
-
-                    {newMeasurement.operation_type && newMeasurement.operation_type !== 'none' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Value
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.001"
-                          value={newMeasurement.operation_value || 0}
-                          onChange={(e) => setNewMeasurement({ ...newMeasurement, operation_value: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Enter value"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Final Unit (Optional)
-                    </label>
-                    <select
-                      value={newMeasurement.final_unit || newMeasurement.unit || ''}
-                      onChange={(e) => setNewMeasurement({ ...newMeasurement, final_unit: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Same as original unit</option>
-                      <option value="CUM">CUM</option>
-                      <option value="/BAG">/BAG</option>
-                      <option value="MT">MT</option>
-                      <option value="NOS">NOS</option>
-                      <option value="SQM">SQM</option>
-                      <option value="RMT">RMT</option>
-                      <option value="/LITRE">/LITRE</option>
-                      <option value="/SET">/SET</option>
-                      <option value="KG">KG</option>
-                      <option value="TONNE">TONNE</option>
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Select if the final quantity should be displayed in a different unit
-                    </p>
-                  </div>
-                </div>
-
                 {/* Preview */}
-                <div className="bg-gray-50 p-4 rounded-md space-y-2">
+                <div className="bg-gray-50 p-4 rounded-md">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600">Calculated Quantity:</span>
                     <span className={`font-medium ${newMeasurement.is_deduction ? 'text-red-600' : 'text-gray-900'}`}>
                       {newMeasurement.is_deduction ? '-' : ''}{calculateQuantity().toFixed(3)} {newMeasurement.unit || currentItem.ssr_unit}
                     </span>
                   </div>
-
-                  {newMeasurement.operation_type && newMeasurement.operation_type !== 'none' && (
-                    <div className="flex justify-between items-center text-sm border-t pt-2">
-                      <span className="text-blue-600 font-medium">Final Quantity:</span>
-                      <span className="font-semibold text-blue-900">
-                        {calculateFinalQuantity().toFixed(3)} {newMeasurement.final_unit || newMeasurement.unit || currentItem.ssr_unit}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between text-xs text-gray-500">
+                  <div className="flex items-center justify-between text-xs mt-1 text-gray-500">
                     <span>Rate Used:</span>
                     <span>₹{getSelectedRate().toFixed(2)}</span>
                   </div>
@@ -2001,91 +2060,14 @@ const handleMeasurementExcelUpload = async (
                   </p>
                 </div>
 
-                {/* Operation and Unit Conversion */}
-                <div className="border-t pt-4 space-y-4">
-                  <h4 className="text-sm font-medium text-gray-900">Final Quantity Calculation</h4>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Apply Operation
-                      </label>
-                      <select
-                        value={newMeasurement.operation_type || 'none'}
-                        onChange={(e) => setNewMeasurement({ ...newMeasurement, operation_type: e.target.value as any })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="none">None</option>
-                        <option value="multiply">Multiply by</option>
-                        <option value="divide">Divide by</option>
-                        <option value="add">Add</option>
-                        <option value="subtract">Subtract</option>
-                      </select>
-                    </div>
-
-                    {newMeasurement.operation_type && newMeasurement.operation_type !== 'none' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Value
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.001"
-                          value={newMeasurement.operation_value || 0}
-                          onChange={(e) => setNewMeasurement({ ...newMeasurement, operation_value: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Enter value"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Final Unit (Optional)
-                    </label>
-                    <select
-                      value={newMeasurement.final_unit || newMeasurement.unit || ''}
-                      onChange={(e) => setNewMeasurement({ ...newMeasurement, final_unit: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Same as original unit</option>
-                      <option value="CUM">CUM</option>
-                      <option value="/BAG">/BAG</option>
-                      <option value="MT">MT</option>
-                      <option value="NOS">NOS</option>
-                      <option value="SQM">SQM</option>
-                      <option value="RMT">RMT</option>
-                      <option value="/LITRE">/LITRE</option>
-                      <option value="/SET">/SET</option>
-                      <option value="KG">KG</option>
-                      <option value="TONNE">TONNE</option>
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Select if the final quantity should be displayed in a different unit
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 p-3 rounded-md space-y-2">
+                <div className="bg-gray-50 p-3 rounded-md">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Calculated Quantity:</span>
                     <span className="font-medium text-gray-900">
                       {calculateQuantity().toFixed(3)} {newMeasurement.unit || item.ssr_unit}
                     </span>
                   </div>
-
-                  {newMeasurement.operation_type && newMeasurement.operation_type !== 'none' && (
-                    <div className="flex justify-between items-center text-sm border-t pt-2">
-                      <span className="text-blue-600 font-medium">Final Quantity:</span>
-                      <span className="font-semibold text-blue-900">
-                        {calculateFinalQuantity().toFixed(3)} {newMeasurement.final_unit || newMeasurement.unit || item.ssr_unit}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between text-xs text-gray-500">
+                  <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
                     <span>Rate Used:</span>
                     <span>
                       ₹{getSelectedRate().toFixed(2)} per {newMeasurement.unit || item.ssr_unit}
