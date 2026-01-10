@@ -2,18 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { SubworkItem, ItemMeasurement, ItemLead, ItemMaterial } from '../types';
-import {
-  Plus,
-  Edit2,
-  Trash2,
-  Calculator,
-  Truck,
-  Upload,
-  X,
-  ImageIcon,
-  Package2,
-  Download
-} from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, Calculator, Truck, Upload, X, Image as ImageIcon, Package2, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface ItemMeasurementsProps {
