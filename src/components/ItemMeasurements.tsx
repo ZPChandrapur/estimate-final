@@ -410,9 +410,22 @@ const handleMeasurementExcelUpload = async (
 
   const handleAddMeasurement = async () => {
     if (!user) return;
+
+    // Validate that a rate is selected
+    if (!selectedDescription) {
+      alert('Please select a rate before adding measurement');
+      return;
+    }
+
     try {
       const nextSrNo = await getNextMeasurementSrNo();
       const calculatedQuantity = calculateQuantity();
+
+      // Validate calculated quantity
+      if (calculatedQuantity === 0 || isNaN(calculatedQuantity)) {
+        alert('Please enter valid measurement values or manual quantity');
+        return;
+      }
 
       // Use the selected rate
       const rate = selectedRate;
@@ -498,6 +511,7 @@ const handleMeasurementExcelUpload = async (
       }, 100);
     } catch (error) {
       console.error('Error adding measurement:', error);
+      alert(`Failed to add measurement: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -641,6 +655,12 @@ const handleMeasurementExcelUpload = async (
     try {
       const calculatedQuantity = calculateQuantity();
 
+      // Validate calculated quantity
+      if (calculatedQuantity === 0 || isNaN(calculatedQuantity)) {
+        alert('Please enter valid measurement values or manual quantity');
+        return;
+      }
+
       const rate = selectedRate;
 
       // Fetch rate data (remove .single(), use first entry)
@@ -723,6 +743,7 @@ const handleMeasurementExcelUpload = async (
       }, 100);
     } catch (error) {
       console.error('Error updating measurement:', error);
+      alert(`Failed to update measurement: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
