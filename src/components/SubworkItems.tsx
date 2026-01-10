@@ -777,6 +777,65 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     }
   };
 
+  const handleRoyaltyClick = async (item: SubworkItem) => {
+    try {
+      if (!item.sr_no) return;
+
+      // Get subwork sr_no
+      const { data: subworkData } = await supabase
+        .schema('estimate')
+        .from('subworks')
+        .select('sr_no')
+        .eq('subworks_id', subworkId)
+        .maybeSingle();
+
+      if (!subworkData) {
+        console.error('Subwork not found');
+        return;
+      }
+
+      // Get measurements for this item
+      const { data: measurements } = await supabase
+        .schema('estimate')
+        .from('item_measurements')
+        .select('calculated_quantity')
+        .eq('subwork_item_id', item.sr_no);
+
+      // Calculate total measurement
+      const totalMeasurement = measurements?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
+
+      // Check if royalty measurement already exists
+      const { data: existing } = await supabase
+        .schema('estimate')
+        .from('royalty_measurements')
+        .select('sr_no')
+        .eq('subwork_item_id', item.sr_no)
+        .maybeSingle();
+
+      // If doesn't exist, create it
+      if (!existing) {
+        await supabase
+          .schema('estimate')
+          .from('royalty_measurements')
+          .insert({
+            works_id: worksId,
+            subwork_id: subworkData.sr_no,
+            subwork_item_id: item.sr_no,
+            measurement: totalMeasurement,
+            metal_factor: 0,
+            murum_factor: 0,
+            sand_factor: 0,
+            created_by: user?.id
+          });
+      }
+
+      // Open the royalty measurements modal
+      setShowRoyaltyMeasurementsModal(true);
+    } catch (error) {
+      console.error('Error handling royalty click:', error);
+    }
+  };
+
   const handleDeleteItem = async (item: SubworkItem) => {
     if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
       return;
@@ -1014,13 +1073,6 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                 Add Testing
               </button>
               <button
-                onClick={() => setShowRoyaltyMeasurementsModal(true)}
-                className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <Calculator className="w-3 h-3 mr-1" />
-                Royalty
-              </button>
-              <button
                 onClick={onClose}
                 className="text-gray-400 hover:text-gray-600"
               >
@@ -1207,6 +1259,15 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
+                            {item.category === 'royalty' && (
+                              <button
+                                onClick={() => handleRoyaltyClick(item)}
+                                className="text-yellow-600 hover:text-yellow-900 p-1 rounded"
+                                title="Royalty Measurements"
+                              >
+                                <Calculator className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
                               onClick={() => handleDeleteItem(item)}
                               className="text-red-600 hover:text-red-900 p-1 rounded"
