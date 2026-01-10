@@ -789,53 +789,53 @@ const handleMeasurementExcelUpload = async (
         throw error;
       }
 
-      // Only update item_rates if we have an operation (not 'none')
-      if (itemOperation.operation_type !== 'none') {
-        // Update item_rates to use final_quantity for amount calculations
-        const { data: rates, error: ratesError } = await supabase
-          .schema('estimate')
-          .from('item_rates')
-          .select('sr_no, rate')
-          .eq('subwork_item_sr_no', currentItem.sr_no);
+      // Update item_rates with the correct quantity
+      const { data: rates, error: ratesError } = await supabase
+        .schema('estimate')
+        .from('item_rates')
+        .select('sr_no, rate')
+        .eq('subwork_item_sr_no', currentItem.sr_no);
 
-        if (ratesError) {
-          console.error('Error fetching rates:', ratesError);
-          throw ratesError;
+      if (ratesError) {
+        console.error('Error fetching rates:', ratesError);
+        throw ratesError;
+      }
+
+      // Determine which quantity to use for rates
+      const quantityForRates = itemOperation.operation_type === 'none' ? totalQuantity : finalQty;
+
+      // Update each rate with new quantity and recalculated amount
+      let totalItemAmount = 0;
+      if (rates && rates.length > 0) {
+        for (const rate of rates) {
+          const rateAmount = rate.rate * quantityForRates;
+          totalItemAmount += rateAmount;
+
+          const { error: updateRateError } = await supabase
+            .schema('estimate')
+            .from('item_rates')
+            .update({
+              ssr_quantity: quantityForRates,
+              rate_total_amount: rateAmount
+            })
+            .eq('sr_no', rate.sr_no);
+
+          if (updateRateError) {
+            console.error('Error updating rate:', updateRateError);
+            throw updateRateError;
+          }
         }
 
-        // Update each rate with new quantity and recalculated amount
-        let totalItemAmount = 0;
-        if (rates && rates.length > 0) {
-          for (const rate of rates) {
-            const rateAmount = rate.rate * finalQty;
-            totalItemAmount += rateAmount;
+        // Update total_item_amount in subwork_items
+        const { error: totalAmountError } = await supabase
+          .schema('estimate')
+          .from('subwork_items')
+          .update({ total_item_amount: totalItemAmount })
+          .eq('sr_no', currentItem.sr_no);
 
-            const { error: updateRateError } = await supabase
-              .schema('estimate')
-              .from('item_rates')
-              .update({
-                ssr_quantity: finalQty,
-                rate_total_amount: rateAmount
-              })
-              .eq('sr_no', rate.sr_no);
-
-            if (updateRateError) {
-              console.error('Error updating rate:', updateRateError);
-              throw updateRateError;
-            }
-          }
-
-          // Update total_item_amount in subwork_items
-          const { error: totalAmountError } = await supabase
-            .schema('estimate')
-            .from('subwork_items')
-            .update({ total_item_amount: totalItemAmount })
-            .eq('sr_no', currentItem.sr_no);
-
-          if (totalAmountError) {
-            console.error('Error updating total amount:', totalAmountError);
-            throw totalAmountError;
-          }
+        if (totalAmountError) {
+          console.error('Error updating total amount:', totalAmountError);
+          throw totalAmountError;
         }
       }
 
