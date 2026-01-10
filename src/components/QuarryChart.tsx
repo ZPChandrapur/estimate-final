@@ -74,8 +74,6 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
   const trRef = useRef<Konva.Transformer | null>(null);
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
 
-  if (!isOpen) return null;
-
   const width = cols * 20;
   const height = rows * 20;
 
@@ -286,6 +284,8 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
   React.useEffect(() => {
     attachTransformer(selectedId);
   }, [selectedId, filteredShapes.length]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
