@@ -123,37 +123,39 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
             const totalMeasurement = measurements?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
 
             // Extract factors from rate analysis entries based on specific material types
-            // Only extract factors for: 80 mm (H.B Metal), Sand, and Murrum
+            // Only extract factors for: 80mm metal (HB), Sand, and Murrum
             let metalFactor = 0;
             let murumFactor = 0;
             let sandFactor = 0;
 
             if (analysis.entries && Array.isArray(analysis.entries)) {
+              console.log('Processing rate analysis entries for item:', item.sr_no, analysis.entries);
               analysis.entries.forEach((entry: any) => {
                 const label = entry.label?.toLowerCase() || '';
-                const material = entry.material?.toLowerCase() || '';
                 const factor = entry.factor || 0;
 
-                // 1. Check for 80 mm (H.B Metal) - search in label or if material contains "metal"
-                if (
-                  label.includes('80 mm') ||
-                  label.includes('h.b metal') ||
-                  label.includes('hb metal') ||
-                  (material && material.includes('metal'))
-                ) {
+                console.log('Checking entry - label:', entry.label, 'factor:', factor);
+
+                // 1. Check ONLY for "80mm metal (HB)" specifically - search in label field
+                if (label.includes('80mm') && label.includes('metal')) {
                   metalFactor = factor;
+                  console.log('✓ Found metal factor:', factor, 'for label:', entry.label);
                 }
 
-                // 2. Check for Sand - search in material field
-                if (material && material.includes('sand')) {
+                // 2. Check for Sand - search in label field
+                if (label.includes('sand')) {
                   sandFactor = factor;
+                  console.log('✓ Found sand factor:', factor, 'for label:', entry.label);
                 }
 
-                // 3. Check for Murrum - search in material field
-                if (material && (material.includes('murrum') || material.includes('murum'))) {
+                // 3. Check for Murrum - search in label field
+                if (label.includes('murrum') || label.includes('murum')) {
                   murumFactor = factor;
+                  console.log('✓ Found murrum factor:', factor, 'for label:', entry.label);
                 }
               });
+
+              console.log('Final factors - Metal:', metalFactor, 'Sand:', sandFactor, 'Murrum:', murumFactor);
             }
 
             // Check if royalty measurement already exists
