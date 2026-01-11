@@ -301,6 +301,20 @@ const handleSave = async () => {
     });
   };
 
+  const getRoyaltySubworks = () => {
+    return subworks.filter(subwork => {
+      const items = subworkItems[subwork.subworks_id] || [];
+      return items.some(item => item.category === 'royalty');
+    });
+  };
+
+  const getTestingSubworks = () => {
+    return subworks.filter(subwork => {
+      const items = subworkItems[subwork.subworks_id] || [];
+      return items.some(item => item.category === 'testing');
+    });
+  };
+
   const getPartCSubworks = () => {
     return subworks.filter(subwork => {
       const items = subworkItems[subwork.subworks_id] || [];
@@ -313,7 +327,9 @@ const handleSave = async () => {
   };
 
   const showFundingCols = shouldShowFundingColumns();
-  const totalColspan = showFundingCols ? 8 : 6;
+  const showTypeColumn = department !== 'pwd';
+  const baseColumns = showTypeColumn ? 6 : 5;
+  const totalColspan = showFundingCols ? baseColumns + 2 : baseColumns;
 
   if (loading) {
     return (
@@ -336,7 +352,7 @@ const handleSave = async () => {
     <div className="space-y-6">
       {/* Work Info */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold mb-4">Works Recap Sheet</h2>
+        <h2 className="text-xl font-semibold mb-4">GENERAL ABSTRACT</h2>
         <div className="space-y-2 text-sm">
           <p>
             <span className="font-medium">Work:</span> {work.work_name}
@@ -465,13 +481,15 @@ const handleSave = async () => {
       {calculations && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Recapitulation Summary</h3>
+            <h3 className="text-lg font-semibold mb-4">Summary</h3>
 
             <table className="w-full border-collapse border border-gray-300 text-sm">
               <thead>
                 <tr className="bg-gray-100">
                   <th className="border border-gray-300 p-3 min-w-[40px] text-center">Sr. No</th>
-                  <th className="border border-gray-300 p-3 min-w-[120px]">Type of Work</th>
+                  {department !== 'pwd' && (
+                    <th className="border border-gray-300 p-3 min-w-[120px]">Type of Work</th>
+                  )}
                   <th className="border border-gray-300 p-3 min-w-[200px]">Item of Work</th>
                   <th className="border border-gray-300 p-3 min-w-[60px] text-right">Unit</th>
                   <th className="border border-gray-300 p-3 min-w-[110px] text-right">Amount per unit(Rs.)</th>
@@ -506,7 +524,9 @@ const handleSave = async () => {
                   return (
                     <tr key={`part-a-${subwork.subworks_id}`}>
                       <td className="border border-gray-300 p-3 text-center">{index + 1}</td>
-                      <td className="border border-gray-300 p-3">Solid waste management</td>
+                      {showTypeColumn && (
+                        <td className="border border-gray-300 p-3">Solid waste management</td>
+                      )}
                       <td className="border border-gray-300 p-3">{subwork.subworks_name}</td>
                       {readonly ? (
                         <td className="border border-gray-300 p-3 text-right">{inputUnit}</td>
@@ -534,7 +554,7 @@ const handleSave = async () => {
                   );
                 })}
                 <tr className="font-bold bg-blue-50">
-                  <td colSpan={5} className="border border-gray-300 p-3 text-right">Subtotal - Part A</td>
+                  <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">Subtotal - Part A</td>
                   <td className="border border-gray-300 p-3 text-right">{calculations.partA.subtotal.toFixed(0)}</td>
                   {showFundingCols && (
                     <>
@@ -547,7 +567,7 @@ const handleSave = async () => {
                   .filter((tax) => tax.applyTo === 'part_a' || tax.applyTo === 'both')
                   .map((tax) => (
                     <tr key={`part-a-tax-${tax.id}`} className="font-semibold">
-                      <td colSpan={5} className="border border-gray-300 p-3 text-right">
+                      <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
                         Add {tax.percentage}% {tax.name}
                       </td>
                       <td className="border border-gray-300 p-3 text-right">{(calculations.partA.taxes[tax.id] || 0).toFixed(0)}</td>
@@ -560,7 +580,7 @@ const handleSave = async () => {
                     </tr>
                   ))}
                 <tr className="font-bold bg-blue-100">
-                  <td colSpan={5} className="border border-gray-300 p-3 text-right">Total of PART - A</td>
+                  <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">Total of PART - A</td>
                   <td className="border border-gray-300 p-3 text-right">{calculations.partA.total.toFixed(0)}</td>
                   {showFundingCols && (
                     <>
@@ -570,56 +590,117 @@ const handleSave = async () => {
                   )}
                 </tr>
 
-                {/* PART B Rows */}
-                <tr className="bg-gray-200 font-bold">
-                  <td colSpan={totalColspan} className="border border-gray-300 p-3">
-                    PART-B: Royalty and Testing
-                  </td>
-                </tr>
-                {getPartBSubworks().map((subwork, index) => {
-                  const items = (subworkItems[subwork.subworks_id] || []).filter(
-                    item => item.category === 'royalty' || item.category === 'testing'
-                  );
-                  const subworkTotalAmount = items.reduce(
-                    (sum, item) => sum + (item.total_item_amount || 0),
-                    0
-                  );
-
-                  const inputUnit = unitInputs[subwork.subworks_id] ?? (Number(subwork.unit) || 1);
-                  const totalAmount = inputUnit * subworkTotalAmount;
-
-                  return (
-                    <tr key={`part-b-${subwork.subworks_id}`}>
-                      <td className="border border-gray-300 p-3 text-center">{index + 1}</td>
-                      <td className="border border-gray-300 p-3">Solid waste management</td>
-                      <td className="border border-gray-300 p-3">{subwork.subworks_name}</td>
-                      {readonly ? (
-                        <td className="border border-gray-300 p-3 text-right">{inputUnit}</td>
-                      ) : (
-                        <td className="border border-gray-300 p-3 text-right">
-                          <input
-                            type="number"
-                            className="w-20 px-1 py-1 border border-gray-300 rounded"
-                            value={inputUnit}
-                            min="0"
-                            step="any"
-                            onChange={(e) => handleUnitChange(subwork.subworks_id, e.target.value)}
-                          />
-                        </td>
-                      )}
-                      <td className="border border-gray-300 p-3 text-right">{subworkTotalAmount.toFixed(0)}</td>
-                      <td className="border border-gray-300 p-3 text-right">{totalAmount.toFixed(0)}</td>
-                      {showFundingCols && (
-                        <>
-                          <td className="border border-gray-300 p-3 text-right">{(totalAmount * 0.7).toFixed(0)}</td>
-                          <td className="border border-gray-300 p-3 text-right">{(totalAmount * 0.3).toFixed(0)}</td>
-                        </>
-                      )}
+                {/* Royalty Rows */}
+                {getRoyaltySubworks().length > 0 && (
+                  <>
+                    <tr className="bg-amber-100 font-bold">
+                      <td colSpan={totalColspan} className="border border-gray-300 p-3">
+                        Royalty Charges
+                      </td>
                     </tr>
-                  );
-                })}
+                    {getRoyaltySubworks().map((subwork, index) => {
+                      const items = (subworkItems[subwork.subworks_id] || []).filter(
+                        item => item.category === 'royalty'
+                      );
+                      const subworkTotalAmount = items.reduce(
+                        (sum, item) => sum + (item.total_item_amount || 0),
+                        0
+                      );
+
+                      const inputUnit = unitInputs[subwork.subworks_id] ?? (Number(subwork.unit) || 1);
+                      const totalAmount = inputUnit * subworkTotalAmount;
+
+                      return (
+                        <tr key={`royalty-${subwork.subworks_id}`}>
+                          <td className="border border-gray-300 p-3 text-center">{index + 1}</td>
+                          {showTypeColumn && (
+                            <td className="border border-gray-300 p-3">Royalty</td>
+                          )}
+                          <td className="border border-gray-300 p-3">{subwork.subworks_name}</td>
+                          {readonly ? (
+                            <td className="border border-gray-300 p-3 text-right">{inputUnit}</td>
+                          ) : (
+                            <td className="border border-gray-300 p-3 text-right">
+                              <input
+                                type="number"
+                                className="w-20 px-1 py-1 border border-gray-300 rounded"
+                                value={inputUnit}
+                                min="0"
+                                step="any"
+                                onChange={(e) => handleUnitChange(subwork.subworks_id, e.target.value)}
+                              />
+                            </td>
+                          )}
+                          <td className="border border-gray-300 p-3 text-right">{subworkTotalAmount.toFixed(0)}</td>
+                          <td className="border border-gray-300 p-3 text-right">{totalAmount.toFixed(0)}</td>
+                          {showFundingCols && (
+                            <>
+                              <td className="border border-gray-300 p-3 text-right">{(totalAmount * 0.7).toFixed(0)}</td>
+                              <td className="border border-gray-300 p-3 text-right">{(totalAmount * 0.3).toFixed(0)}</td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* Testing Rows */}
+                {getTestingSubworks().length > 0 && (
+                  <>
+                    <tr className="bg-purple-100 font-bold">
+                      <td colSpan={totalColspan} className="border border-gray-300 p-3">
+                        Testing Charges
+                      </td>
+                    </tr>
+                    {getTestingSubworks().map((subwork, index) => {
+                      const items = (subworkItems[subwork.subworks_id] || []).filter(
+                        item => item.category === 'testing'
+                      );
+                      const subworkTotalAmount = items.reduce(
+                        (sum, item) => sum + (item.total_item_amount || 0),
+                        0
+                      );
+
+                      const inputUnit = unitInputs[subwork.subworks_id] ?? (Number(subwork.unit) || 1);
+                      const totalAmount = inputUnit * subworkTotalAmount;
+
+                      return (
+                        <tr key={`testing-${subwork.subworks_id}`}>
+                          <td className="border border-gray-300 p-3 text-center">{index + 1}</td>
+                          {showTypeColumn && (
+                            <td className="border border-gray-300 p-3">Testing</td>
+                          )}
+                          <td className="border border-gray-300 p-3">{subwork.subworks_name}</td>
+                          {readonly ? (
+                            <td className="border border-gray-300 p-3 text-right">{inputUnit}</td>
+                          ) : (
+                            <td className="border border-gray-300 p-3 text-right">
+                              <input
+                                type="number"
+                                className="w-20 px-1 py-1 border border-gray-300 rounded"
+                                value={inputUnit}
+                                min="0"
+                                step="any"
+                                onChange={(e) => handleUnitChange(subwork.subworks_id, e.target.value)}
+                              />
+                            </td>
+                          )}
+                          <td className="border border-gray-300 p-3 text-right">{subworkTotalAmount.toFixed(0)}</td>
+                          <td className="border border-gray-300 p-3 text-right">{totalAmount.toFixed(0)}</td>
+                          {showFundingCols && (
+                            <>
+                              <td className="border border-gray-300 p-3 text-right">{(totalAmount * 0.7).toFixed(0)}</td>
+                              <td className="border border-gray-300 p-3 text-right">{(totalAmount * 0.3).toFixed(0)}</td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </>
+                )}
                 <tr className="font-bold bg-green-50">
-                  <td colSpan={5} className="border border-gray-300 p-3 text-right">Subtotal - Part B</td>
+                  <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">Subtotal - Part B</td>
                   <td className="border border-gray-300 p-3 text-right">{calculations.partB.subtotal.toFixed(0)}</td>
                   {showFundingCols && (
                     <>
@@ -632,7 +713,7 @@ const handleSave = async () => {
                   .filter((tax) => tax.applyTo === 'part_b' || tax.applyTo === 'both')
                   .map((tax) => (
                     <tr key={`part-b-tax-${tax.id}`} className="font-semibold">
-                      <td colSpan={5} className="border border-gray-300 p-3 text-right">
+                      <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
                         Add {tax.percentage}% {tax.name}
                       </td>
                       <td className="border border-gray-300 p-3 text-right">{(calculations.partB.taxes[tax.id] || 0).toFixed(0)}</td>
@@ -645,7 +726,7 @@ const handleSave = async () => {
                     </tr>
                   ))}
                 <tr className="font-bold bg-green-100">
-                  <td colSpan={5} className="border border-gray-300 p-3 text-right">Total of PART - B</td>
+                  <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">Total of PART - B</td>
                   <td className="border border-gray-300 p-3 text-right">{calculations.partB.total.toFixed(0)}</td>
                   {showFundingCols && (
                     <>
@@ -678,7 +759,9 @@ const handleSave = async () => {
                       return (
                         <tr key={`part-c-${subwork.subworks_id}`}>
                           <td className="border border-gray-300 p-3 text-center">{index + 1}</td>
-                          <td className="border border-gray-300 p-3">Solid waste management</td>
+                          {showTypeColumn && (
+                            <td className="border border-gray-300 p-3">Solid waste management</td>
+                          )}
                           <td className="border border-gray-300 p-3">{subwork.subworks_name}</td>
                           {readonly ? (
                             <td className="border border-gray-300 p-3 text-right">{inputUnit}</td>
@@ -706,7 +789,7 @@ const handleSave = async () => {
                       );
                     })}
                     <tr className="font-bold bg-purple-50">
-                      <td colSpan={5} className="border border-gray-300 p-3 text-right">Subtotal - Part C</td>
+                      <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">Subtotal - Part C</td>
                       <td className="border border-gray-300 p-3 text-right">{calculations.partC.subtotal.toFixed(0)}</td>
                       {showFundingCols && (
                         <>
@@ -719,7 +802,7 @@ const handleSave = async () => {
                       .filter((tax) => tax.applyTo === 'part_c' || tax.applyTo === 'both')
                       .map((tax) => (
                         <tr key={`part-c-tax-${tax.id}`} className="font-semibold">
-                          <td colSpan={5} className="border border-gray-300 p-3 text-right">
+                          <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
                             Add {tax.percentage}% {tax.name}
                           </td>
                           <td className="border border-gray-300 p-3 text-right">{(calculations.partC.taxes[tax.id] || 0).toFixed(0)}</td>
@@ -732,7 +815,7 @@ const handleSave = async () => {
                         </tr>
                       ))}
                     <tr className="font-bold bg-purple-100">
-                      <td colSpan={5} className="border border-gray-300 p-3 text-right">Total of PART - C</td>
+                      <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">Total of PART - C</td>
                       <td className="border border-gray-300 p-3 text-right">{calculations.partC.total.toFixed(0)}</td>
                       {showFundingCols && (
                         <>
@@ -746,7 +829,7 @@ const handleSave = async () => {
 
                 {/* Additional Charges & Grand Total */}
                 <tr className="font-semibold">
-                  <td colSpan={5} className="border border-gray-300 p-3 text-right">
+                  <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
                     DPR charges 5% or 1 Lakh whichever is less
                   </td>
                   <td className="border border-gray-300 p-3 text-right">
@@ -762,7 +845,7 @@ const handleSave = async () => {
                   )}
                 </tr>
                 <tr className="font-bold bg-yellow-100 text-lg">
-                  <td colSpan={5} className="border border-gray-300 p-3 text-right">
+                  <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
                     Gross Total Estimated Amount
                   </td>
                   <td className="border border-gray-300 p-3 text-right">{calculations.grandTotal.toFixed(0)}</td>
