@@ -493,6 +493,22 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       console.log('Royalty items found:', royaltyItems.length, royaltyItems);
       if (royaltyItems.length === 0) return;
 
+      // Get subwork sr_no (integer) from subworkId (string)
+      const { data: subworkData, error: subworkError } = await supabase
+        .schema('estimate')
+        .from('subworks')
+        .select('sr_no')
+        .eq('subworks_id', subworkId)
+        .maybeSingle();
+
+      if (subworkError) throw subworkError;
+      if (!subworkData) {
+        console.error('Subwork not found for subworkId:', subworkId);
+        return;
+      }
+
+      const subworkSrNo = subworkData.sr_no;
+
       const itemSrNos = royaltyItems.map(item => item.sr_no);
       console.log('Fetching royalty measurements for item sr_nos:', itemSrNos);
 
@@ -502,12 +518,11 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         .select('subwork_item_id, hb_metal, murum, sand')
         .in('subwork_item_id', itemSrNos)
         .eq('works_id', worksId)
-        .eq('subwork_id', subworkId);
+        .eq('subwork_id', subworkSrNo);
 
       if (error) throw error;
 
       console.log('Royalty measurements fetched:', measurements);
-      console.log('Query params - worksId:', worksId, 'subworkId:', subworkId, 'itemSrNos:', itemSrNos);
 
       const measurementsMap: { [key: string]: { hb_metal: number; murum: number; sand: number } } = {};
       (measurements || []).forEach(measurement => {
@@ -533,6 +548,22 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       console.log('Testing items found:', testingItems.length, testingItems);
       if (testingItems.length === 0) return;
 
+      // Get subwork sr_no (integer) from subworkId (string)
+      const { data: subworkData, error: subworkError } = await supabase
+        .schema('estimate')
+        .from('subworks')
+        .select('sr_no')
+        .eq('subworks_id', subworkId)
+        .maybeSingle();
+
+      if (subworkError) throw subworkError;
+      if (!subworkData) {
+        console.error('Subwork not found for subworkId:', subworkId);
+        return;
+      }
+
+      const subworkSrNo = subworkData.sr_no;
+
       const itemSrNos = testingItems.map(item => item.sr_no);
       console.log('Fetching testing measurements for item sr_nos:', itemSrNos);
 
@@ -542,7 +573,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         .select('subwork_item_id, quantity, required_tests')
         .in('subwork_item_id', itemSrNos)
         .eq('works_id', worksId)
-        .eq('subwork_id', subworkId);
+        .eq('subwork_id', subworkSrNo);
 
       if (error) throw error;
 
