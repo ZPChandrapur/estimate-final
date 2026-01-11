@@ -91,25 +91,22 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
           continue;
         }
 
-        // Check if entries contain lead statement data with specific materials
+        // Check if entries contain lead statement data
         if (analysis && analysis.entries && Array.isArray(analysis.entries)) {
-          // Check for specific materials: 80 mm (H.B Metal), Metal, Sand, or Murrum
-          const hasRelevantMaterial = analysis.entries.some((entry: any) => {
+          // First check if this item has rate analysis from lead statement
+          const hasLeadEntry = analysis.entries.some((entry: any) => {
             const label = entry.label?.toLowerCase() || '';
-            const material = entry.material?.toLowerCase() || '';
-
             return (
-              label.includes('80 mm') ||
-              label.includes('h.b metal') ||
-              label.includes('hb metal') ||
-              material.includes('metal') ||
-              material.includes('sand') ||
-              material.includes('murrum') ||
-              material.includes('murum')
+              label.includes('lead') ||
+              label.includes('royalty') ||
+              label.includes('metal') ||
+              label.includes('sand') ||
+              label.includes('murum') ||
+              label.includes('murrum')
             );
           });
 
-          if (hasRelevantMaterial) {
+          if (hasLeadEntry) {
             // Get measurement from item_measurements
             const { data: measurements, error: measurementError } = await supabase
               .schema('estimate')
@@ -125,7 +122,8 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
             // Calculate total measurement
             const totalMeasurement = measurements?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
 
-            // Extract factors from rate analysis entries based on material type
+            // Extract factors from rate analysis entries based on specific material types
+            // Only extract factors for: 80 mm (H.B Metal), Sand, and Murrum
             let metalFactor = 0;
             let murumFactor = 0;
             let sandFactor = 0;
@@ -136,23 +134,23 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
                 const material = entry.material?.toLowerCase() || '';
                 const factor = entry.factor || 0;
 
-                // Check for 80 mm (H.B Metal) or any material containing "metal"
+                // 1. Check for 80 mm (H.B Metal) - search in label or if material contains "metal"
                 if (
                   label.includes('80 mm') ||
                   label.includes('h.b metal') ||
                   label.includes('hb metal') ||
-                  material.includes('metal')
+                  (material && material.includes('metal'))
                 ) {
                   metalFactor = factor;
                 }
 
-                // Check for Sand
-                if (material.includes('sand')) {
+                // 2. Check for Sand - search in material field
+                if (material && material.includes('sand')) {
                   sandFactor = factor;
                 }
 
-                // Check for Murrum/Murum
-                if (material.includes('murrum') || material.includes('murum')) {
+                // 3. Check for Murrum - search in material field
+                if (material && (material.includes('murrum') || material.includes('murum'))) {
                   murumFactor = factor;
                 }
               });
