@@ -25,6 +25,7 @@ const WorksRecapSheet: React.FC<WorksRecapSheetProps> = ({
   const [work, setWork] = useState<Work | null>(null);
   const [subworks, setSubworks] = useState<SubWork[]>([]);
   const [subworkItems, setSubworkItems] = useState<{ [subworkId: string]: SubworkItem[] }>({});
+  const [subworkTotals, setSubworkTotals] = useState<Record<string, { regular: number; royalty: number; testing: number }>>({});
   const [loading, setLoading] = useState(true);
   const [taxes, setTaxes] = useState<TaxEntry[]>([
     { id: '1', name: 'GST', percentage: 18, applyTo: 'part_b' },
@@ -52,7 +53,120 @@ const WorksRecapSheet: React.FC<WorksRecapSheetProps> = ({
 
   useEffect(() => {
     if (work && subworks.length > 0) calculateRecap();
-  }, [work, subworks, subworkItems, taxes, unitInputs]);
+  }, [work, subworks, subworkItems, subworkTotals, taxes, unitInputs]);
+
+const fetchSubworkTotals = async (subworksData: SubWork[], itemsMap: { [subworkId: string]: SubworkItem[] }) => {
+  try {
+    const totals: Record<string, { regular: number; royalty: number; testing: number }> = {};
+
+    if (!subworksData || subworksData.length === 0) return totals;
+
+    const subworkIds = subworksData.map(sw => sw.subworks_id);
+    const subworkSrNos = subworksData.map(sw => sw.sr_no);
+
+    const subworkIdToSrNo: Record<string, number> = {};
+    const subworkSrNoToId: Record<number, string> = {};
+    subworksData.forEach(sw => {
+      subworkIdToSrNo[sw.subworks_id] = sw.sr_no;
+      subworkSrNoToId[sw.sr_no] = sw.subworks_id;
+    });
+
+    const allSubworkItems = Object.values(itemsMap).flat();
+
+    if (allSubworkItems.length === 0) {
+      subworksData.forEach(subwork => {
+        totals[subwork.subworks_id] = { regular: 0, royalty: 0, testing: 0 };
+      });
+      return totals;
+    }
+
+    const itemSrNos = allSubworkItems.map(i => i.sr_no).filter(sr => sr);
+
+    const { data: rateRows } = await supabase
+      .schema('estimate')
+      .from('item_rates')
+      .select('subwork_item_sr_no, rate, rate_total_amount, description')
+      .in('subwork_item_sr_no', itemSrNos);
+
+    const { data: royaltyMeasurements } = await supabase
+      .schema('estimate')
+      .from('royalty_measurements')
+      .select('subwork_id, hb_metal, murum, sand')
+      .in('subwork_id', subworkSrNos);
+
+    const { data: testingMeasurements } = await supabase
+      .schema('estimate')
+      .from('testing_measurements')
+      .select('subwork_item_id, required_tests')
+      .in('subwork_item_id', itemSrNos);
+
+    const royaltyTotalsPerSubwork: Record<string, { hb_metal: number; murum: number; sand: number }> = {};
+    (royaltyMeasurements || []).forEach(measurement => {
+      const subworkSrNo = measurement.subwork_id;
+      const subworkId = subworkSrNoToId[subworkSrNo];
+      if (!subworkId) return;
+
+      if (!royaltyTotalsPerSubwork[subworkId]) {
+        royaltyTotalsPerSubwork[subworkId] = { hb_metal: 0, murum: 0, sand: 0 };
+      }
+      royaltyTotalsPerSubwork[subworkId].hb_metal += Number(measurement.hb_metal) || 0;
+      royaltyTotalsPerSubwork[subworkId].murum += Number(measurement.murum) || 0;
+      royaltyTotalsPerSubwork[subworkId].sand += Number(measurement.sand) || 0;
+    });
+
+    const testingTotalsPerItem: Record<number, number> = {};
+    (testingMeasurements || []).forEach(measurement => {
+      testingTotalsPerItem[measurement.subwork_item_id] = Number(measurement.required_tests) || 0;
+    });
+
+    subworkIds.forEach(id => {
+      totals[id] = { regular: 0, royalty: 0, testing: 0 };
+    });
+
+    allSubworkItems.forEach(item => {
+      const subworkId = item.subwork_id;
+      const category = item.category;
+      const itemRates = (rateRows || []).filter(r => r.subwork_item_sr_no === item.sr_no);
+
+      if (!totals[subworkId]) {
+        totals[subworkId] = { regular: 0, royalty: 0, testing: 0 };
+      }
+
+      let totalItemAmt = 0;
+
+      if (category === 'royalty' && royaltyTotalsPerSubwork[subworkId]) {
+        const royaltyData = royaltyTotalsPerSubwork[subworkId];
+        itemRates.forEach(rate => {
+          const rateDesc = (rate.description || '').toLowerCase();
+          let quantity = 0;
+          if (rateDesc.includes('metal')) {
+            quantity = royaltyData.hb_metal;
+          } else if (rateDesc.includes('murum')) {
+            quantity = royaltyData.murum;
+          } else if (rateDesc.includes('sand')) {
+            quantity = royaltyData.sand;
+          }
+          totalItemAmt += quantity * Number(rate.rate || 0);
+        });
+        totals[subworkId].royalty += totalItemAmt;
+      } else if (category === 'testing' && item.sr_no && testingTotalsPerItem[item.sr_no]) {
+        const testingQty = testingTotalsPerItem[item.sr_no];
+        itemRates.forEach(rate => {
+          totalItemAmt += testingQty * Number(rate.rate || 0);
+        });
+        totals[subworkId].testing += totalItemAmt;
+      } else {
+        totalItemAmt = itemRates.reduce((sum, rate) => sum + (Number(rate.rate_total_amount) || 0), 0);
+        totals[subworkId].regular += totalItemAmt;
+      }
+    });
+
+    return totals;
+  } catch (error) {
+    console.error('Error fetching subwork totals:', error);
+    return {};
+  }
+};
 
 const fetchWorkData = async () => {
   try {
@@ -96,6 +210,9 @@ const fetchWorkData = async () => {
       }
       setSubworkItems(itemsMap);
 
+      const totals = await fetchSubworkTotals(subworksData || [], itemsMap);
+      setSubworkTotals(totals);
+
       if (recapJsonData.taxes) {
         setTaxes(recapJsonData.taxes);
       } else {
@@ -138,6 +255,9 @@ const fetchWorkData = async () => {
         itemsMap[subwork.subworks_id] = Array.isArray(items) ? items : [];
       }
       setSubworkItems(itemsMap);
+
+      const totals = await fetchSubworkTotals(subworksData || [], itemsMap);
+      setSubworkTotals(totals);
     }
   } catch (error) {
     console.error('Error fetching work data:', error);
@@ -153,18 +273,25 @@ const fetchWorkData = async () => {
     let partCSubtotal = 0;
 
     subworks.forEach(subwork => {
-      const items = subworkItems[subwork.subworks_id] || [];
-      const subworkTotal = items.reduce((sum, item) => sum + (item.total_item_amount || 0), 0);
       const inputUnit = unitInputs[subwork.subworks_id] ?? (Number(subwork.unit) || 1);
-      const rowTotal = subworkTotal * inputUnit;
+      const subworkTotal = subworkTotals[subwork.subworks_id];
 
-      const isPartA = items.some(item => !item.category || item.category === '');
-      const isPartB = items.some(item => item.category === 'royalty' || item.category === 'testing');
-      const isPartC = items.some(item => item.category === 'With GST' || item.category === 'materials' || item.category === 'purchasing');
+      if (subworkTotal) {
+        partASubtotal += (subworkTotal.regular || 0) * inputUnit;
+        partBSubtotal += ((subworkTotal.royalty || 0) + (subworkTotal.testing || 0)) * inputUnit;
+      } else {
+        const items = subworkItems[subwork.subworks_id] || [];
+        const subworkTotalAmt = items.reduce((sum, item) => sum + (item.total_item_amount || 0), 0);
+        const rowTotal = subworkTotalAmt * inputUnit;
 
-      if (isPartA) partASubtotal += rowTotal;
-      if (isPartB) partBSubtotal += rowTotal;
-      if (isPartC) partCSubtotal += rowTotal;
+        const isPartA = items.some(item => !item.category || item.category === '');
+        const isPartB = items.some(item => item.category === 'royalty' || item.category === 'testing');
+        const isPartC = items.some(item => item.category === 'With GST' || item.category === 'materials' || item.category === 'purchasing');
+
+        if (isPartA) partASubtotal += rowTotal;
+        if (isPartB) partBSubtotal += rowTotal;
+        if (isPartC) partCSubtotal += rowTotal;
+      }
     });
 
     const calculateTaxes = (subtotal: number, applyToPart: 'part_a' | 'part_b' | 'part_c') => {
@@ -313,15 +440,15 @@ const handleSave = async () => {
 
   const getRoyaltySubworks = () => {
     return subworks.filter(subwork => {
-      const items = subworkItems[subwork.subworks_id] || [];
-      return items.some(item => item.category === 'royalty');
+      const totals = subworkTotals[subwork.subworks_id];
+      return totals && totals.royalty > 0;
     });
   };
 
   const getTestingSubworks = () => {
     return subworks.filter(subwork => {
-      const items = subworkItems[subwork.subworks_id] || [];
-      return items.some(item => item.category === 'testing');
+      const totals = subworkTotals[subwork.subworks_id];
+      return totals && totals.testing > 0;
     });
   };
 
@@ -610,16 +737,11 @@ const handleSave = async () => {
                       </td>
                     </tr>
                     {getRoyaltySubworks().map((subwork, index) => {
-                      const items = (subworkItems[subwork.subworks_id] || []).filter(
-                        item => item.category === 'royalty'
-                      );
-                      const subworkTotalAmount = items.reduce(
-                        (sum, item) => sum + (item.total_item_amount || 0),
-                        0
-                      );
+                      const totals = subworkTotals[subwork.subworks_id];
+                      const subworkRoyaltyAmount = totals?.royalty || 0;
 
                       const inputUnit = unitInputs[subwork.subworks_id] ?? (Number(subwork.unit) || 1);
-                      const totalAmount = inputUnit * subworkTotalAmount;
+                      const totalAmount = inputUnit * subworkRoyaltyAmount;
 
                       return (
                         <tr key={`royalty-${subwork.subworks_id}`}>
@@ -642,7 +764,7 @@ const handleSave = async () => {
                               />
                             </td>
                           )}
-                          <td className="border border-gray-300 p-3 text-right">{subworkTotalAmount.toFixed(0)}</td>
+                          <td className="border border-gray-300 p-3 text-right">{subworkRoyaltyAmount.toFixed(0)}</td>
                           <td className="border border-gray-300 p-3 text-right">{totalAmount.toFixed(0)}</td>
                           {showFundingCols && (
                             <>
@@ -665,16 +787,11 @@ const handleSave = async () => {
                       </td>
                     </tr>
                     {getTestingSubworks().map((subwork, index) => {
-                      const items = (subworkItems[subwork.subworks_id] || []).filter(
-                        item => item.category === 'testing'
-                      );
-                      const subworkTotalAmount = items.reduce(
-                        (sum, item) => sum + (item.total_item_amount || 0),
-                        0
-                      );
+                      const totals = subworkTotals[subwork.subworks_id];
+                      const subworkTestingAmount = totals?.testing || 0;
 
                       const inputUnit = unitInputs[subwork.subworks_id] ?? (Number(subwork.unit) || 1);
-                      const totalAmount = inputUnit * subworkTotalAmount;
+                      const totalAmount = inputUnit * subworkTestingAmount;
 
                       return (
                         <tr key={`testing-${subwork.subworks_id}`}>
@@ -697,7 +814,7 @@ const handleSave = async () => {
                               />
                             </td>
                           )}
-                          <td className="border border-gray-300 p-3 text-right">{subworkTotalAmount.toFixed(0)}</td>
+                          <td className="border border-gray-300 p-3 text-right">{subworkTestingAmount.toFixed(0)}</td>
                           <td className="border border-gray-300 p-3 text-right">{totalAmount.toFixed(0)}</td>
                           {showFundingCols && (
                             <>
