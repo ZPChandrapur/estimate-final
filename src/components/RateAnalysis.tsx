@@ -78,6 +78,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   const [searchCompleted, setSearchCompleted] = useState(false);
   const [isFromLeadStatement, setIsFromLeadStatement] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastFetchedRef = useRef<{ itemId: number | null; rateId: number | null } | null>(null);
+  const isFetchingRef = useRef(false);
 
   // NEW STATE FOR INLINE ADDING + EDITING
   const [rowBeingAddedBelow, setRowBeingAddedBelow] = useState<number | null>(null);
@@ -187,11 +189,17 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       setFinalTaxApplied(null);
       setSavedBaseRate(null);
       setIsEditMode(false);
+      // Reset fetch tracking refs
+      lastFetchedRef.current = null;
+      isFetchingRef.current = false;
     }
   }, [isOpen]);
 
   useEffect(() => {
     setCurrentItem(item || {} as SubworkItem);
+    // Reset fetch tracking when item changes
+    lastFetchedRef.current = null;
+    isFetchingRef.current = false;
   }, [item]);
 
   useEffect(() => {
@@ -307,6 +315,20 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     try {
       if (!item?.sr_no) return;
 
+      // Prevent duplicate fetches
+      const currentFetch = { itemId: item.sr_no, rateId };
+      if (
+        isFetchingRef.current ||
+        (lastFetchedRef.current?.itemId === currentFetch.itemId &&
+         lastFetchedRef.current?.rateId === currentFetch.rateId)
+      ) {
+        console.log('⏭️ Skipping duplicate fetch for item:', item.sr_no, 'rate:', rateId);
+        return;
+      }
+
+      isFetchingRef.current = true;
+      lastFetchedRef.current = currentFetch;
+
       console.log('🔍 Fetching rate analysis for item:', item.sr_no, 'rate:', rateId);
 
       let query = supabase
@@ -353,6 +375,8 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       setSavedBaseRate(null);
       setIsEditMode(false);
       setFinalTaxApplied(null);
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 
