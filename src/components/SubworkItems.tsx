@@ -525,15 +525,14 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
 
       const subworkSrNo = subworkData.sr_no;
 
-      const itemSrNos = royaltyItems.map(item => item.sr_no);
-      console.log('Fetching royalty measurements for item sr_nos:', itemSrNos);
+      console.log('Fetching ALL royalty measurements for subwork');
       console.log('Query filters - works_id:', currentWorksId, 'subwork_id:', subworkSrNo);
 
+      // Fetch ALL measurements for this subwork (not just royalty items)
       const { data: measurements, error } = await supabase
         .schema('estimate')
         .from('royalty_measurements')
         .select('subwork_item_id, hb_metal, murum, sand')
-        .in('subwork_item_id', itemSrNos)
         .eq('works_id', currentWorksId)
         .eq('subwork_id', subworkSrNo);
 
@@ -541,15 +540,20 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
 
       console.log('Royalty measurements fetched:', measurements);
 
-      const measurementsMap: { [key: string]: { hb_metal: number; murum: number; sand: number } } = {};
+      // Calculate total for ALL materials in the subwork
+      const totalMaterials = { hb_metal: 0, murum: 0, sand: 0 };
       (measurements || []).forEach(measurement => {
-        const key = measurement.subwork_item_id.toString();
-        if (!measurementsMap[key]) {
-          measurementsMap[key] = { hb_metal: 0, murum: 0, sand: 0 };
-        }
-        measurementsMap[key].hb_metal += Number(measurement.hb_metal) || 0;
-        measurementsMap[key].murum += Number(measurement.murum) || 0;
-        measurementsMap[key].sand += Number(measurement.sand) || 0;
+        totalMaterials.hb_metal += Number(measurement.hb_metal) || 0;
+        totalMaterials.murum += Number(measurement.murum) || 0;
+        totalMaterials.sand += Number(measurement.sand) || 0;
+      });
+
+      console.log('Total materials for subwork:', totalMaterials);
+
+      // Assign the same total to ALL royalty items
+      const measurementsMap: { [key: string]: { hb_metal: number; murum: number; sand: number } } = {};
+      royaltyItems.forEach(item => {
+        measurementsMap[item.sr_no.toString()] = { ...totalMaterials };
       });
 
       console.log('Royalty measurements map:', measurementsMap);
