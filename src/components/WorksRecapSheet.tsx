@@ -374,6 +374,20 @@ const fetchWorkData = async () => {
     setSaved(false);
   };
 
+  const updateTaxType = (id: string, newType: 'percentage' | 'fixed') => {
+    setTaxes(taxes.map(tax => {
+      if (tax.id === id) {
+        if (newType === 'percentage') {
+          return { ...tax, type: 'percentage', fixedAmount: undefined, percentage: 0 };
+        } else {
+          return { ...tax, type: 'fixed', percentage: undefined, fixedAmount: 0 };
+        }
+      }
+      return tax;
+    }));
+    setSaved(false);
+  };
+
   const removeTax = (id: string) => {
     setTaxes(taxes.filter(tax => tax.id !== id));
     setSaved(false);
@@ -602,12 +616,7 @@ const handleSave = async () => {
                   value={tax.type || 'percentage'}
                   onChange={(e) => {
                     const newType = e.target.value as 'percentage' | 'fixed';
-                    updateTax(tax.id, 'type', newType);
-                    if (newType === 'percentage') {
-                      updateTax(tax.id, 'fixedAmount', undefined);
-                    } else {
-                      updateTax(tax.id, 'percentage', undefined);
-                    }
+                    updateTaxType(tax.id, newType);
                   }}
                   className="w-32 px-3 py-2 border border-gray-300 rounded text-sm"
                 >
