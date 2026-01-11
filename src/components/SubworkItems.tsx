@@ -1148,14 +1148,41 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
 
     subworkItems.forEach(item => {
       const itemRates = itemRatesMap[item.sr_no.toString()] || [];
-      const itemTotal = itemRates.reduce((sum, rate) => sum + rate.rate_total_amount, 0);
 
-      if (item.category === 'royalty') {
-        royaltyTotal += itemTotal;
-      } else if (item.category === 'testing') {
+      // Calculate item total based on category
+      let itemTotal = 0;
+
+      if (item.category === 'testing' && testingMeasurementsMap[item.sr_no?.toString() || '']) {
+        // For testing items with measurements, use the testing quantity
+        const testingQty = testingMeasurementsMap[item.sr_no?.toString() || ''].required_tests;
+        itemTotal = itemRates.reduce((sum, rate) => sum + (testingQty * Number(rate.rate)), 0);
         testingTotal += itemTotal;
+      } else if (item.category === 'royalty' && royaltyMeasurementsMap[item.sr_no?.toString() || '']) {
+        // For royalty items with measurements, calculate based on material quantities
+        const royaltyData = royaltyMeasurementsMap[item.sr_no?.toString() || ''];
+        itemTotal = itemRates.reduce((sum, rate) => {
+          const rateDesc = rate.description.toLowerCase();
+          let quantity = 0;
+          if (rateDesc.includes('metal')) {
+            quantity = royaltyData.hb_metal;
+          } else if (rateDesc.includes('murum')) {
+            quantity = royaltyData.murum;
+          } else if (rateDesc.includes('sand')) {
+            quantity = royaltyData.sand;
+          }
+          return sum + (quantity * Number(rate.rate));
+        }, 0);
+        royaltyTotal += itemTotal;
       } else {
-        regularTotal += itemTotal;
+        // For regular items, use stored rate_total_amount
+        itemTotal = itemRates.reduce((sum, rate) => sum + Number(rate.rate_total_amount || 0), 0);
+        if (item.category === 'royalty') {
+          royaltyTotal += itemTotal;
+        } else if (item.category === 'testing') {
+          testingTotal += itemTotal;
+        } else {
+          regularTotal += itemTotal;
+        }
       }
     });
 
