@@ -93,18 +93,40 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
 
         // Check if entries contain lead statement data
         if (analysis && analysis.entries && Array.isArray(analysis.entries)) {
-          // First check if this item has rate analysis from lead statement
+          console.log('🔍 Checking rate analysis entries for item:', item.sr_no, analysis.entries);
+
+          // Check if this item has materials added from lead statements
+          // Materials from lead statements will have the material_type field or specific material names
           const hasLeadEntry = analysis.entries.some((entry: any) => {
             const label = entry.label?.toLowerCase() || '';
-            return (
+
+            // Check for material_type field (indicates material from lead statement)
+            if (entry.material_type) {
+              console.log('✓ Found material_type:', entry.material_type, 'in entry:', entry.label);
+              return true;
+            }
+
+            // Check for specific keywords in label
+            const hasKeyword = (
               label.includes('lead') ||
               label.includes('royalty') ||
               label.includes('metal') ||
               label.includes('sand') ||
               label.includes('murum') ||
-              label.includes('murrum')
+              label.includes('murrum') ||
+              label.includes('80mm') ||
+              label.includes('aggregate') ||
+              label.includes('hb')
             );
+
+            if (hasKeyword) {
+              console.log('✓ Found keyword match in label:', entry.label);
+            }
+
+            return hasKeyword;
           });
+
+          console.log('hasLeadEntry result:', hasLeadEntry);
 
           if (hasLeadEntry) {
             // Get measurement from item_measurements
