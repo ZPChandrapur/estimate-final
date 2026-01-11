@@ -67,9 +67,9 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
     required_quantity: 0,
     rate_per_unit: 0
   });
-  const [newTax, setNewTax] = useState({ label: '', value: '', factor: 1, type: 'Addition', material_type: '' });
+  const [newTax, setNewTax] = useState({ label: '', value: '', factor: 1, type: 'Addition' });
   const [entries, setEntries] = useState<
-    { label: string; type: string; value: number; factor: number; amount: number; material_type?: string }
+    { label: string; type: string; value: number; factor: number; amount: number }
   >([]);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [leadStatements, setLeadStatements] = useState<any[]>([]);
@@ -84,7 +84,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   // NEW STATE FOR INLINE ADDING + EDITING
   const [rowBeingAddedBelow, setRowBeingAddedBelow] = useState<number | null>(null);
   const [rowBeingEdited, setRowBeingEdited] = useState<number | null>(null);
-  const [tempRow, setTempRow] = useState({ label: '', type: 'Addition', value: 0, factor: 1, material_type: '' });
+  const [tempRow, setTempRow] = useState({ label: '', type: 'Addition', value: 0, factor: 1 });
 
   // NEW STATE FOR FINAL-RATE TAX
   const [showFinalTaxInput, setShowFinalTaxInput] = useState(false);
@@ -477,12 +477,10 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   const handleSelectLeadStatement = (lead: any) => {
     console.log('✅ Selected lead statement:', lead);
     console.log('💰 Total rate:', lead.total_rate);
-    console.log('🏷️ Material type:', lead.material_type);
     setNewTax({
       ...newTax,
       label: lead.material,
-      value: lead.total_rate || '0',
-      material_type: lead.material_type || '' // Store material type
+      value: lead.total_rate || '0'
     });
     setIsFromLeadStatement(true);
     setShowLeadDropdown(false);
@@ -653,23 +651,18 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
         Number(newTax.factor)
       );
 
-      const newEntry: any = {
-        label: newTax.label,
-        type: newTax.type,
-        value: Number(newTax.value),
-        factor: Number(newTax.factor),
-        amount,
-      };
+      setEntries(prev => [
+        ...prev,
+        {
+          label: newTax.label,
+          type: newTax.type,
+          value: Number(newTax.value),
+          factor: Number(newTax.factor),
+          amount,
+        }
+      ]);
 
-      // Include material_type if present (from lead statement)
-      if (newTax.material_type) {
-        newEntry.material_type = newTax.material_type;
-        console.log('✅ Adding entry with material_type:', newTax.material_type);
-      }
-
-      setEntries(prev => [...prev, newEntry]);
-
-      setNewTax({ label: '', value: '', factor: 1, type: 'Addition', material_type: '' });
+      setNewTax({ label: '', value: '', factor: 1, type: 'Addition' });
       setIsFromLeadStatement(false);
       setEditIndex(null);
     }
@@ -702,8 +695,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       label: entry.label,
       value: entry.value,
       type: entry.type,
-      factor: entry.factor,
-      material_type: entry.material_type || ''
+      factor: entry.factor
     });
     setEditIndex(index);
   };
@@ -730,27 +722,19 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
         Number(newTax.factor)
       );
 
-      setEntries(entries.map((ent, idx) => {
-        if (idx === editIndex) {
-          const updatedEntry: any = {
+      setEntries(entries.map((ent, idx) =>
+        idx === editIndex
+          ? {
             label: newTax.label,
             type: newTax.type,
             value: Number(newTax.value),
             factor: Number(newTax.factor),
             amount
-          };
-
-          // Preserve material_type if present
-          if (newTax.material_type) {
-            updatedEntry.material_type = newTax.material_type;
           }
+          : ent
+      ));
 
-          return updatedEntry;
-        }
-        return ent;
-      }));
-
-      setNewTax({ label: '', value: '', factor: 1, type: 'Addition', material_type: '' });
+      setNewTax({ label: '', value: '', factor: 1, type: 'Addition' });
       setEditIndex(null);
     }
   };
@@ -759,7 +743,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
   const handleDelete = (index: number) => {
     setEntries(prev => prev.filter((_, idx) => idx !== index));
     setEditIndex(null);
-    setNewTax({ label: '', value: '', factor: 1, type: 'Addition', material_type: '' });
+    setNewTax({ label: '', value: '', factor: 1, type: 'Addition' });
   };
 
   // INLINE SAVE FOR NEW ROW (Option A behavior)
@@ -775,7 +759,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       Number(tempRow.value),
       Number(tempRow.factor)
     );
-    const newEntry: any = {
+    const newEntry = {
       label: tempRow.label,
       type: tempRow.type,
       value: Number(tempRow.value),
@@ -783,17 +767,12 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       amount,
     };
 
-    // Include material_type if present
-    if (tempRow.material_type) {
-      newEntry.material_type = tempRow.material_type;
-    }
-
     const updated = [...entries];
     updated.splice(index + 1, 0, newEntry);
     setEntries(updated);
 
     setRowBeingAddedBelow(null);
-    setTempRow({ label: '', type: 'Addition', value: 0, factor: 1, material_type: '' });
+    setTempRow({ label: '', type: 'Addition', value: 0, factor: 1 });
   };
 
   // INLINE SAVE FOR EDITED ROW
@@ -810,29 +789,21 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       Number(tempRow.factor)
     );
 
-    const updated = entries.map((row, idx) => {
-      if (idx === index) {
-        const updatedEntry: any = {
+    const updated = entries.map((row, idx) =>
+      idx === index
+        ? {
           label: tempRow.label,
           type: tempRow.type,
           value: Number(tempRow.value),
           factor: Number(tempRow.factor),
           amount
-        };
-
-        // Include material_type if present
-        if (tempRow.material_type) {
-          updatedEntry.material_type = tempRow.material_type;
         }
-
-        return updatedEntry;
-      }
-      return row;
-    });
+        : row
+    );
 
     setEntries(updated);
     setRowBeingEdited(null);
-    setTempRow({ label: '', type: 'Addition', value: 0, factor: 1, material_type: '' });
+    setTempRow({ label: '', type: 'Addition', value: 0, factor: 1 });
   };
 
   // FINAL RATE TAX HANDLERS
@@ -1300,8 +1271,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                                         label: '',
                                         type: 'Addition',
                                         value: 0,
-                                        factor: 1,
-                                        material_type: ''
+                                        factor: 1
                                       });
                                     }}
                                     className="p-1.5 text-green-600 hover:bg-green-50 rounded"
@@ -1315,8 +1285,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
                                         label: entry.label,
                                         type: entry.type,
                                         value: entry.value,
-                                        factor: entry.factor,
-                                        material_type: entry.material_type || ''
+                                        factor: entry.factor
                                       });
                                     }}
                                     className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"

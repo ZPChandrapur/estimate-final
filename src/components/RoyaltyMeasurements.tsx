@@ -91,44 +91,42 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
           continue;
         }
 
-        // Check if entries contain lead statement data
+        // Check if entries contain royalty materials
         if (analysis && analysis.entries && Array.isArray(analysis.entries)) {
           console.log('🔍 Checking rate analysis entries for item:', item.sr_no, analysis.entries);
 
-          // Check if this item has materials added from lead statements
-          // Materials from lead statements will have the material_type field or specific material names
-          const hasLeadEntry = analysis.entries.some((entry: any) => {
-            const label = entry.label?.toLowerCase() || '';
+          // List of royalty materials
+          const royaltyMaterials = [
+            '80 mm (H.B Metal)',
+            'C.B. Metal (Above 40 mm)',
+            'C.B. Metal (Below 40 mm)',
+            'Sand',
+            'Murrum',
+            'Steel',
+            'Bricks',
+            'Tiles',
+            'Paving Blocks'
+          ];
 
-            // Check for material_type field (indicates material from lead statement)
-            if (entry.material_type) {
-              console.log('✓ Found material_type:', entry.material_type, 'in entry:', entry.label);
-              return true;
-            }
+          // Check if any entry label matches royalty materials
+          const hasRoyaltyMaterial = analysis.entries.some((entry: any) => {
+            const label = entry.label || '';
 
-            // Check for specific keywords in label
-            const hasKeyword = (
-              label.includes('lead') ||
-              label.includes('royalty') ||
-              label.includes('metal') ||
-              label.includes('sand') ||
-              label.includes('murum') ||
-              label.includes('murrum') ||
-              label.includes('80mm') ||
-              label.includes('aggregate') ||
-              label.includes('hb')
+            // Check if label matches any royalty material (case-insensitive)
+            const matches = royaltyMaterials.some(material =>
+              label.toLowerCase().includes(material.toLowerCase())
             );
 
-            if (hasKeyword) {
-              console.log('✓ Found keyword match in label:', entry.label);
+            if (matches) {
+              console.log('✓ Found royalty material in label:', entry.label);
             }
 
-            return hasKeyword;
+            return matches;
           });
 
-          console.log('hasLeadEntry result:', hasLeadEntry);
+          console.log('hasRoyaltyMaterial result:', hasRoyaltyMaterial);
 
-          if (hasLeadEntry) {
+          if (hasRoyaltyMaterial) {
             // Get measurement from item_measurements
             const { data: measurements, error: measurementError } = await supabase
               .schema('estimate')
@@ -144,8 +142,8 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
             // Calculate total measurement
             const totalMeasurement = measurements?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
 
-            // Extract factors from rate analysis entries based on specific material types
-            // Only extract factors for: 80mm metal (HB), Sand, and Murrum
+            // Extract factors from rate analysis entries based on specific materials
+            // Only extract factors for: 80 mm (H.B Metal), Sand, and Murrum
             let metalFactor = 0;
             let murumFactor = 0;
             let sandFactor = 0;
@@ -153,25 +151,26 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
             if (analysis.entries && Array.isArray(analysis.entries)) {
               console.log('Processing rate analysis entries for item:', item.sr_no, analysis.entries);
               analysis.entries.forEach((entry: any) => {
-                const label = entry.label?.toLowerCase() || '';
+                const label = entry.label || '';
+                const labelLower = label.toLowerCase();
                 const factor = entry.factor || 0;
 
                 console.log('Checking entry - label:', entry.label, 'factor:', factor);
 
-                // 1. Check ONLY for "80mm metal (HB)" specifically - search in label field
-                if (label.includes('80mm') && label.includes('metal')) {
+                // 1. Check for "80 mm (H.B Metal)"
+                if (labelLower.includes('80 mm') && labelLower.includes('h.b') && labelLower.includes('metal')) {
                   metalFactor = factor;
-                  console.log('✓ Found metal factor:', factor, 'for label:', entry.label);
+                  console.log('✓ Found H.B Metal factor:', factor, 'for label:', entry.label);
                 }
 
-                // 2. Check for Sand - search in label field
-                if (label.includes('sand')) {
+                // 2. Check for Sand
+                if (labelLower === 'sand' || labelLower.includes('sand')) {
                   sandFactor = factor;
                   console.log('✓ Found sand factor:', factor, 'for label:', entry.label);
                 }
 
-                // 3. Check for Murrum - search in label field
-                if (label.includes('murrum') || label.includes('murum')) {
+                // 3. Check for Murrum
+                if (labelLower === 'murrum' || labelLower.includes('murrum')) {
                   murumFactor = factor;
                   console.log('✓ Found murrum factor:', factor, 'for label:', entry.label);
                 }
