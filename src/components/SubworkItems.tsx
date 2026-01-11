@@ -547,9 +547,9 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         if (!measurementsMap[key]) {
           measurementsMap[key] = { hb_metal: 0, murum: 0, sand: 0 };
         }
-        measurementsMap[key].hb_metal += measurement.hb_metal || 0;
-        measurementsMap[key].murum += measurement.murum || 0;
-        measurementsMap[key].sand += measurement.sand || 0;
+        measurementsMap[key].hb_metal += Number(measurement.hb_metal) || 0;
+        measurementsMap[key].murum += Number(measurement.murum) || 0;
+        measurementsMap[key].sand += Number(measurement.sand) || 0;
       });
 
       console.log('Royalty measurements map:', measurementsMap);
@@ -601,8 +601,8 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       (measurements || []).forEach(measurement => {
         const key = measurement.subwork_item_id.toString();
         measurementsMap[key] = {
-          quantity: measurement.quantity || 0,
-          required_tests: measurement.required_tests || 0
+          quantity: Number(measurement.quantity) || 0,
+          required_tests: Number(measurement.required_tests) || 0
         };
       });
 
@@ -1410,7 +1410,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                                 let displayQuantity, displayLabel;
                                 if (item.category === 'testing') {
                                   if (testingMeasurementsMap[item.sr_no?.toString() || '']) {
-                                    displayQuantity = testingMeasurementsMap[item.sr_no?.toString() || ''].quantity;
+                                    displayQuantity = testingMeasurementsMap[item.sr_no?.toString() || ''].required_tests;
                                     displayLabel = 'Testing Qty';
                                   } else {
                                     displayQuantity = item.final_quantity !== undefined && item.final_quantity !== null
@@ -1472,7 +1472,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                               {/* For testing items, use testing measurements */}
                               {item.category === 'testing' && testingMeasurementsMap[item.sr_no?.toString() || ''] ? (
                                 <div>
-                                  <div className="font-medium">{testingMeasurementsMap[item.sr_no?.toString() || ''].quantity.toFixed(3)} {item.ssr_unit}</div>
+                                  <div className="font-medium">{testingMeasurementsMap[item.sr_no?.toString() || ''].required_tests.toFixed(3)} {item.ssr_unit}</div>
                                   <div className="text-xs text-green-600">(Testing Qty)</div>
                                 </div>
                               ) : item.category === 'testing' ? (
