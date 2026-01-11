@@ -1087,7 +1087,30 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     return `${rates.length} rates (₹${rates.reduce((sum, rate) => sum + rate.rate, 0).toFixed(2)})`;
   };
 
-  const totalItemsAmount = Object.values(itemRatesMap).flat().reduce((sum, rate) => sum + rate.rate_total_amount, 0);
+  // Calculate totals separately for regular, royalty, and testing items
+  const calculateTotals = () => {
+    let regularTotal = 0;
+    let royaltyTotal = 0;
+    let testingTotal = 0;
+
+    subworkItems.forEach(item => {
+      const itemRates = itemRatesMap[item.sr_no.toString()] || [];
+      const itemTotal = itemRates.reduce((sum, rate) => sum + rate.rate_total_amount, 0);
+
+      if (item.category === 'royalty') {
+        royaltyTotal += itemTotal;
+      } else if (item.category === 'testing') {
+        testingTotal += itemTotal;
+      } else {
+        regularTotal += itemTotal;
+      }
+    });
+
+    return { regularTotal, royaltyTotal, testingTotal };
+  };
+
+  const { regularTotal, royaltyTotal, testingTotal } = calculateTotals();
+  const totalItemsAmount = regularTotal + royaltyTotal + testingTotal;
 
   const addRateEntry = () => {
     setItemRates(prev => [...prev, { description: '', rate: 0, unit: '' }]);
@@ -1221,8 +1244,20 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
               <p className="text-sm text-gray-500">{subworkName}</p>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="text-sm text-gray-600">
-                Total: {formatCurrency(totalItemsAmount)}
+              <div className="flex flex-col text-xs text-gray-600 mr-4">
+                <div className="font-semibold text-sm">
+                  Total: {formatCurrency(regularTotal)}
+                </div>
+                {royaltyTotal > 0 && (
+                  <div className="text-amber-600">
+                    Royalty: {formatCurrency(royaltyTotal)}
+                  </div>
+                )}
+                {testingTotal > 0 && (
+                  <div className="text-purple-600">
+                    Testing: {formatCurrency(testingTotal)}
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => setShowAddItemModal(true)}
