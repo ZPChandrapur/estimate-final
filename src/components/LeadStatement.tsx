@@ -15,11 +15,13 @@ interface LeadStatementItem {
   works_id: string;
   sr_no: number;
   material: string;
+  material_type?: string;
   reference: string;
   lead_in_km: number;
   lead_charges: number;
   total_rate: number;
   unit: string;
+  unit_from_lead_chart?: string;
   created_at: string;
   created_by: string;
 }
@@ -38,11 +40,13 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
   const [selectedItem, setSelectedItem] = useState<LeadStatementItem | null>(null);
   const [formData, setFormData] = useState({
     material: '',
+    material_type: '',
     reference: '',
     lead_in_km: 0,
     lead_charges: 0,
     total_rate: 0,
-    unit: ''
+    unit: '',
+    unit_from_lead_chart: ''
   });
 
   const [materialOptions, setMaterialOptions] = useState<{ name: string; rate: string; unit: string }[]>([]);
@@ -219,7 +223,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
 
     setFormData({
       ...formData,
-      material: option.name,
+      material_type: option.name,
       lead_charges: rate,
       total_rate: totalRate,
       unit_from_lead_chart: option.unit, // Store the original unit from lead chart
@@ -246,6 +250,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
           works_id: worksId,
           sr_no: nextSrNo,
           material: formData.material,
+          material_type: formData.material_type,
           reference: formData.reference,
           lead_in_km: formData.lead_in_km,
           lead_charges: formData.lead_charges,
@@ -275,10 +280,11 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
     setSelectedItem(item);
     setFormData({
       material: item.material,
+      material_type: item.material_type || '',
       reference: item.reference,
       lead_in_km: item.lead_in_km,
       lead_charges: item.lead_charges,
-      unit_from_lead_chart: item.unit_from_lead_chart,
+      unit_from_lead_chart: item.unit_from_lead_chart || '',
       total_rate: item.total_rate,
       unit: item.unit
     });
@@ -299,6 +305,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
         .from('lead_statements')
         .update({
           material: formData.material,
+          material_type: formData.material_type,
           reference: formData.reference,
           lead_in_km: formData.lead_in_km,
           lead_charges: formData.lead_charges,
@@ -348,11 +355,13 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
   const resetForm = () => {
     setFormData({
       material: '',
+      material_type: '',
       reference: '',
       lead_in_km: 0,
       lead_charges: 0,
       total_rate: 0,
-      unit: ''
+      unit: '',
+      unit_from_lead_chart: ''
     });
     setMaterialOptions([]);
     setShowMaterialOptions(false);
@@ -413,6 +422,9 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                         Material
                       </th>
                       <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 uppercase border border-gray-300">
+                        Material Type
+                      </th>
+                      <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 uppercase border border-gray-300">
                         Reference
                       </th>
                       <th className="px-4 py-2 text-center text-xs font-medium text-gray-700 uppercase border border-gray-300">
@@ -447,6 +459,9 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 border border-gray-300">
                           {item.material}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-600 border border-gray-300">
+                          {item.material_type || '-'}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 border border-gray-300">
                           {item.reference || '-'}
@@ -544,15 +559,37 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Material * {showMaterialOptions && <span className="text-xs text-blue-600">(Select from options below)</span>}
+                    Material *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.material}
                     onChange={(e) => setFormData({ ...formData, material: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={showMaterialOptions ? "Select a material type below" : "e.g., Cement, Steel, Sand, 80mm Metal"}
                     required
+                  >
+                    <option value="">Select Material</option>
+                    <option value="80 mm (H.B Metal)">80 mm (H.B Metal)</option>
+                    <option value="C.B. Metal (Above 40 mm)">C.B. Metal (Above 40 mm)</option>
+                    <option value="C.B. Metal (Below 40 mm)">C.B. Metal (Below 40 mm)</option>
+                    <option value="Sand">Sand</option>
+                    <option value="Murrum">Murrum</option>
+                    <option value="Steel">Steel</option>
+                    <option value="Bricks">Bricks</option>
+                    <option value="Tiles">Tiles</option>
+                    <option value="Paving Blocks">Paving Blocks</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Material Type {showMaterialOptions && <span className="text-xs text-blue-600">(Select from search results below)</span>}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.material_type}
+                    onChange={(e) => setFormData({ ...formData, material_type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder={showMaterialOptions ? "Select a material type from search results below" : "Enter material type or search by Lead in Km"}
                     readOnly={showMaterialOptions}
                   />
                 </div>
@@ -632,7 +669,7 @@ const LeadStatement: React.FC<LeadStatementProps> = ({
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-gray-600 mt-2">Click on a material to auto-fill Material, Lead Charges, and Unit</p>
+                    <p className="text-xs text-gray-600 mt-2">Click on a material type to auto-fill Material Type, Lead Charges, and Unit</p>
                   </div>
                 )}
 
