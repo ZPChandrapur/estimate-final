@@ -228,6 +228,16 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
       if (!subworks || subworks.length === 0) return;
 
       const subworkIds = subworks.map(sw => sw.subworks_id);
+      const subworkSrNos = subworks.map(sw => sw.sr_no);
+
+      // Create mapping between subworks_id and sr_no
+      const subworkIdToSrNo: Record<string, number> = {};
+      const subworkSrNoToId: Record<number, string> = {};
+      subworks.forEach(sw => {
+        subworkIdToSrNo[sw.subworks_id] = sw.sr_no;
+        subworkSrNoToId[sw.sr_no] = sw.subworks_id;
+      });
+
       const { data: subworkItems, error: itemsError } = await supabase
         .schema('estimate')
         .from('subwork_items')
@@ -251,19 +261,53 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
       }
 
       const itemSrNos = subworkItems.map(i => i.sr_no);
+
+      // Fetch all rates with descriptions for calculation
       const { data: rateRows, error: rateError } = await supabase
         .schema('estimate')
         .from('item_rates')
-        .select('subwork_item_sr_no, rate_total_amount')
+        .select('subwork_item_sr_no, rate, rate_total_amount, description')
         .in('subwork_item_sr_no', itemSrNos);
 
       if (rateError) throw rateError;
 
-      const itemTotals: Record<number, number> = {};
-      (rateRows || []).forEach(rate => {
-        itemTotals[rate.subwork_item_sr_no] =
-          (itemTotals[rate.subwork_item_sr_no] || 0) +
-          (rate.rate_total_amount || 0);
+      // Fetch royalty measurements for all subworks (using sr_no)
+      const { data: royaltyMeasurements, error: royaltyError } = await supabase
+        .schema('estimate')
+        .from('royalty_measurements')
+        .select('subwork_id, hb_metal, murum, sand')
+        .in('subwork_id', subworkSrNos);
+
+      if (royaltyError) throw royaltyError;
+
+      // Fetch testing measurements for all items
+      const { data: testingMeasurements, error: testingError } = await supabase
+        .schema('estimate')
+        .from('testing_measurements')
+        .select('subwork_item_id, required_tests')
+        .in('subwork_item_id', itemSrNos);
+
+      if (testingError) throw testingError;
+
+      // Calculate royalty totals per subwork (convert sr_no to subworks_id)
+      const royaltyTotalsPerSubwork: Record<string, { hb_metal: number; murum: number; sand: number }> = {};
+      (royaltyMeasurements || []).forEach(measurement => {
+        const subworkSrNo = measurement.subwork_id;
+        const subworkId = subworkSrNoToId[subworkSrNo];
+        if (!subworkId) return;
+
+        if (!royaltyTotalsPerSubwork[subworkId]) {
+          royaltyTotalsPerSubwork[subworkId] = { hb_metal: 0, murum: 0, sand: 0 };
+        }
+        royaltyTotalsPerSubwork[subworkId].hb_metal += Number(measurement.hb_metal) || 0;
+        royaltyTotalsPerSubwork[subworkId].murum += Number(measurement.murum) || 0;
+        royaltyTotalsPerSubwork[subworkId].sand += Number(measurement.sand) || 0;
+      });
+
+      // Calculate testing totals per item
+      const testingTotalsPerItem: Record<number, number> = {};
+      (testingMeasurements || []).forEach(measurement => {
+        testingTotalsPerItem[measurement.subwork_item_id] = Number(measurement.required_tests) || 0;
       });
 
       // Initialize totals for all subworks
@@ -274,18 +318,41 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
       // Calculate totals by category
       subworkItems.forEach(item => {
         const subworkId = item.subwork_id;
-        const totalItemAmt = itemTotals[item.sr_no] || 0;
         const category = item.category;
+        const itemRates = (rateRows || []).filter(r => r.subwork_item_sr_no === item.sr_no);
 
         if (!totals[subworkId]) {
           totals[subworkId] = { regular: 0, royalty: 0, testing: 0 };
         }
 
-        if (category === 'royalty') {
+        let totalItemAmt = 0;
+
+        if (category === 'royalty' && royaltyTotalsPerSubwork[subworkId]) {
+          // Calculate royalty based on measurements
+          const royaltyData = royaltyTotalsPerSubwork[subworkId];
+          itemRates.forEach(rate => {
+            const rateDesc = (rate.description || '').toLowerCase();
+            let quantity = 0;
+            if (rateDesc.includes('metal')) {
+              quantity = royaltyData.hb_metal;
+            } else if (rateDesc.includes('murum')) {
+              quantity = royaltyData.murum;
+            } else if (rateDesc.includes('sand')) {
+              quantity = royaltyData.sand;
+            }
+            totalItemAmt += quantity * Number(rate.rate || 0);
+          });
           totals[subworkId].royalty += totalItemAmt;
-        } else if (category === 'testing') {
+        } else if (category === 'testing' && testingTotalsPerItem[item.sr_no]) {
+          // Calculate testing based on measurements
+          const testingQty = testingTotalsPerItem[item.sr_no];
+          itemRates.forEach(rate => {
+            totalItemAmt += testingQty * Number(rate.rate || 0);
+          });
           totals[subworkId].testing += totalItemAmt;
         } else {
+          // For regular items, use stored rate_total_amount
+          totalItemAmt = itemRates.reduce((sum, rate) => sum + (Number(rate.rate_total_amount) || 0), 0);
           totals[subworkId].regular += totalItemAmt;
         }
       });
