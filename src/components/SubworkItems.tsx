@@ -536,6 +536,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       });
 
       console.log('Royalty measurements map:', measurementsMap);
+      console.log('Royalty map keys:', Object.keys(measurementsMap));
       setRoyaltyMeasurementsMap(measurementsMap);
     } catch (error) {
       console.error('Error fetching royalty measurements:', error);
@@ -589,6 +590,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       });
 
       console.log('Testing measurements map:', measurementsMap);
+      console.log('Testing map keys:', Object.keys(measurementsMap));
       setTestingMeasurementsMap(measurementsMap);
     } catch (error) {
       console.error('Error fetching testing measurements:', error);
@@ -1390,14 +1392,32 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                               {itemRatesMap[item.sr_no.toString()].map((rate, index) => {
                                 // For testing items, use testing measurements
                                 let displayQuantity, displayLabel;
-                                if (item.category === 'testing' && testingMeasurementsMap[item.sr_no?.toString() || '']) {
-                                  displayQuantity = testingMeasurementsMap[item.sr_no?.toString() || ''].quantity;
-                                  displayLabel = 'Testing Qty';
-                                } else if (item.category === 'royalty' && royaltyMeasurementsMap[item.sr_no?.toString() || '']) {
-                                  // For royalty, sum up metal, murum, and sand
-                                  const royaltyData = royaltyMeasurementsMap[item.sr_no?.toString() || ''];
-                                  displayQuantity = royaltyData.hb_metal + royaltyData.murum + royaltyData.sand;
-                                  displayLabel = 'Total Royalty';
+                                if (item.category === 'testing') {
+                                  if (testingMeasurementsMap[item.sr_no?.toString() || '']) {
+                                    console.log(`Testing item ${item.sr_no} found in map:`, testingMeasurementsMap[item.sr_no?.toString() || '']);
+                                    displayQuantity = testingMeasurementsMap[item.sr_no?.toString() || ''].quantity;
+                                    displayLabel = 'Testing Qty';
+                                  } else {
+                                    console.log(`Testing item ${item.sr_no} NOT found in map. Available keys:`, Object.keys(testingMeasurementsMap));
+                                    displayQuantity = item.final_quantity !== undefined && item.final_quantity !== null
+                                      ? item.final_quantity
+                                      : rate.ssr_quantity;
+                                    displayLabel = item.final_quantity !== undefined && item.final_quantity !== null ? 'Calculated' : null;
+                                  }
+                                } else if (item.category === 'royalty') {
+                                  if (royaltyMeasurementsMap[item.sr_no?.toString() || '']) {
+                                    console.log(`Royalty item ${item.sr_no} found in map:`, royaltyMeasurementsMap[item.sr_no?.toString() || '']);
+                                    // For royalty, sum up metal, murum, and sand
+                                    const royaltyData = royaltyMeasurementsMap[item.sr_no?.toString() || ''];
+                                    displayQuantity = royaltyData.hb_metal + royaltyData.murum + royaltyData.sand;
+                                    displayLabel = 'Total Royalty';
+                                  } else {
+                                    console.log(`Royalty item ${item.sr_no} NOT found in map. Available keys:`, Object.keys(royaltyMeasurementsMap));
+                                    displayQuantity = item.final_quantity !== undefined && item.final_quantity !== null
+                                      ? item.final_quantity
+                                      : rate.ssr_quantity;
+                                    displayLabel = item.final_quantity !== undefined && item.final_quantity !== null ? 'Calculated' : null;
+                                  }
                                 } else {
                                   // Use final_quantity if available, otherwise ssr_quantity
                                   displayQuantity = item.final_quantity !== undefined && item.final_quantity !== null
@@ -1439,19 +1459,55 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
                             <div>
                               {/* For testing items, use testing measurements */}
                               {item.category === 'testing' && testingMeasurementsMap[item.sr_no?.toString() || ''] ? (
-                                <div>
-                                  <div className="font-medium">{testingMeasurementsMap[item.sr_no?.toString() || ''].quantity.toFixed(3)} {item.ssr_unit}</div>
-                                  <div className="text-xs text-green-600">(Testing Qty)</div>
-                                </div>
-                              ) : item.category === 'royalty' && royaltyMeasurementsMap[item.sr_no?.toString() || ''] ? (
-                                <div>
-                                  <div className="font-medium">
-                                    {(royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal +
-                                      royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum +
-                                      royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand).toFixed(3)} {item.ssr_unit}
+                                <>
+                                  {console.log(`[No Rates] Testing item ${item.sr_no} found in map:`, testingMeasurementsMap[item.sr_no?.toString() || ''])}
+                                  <div>
+                                    <div className="font-medium">{testingMeasurementsMap[item.sr_no?.toString() || ''].quantity.toFixed(3)} {item.ssr_unit}</div>
+                                    <div className="text-xs text-green-600">(Testing Qty)</div>
                                   </div>
-                                  <div className="text-xs text-green-600">(Total Royalty)</div>
-                                </div>
+                                </>
+                              ) : item.category === 'testing' ? (
+                                <>
+                                  {console.log(`[No Rates] Testing item ${item.sr_no} NOT found in map. Available keys:`, Object.keys(testingMeasurementsMap))}
+                                  {item.final_quantity !== undefined && item.final_quantity !== null ? (
+                                    <div>
+                                      <div className="font-medium">{Number(item.final_quantity).toFixed(3)} {item.final_unit || item.ssr_unit}</div>
+                                      <div className="text-xs text-green-600">(Calculated)</div>
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <div className="font-medium">{Number(item.ssr_quantity).toFixed(3)} {item.ssr_unit}</div>
+                                      <div className="text-xs text-gray-500">(Auto-calculated)</div>
+                                    </div>
+                                  )}
+                                </>
+                              ) : item.category === 'royalty' && royaltyMeasurementsMap[item.sr_no?.toString() || ''] ? (
+                                <>
+                                  {console.log(`[No Rates] Royalty item ${item.sr_no} found in map:`, royaltyMeasurementsMap[item.sr_no?.toString() || ''])}
+                                  <div>
+                                    <div className="font-medium">
+                                      {(royaltyMeasurementsMap[item.sr_no?.toString() || ''].hb_metal +
+                                        royaltyMeasurementsMap[item.sr_no?.toString() || ''].murum +
+                                        royaltyMeasurementsMap[item.sr_no?.toString() || ''].sand).toFixed(3)} {item.ssr_unit}
+                                    </div>
+                                    <div className="text-xs text-green-600">(Total Royalty)</div>
+                                  </div>
+                                </>
+                              ) : item.category === 'royalty' ? (
+                                <>
+                                  {console.log(`[No Rates] Royalty item ${item.sr_no} NOT found in map. Available keys:`, Object.keys(royaltyMeasurementsMap))}
+                                  {item.final_quantity !== undefined && item.final_quantity !== null ? (
+                                    <div>
+                                      <div className="font-medium">{Number(item.final_quantity).toFixed(3)} {item.final_unit || item.ssr_unit}</div>
+                                      <div className="text-xs text-green-600">(Calculated)</div>
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <div className="font-medium">{Number(item.ssr_quantity).toFixed(3)} {item.ssr_unit}</div>
+                                      <div className="text-xs text-gray-500">(Auto-calculated)</div>
+                                    </div>
+                                  )}
+                                </>
                               ) : item.final_quantity !== undefined && item.final_quantity !== null ? (
                                 <div>
                                   <div className="font-medium">{Number(item.final_quantity).toFixed(3)} {item.final_unit || item.ssr_unit}</div>
