@@ -56,12 +56,25 @@ const Subworks: React.FC = () => {
   const [designPhotos, setDesignPhotos] = useState<any[]>([]);
   const [uploadingDesign, setUploadingDesign] = useState(false);
 
-  // Subwork totals
-  const [subworkTotals, setSubworkTotals] = useState<Record<string, number>>({});
-  const totalSubworkEstimate = Object.values(subworkTotals || {}).reduce(
-    (acc, val) => acc + val,
-    0
-  );
+  // Subwork totals - separated by category
+  const [subworkTotals, setSubworkTotals] = useState<Record<string, { regular: number; royalty: number; testing: number }>>({});
+
+  const calculateOverallTotals = () => {
+    let regularTotal = 0;
+    let royaltyTotal = 0;
+    let testingTotal = 0;
+
+    Object.values(subworkTotals || {}).forEach(totals => {
+      regularTotal += totals.regular || 0;
+      royaltyTotal += totals.royalty || 0;
+      testingTotal += totals.testing || 0;
+    });
+
+    return { regularTotal, royaltyTotal, testingTotal };
+  };
+
+  const { regularTotal: totalRegular, royaltyTotal: totalRoyalty, testingTotal: totalTesting } = calculateOverallTotals();
+  const totalSubworkEstimate = totalRegular + totalRoyalty + totalTesting;
 
   // Lead / CSR / SSR
   const [showLeadChargesModal, setShowLeadChargesModal] = useState(false);
@@ -158,24 +171,24 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
 
       const subworkIds = (subworksData || []).map(sw => sw.subworks_id);
       if (subworkIds.length > 0) {
+        // Fetch item counts
         const { data: itemsData, error: itemsError } = await supabase
           .schema('estimate')
           .from('subwork_items')
-          .select('subwork_id, total_item_amount')
+          .select('subwork_id')
           .in('subwork_id', subworkIds);
         if (itemsError) throw itemsError;
 
-        const totals: Record<string, number> = {};
         const counts: Record<string, number> = {};
-
         (itemsData || []).forEach(item => {
           const id = item.subwork_id;
-          totals[id] = (totals[id] || 0) + (item.total_item_amount || 0);
           counts[id] = (counts[id] || 0) + 1;
         });
 
-        setSubworkTotals(totals);
         setSubworkItemCounts(counts);
+
+        // Fetch totals separately using the updated function
+        await fetchSubworkTotals();
       } else {
         setSubworkTotals({});
         setSubworkItemCounts({});
@@ -210,7 +223,7 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
 
   const fetchSubworkTotals = async () => {
     try {
-      const totals: { [key: string]: number } = {};
+      const totals: Record<string, { regular: number; royalty: number; testing: number }> = {};
 
       if (!subworks || subworks.length === 0) return;
 
@@ -218,14 +231,14 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
       const { data: subworkItems, error: itemsError } = await supabase
         .schema('estimate')
         .from('subwork_items')
-        .select('sr_no, subwork_id')
+        .select('sr_no, subwork_id, category')
         .in('subwork_id', subworkIds);
 
       if (itemsError) throw itemsError;
 
       if (!subworkItems || subworkItems.length === 0) {
         for (const subwork of subworks) {
-          totals[subwork.subworks_id] = 0;
+          totals[subwork.subworks_id] = { regular: 0, royalty: 0, testing: 0 };
 
           await supabase
             .schema('estimate')
@@ -253,17 +266,37 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
           (rate.rate_total_amount || 0);
       });
 
+      // Initialize totals for all subworks
+      subworkIds.forEach(id => {
+        totals[id] = { regular: 0, royalty: 0, testing: 0 };
+      });
+
+      // Calculate totals by category
       subworkItems.forEach(item => {
         const subworkId = item.subwork_id;
         const totalItemAmt = itemTotals[item.sr_no] || 0;
-        totals[subworkId] = (totals[subworkId] || 0) + totalItemAmt;
+        const category = item.category;
+
+        if (!totals[subworkId]) {
+          totals[subworkId] = { regular: 0, royalty: 0, testing: 0 };
+        }
+
+        if (category === 'royalty') {
+          totals[subworkId].royalty += totalItemAmt;
+        } else if (category === 'testing') {
+          totals[subworkId].testing += totalItemAmt;
+        } else {
+          totals[subworkId].regular += totalItemAmt;
+        }
       });
 
+      // Update subwork_amount with total of all categories
       for (const subworkId in totals) {
+        const total = totals[subworkId].regular + totals[subworkId].royalty + totals[subworkId].testing;
         await supabase
           .schema('estimate')
           .from('subworks')
-          .update({ subwork_amount: totals[subworkId] })
+          .update({ subwork_amount: total })
           .eq('subworks_id', subworkId);
       }
 
@@ -813,11 +846,23 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
               <p className="text-sm text-indigo-700 mt-1">
                 Division: {selectedWork.division || 'N/A'}
               </p>
-              <div className="flex items-center mt-2 text-sm text-indigo-600">
-                <IndianRupee className="w-3 h-3 mr-1" />
-                <span>
-                  Total Estimate: {formatCurrency(totalSubworkEstimate)}
-                </span>
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center text-sm text-indigo-900 font-semibold">
+                  <IndianRupee className="w-3 h-3 mr-1" />
+                  <span>
+                    Total Estimate: {formatCurrency(totalRegular)}
+                  </span>
+                </div>
+                {totalRoyalty > 0 && (
+                  <div className="flex items-center text-xs text-amber-700 ml-4">
+                    <span>Royalty: {formatCurrency(totalRoyalty)}</span>
+                  </div>
+                )}
+                {totalTesting > 0 && (
+                  <div className="flex items-center text-xs text-purple-700 ml-4">
+                    <span>Testing: {formatCurrency(totalTesting)}</span>
+                  </div>
+                )}
               </div>
             </div>
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-lg">
@@ -972,16 +1017,32 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
                         <p className="text-sm text-gray-600 mt-1 line-clamp-2">
                           {subwork.subworks_name}
                         </p>
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="text-xs text-gray-500">
-                            Items:{' '}
-                            {subworkItemCounts[subwork.subworks_id] || 0}
-                          </span>
-                          <span className="text-sm font-medium text-green-600">
-                            {formatCurrency(
-                              subworkTotals[subwork.subworks_id] || 0
-                            )}
-                          </span>
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-500">
+                              Items:{' '}
+                              {subworkItemCounts[subwork.subworks_id] || 0}
+                            </span>
+                            <span className="text-sm font-semibold text-green-600">
+                              {formatCurrency(
+                                subworkTotals[subwork.subworks_id]?.regular || 0
+                              )}
+                            </span>
+                          </div>
+                          {subworkTotals[subwork.subworks_id]?.royalty > 0 && (
+                            <div className="flex justify-end mt-0.5">
+                              <span className="text-xs text-amber-600">
+                                Royalty: {formatCurrency(subworkTotals[subwork.subworks_id].royalty)}
+                              </span>
+                            </div>
+                          )}
+                          {subworkTotals[subwork.subworks_id]?.testing > 0 && (
+                            <div className="flex justify-end mt-0.5">
+                              <span className="text-xs text-purple-600">
+                                Testing: {formatCurrency(subworkTotals[subwork.subworks_id].testing)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
