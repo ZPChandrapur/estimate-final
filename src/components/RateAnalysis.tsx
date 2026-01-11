@@ -313,16 +313,29 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
 
   const fetchRateAnalysisForRate = async (rateId: number | null) => {
     try {
-      if (!item?.sr_no) return;
+      if (!item?.sr_no) {
+        console.log('⚠️ No item sr_no, skipping fetch');
+        return;
+      }
 
       // Prevent duplicate fetches
       const currentFetch = { itemId: item.sr_no, rateId };
+
+      console.log('🔄 Fetch request - item:', item.sr_no, 'rate:', rateId);
+      console.log('🔄 Currently fetching?', isFetchingRef.current);
+      console.log('🔄 Last fetched:', lastFetchedRef.current);
+      console.log('🔄 Current entries count:', entries.length);
+
+      if (isFetchingRef.current) {
+        console.log('⏭️ Already fetching, skipping duplicate');
+        return;
+      }
+
       if (
-        isFetchingRef.current ||
-        (lastFetchedRef.current?.itemId === currentFetch.itemId &&
-         lastFetchedRef.current?.rateId === currentFetch.rateId)
+        lastFetchedRef.current?.itemId === currentFetch.itemId &&
+        lastFetchedRef.current?.rateId === currentFetch.rateId
       ) {
-        console.log('⏭️ Skipping duplicate fetch for item:', item.sr_no, 'rate:', rateId);
+        console.log('⏭️ Already fetched this exact combination, skipping');
         return;
       }
 
@@ -330,6 +343,7 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
       lastFetchedRef.current = currentFetch;
 
       console.log('🔍 Fetching rate analysis for item:', item.sr_no, 'rate:', rateId);
+      console.log('🔍 Query: subwork_item_id =', item.sr_no, ', item_rate_id =', rateId === null ? 'NULL' : rateId);
 
       let query = supabase
         .schema('estimate')
@@ -363,18 +377,34 @@ const RateAnalysis: React.FC<RateAnalysisProps> = ({ isOpen, onClose, item, base
           setFinalTaxApplied(null);
         }
       } else {
-        console.log('⚠️ No existing analysis found - resetting entries');
+        console.log('⚠️ No existing analysis found in database');
+        // CRITICAL: Only reset if we don't have entries already loaded
+        // This prevents a race condition from wiping out data
+        setEntries(prev => {
+          if (prev.length > 0) {
+            console.log('✅ Keeping existing', prev.length, 'entries (preventing data loss)');
+            return prev;
+          } else {
+            console.log('⚠️ No existing entries, initializing empty state');
+            return [];
+          }
+        });
+        // Only reset other state if entries are empty
+        if (entries.length === 0) {
+          setSavedBaseRate(null);
+          setIsEditMode(false);
+          setFinalTaxApplied(null);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error fetching rate analysis:', error);
+      // Don't wipe out existing data on error
+      if (entries.length === 0) {
         setEntries([]);
         setSavedBaseRate(null);
         setIsEditMode(false);
         setFinalTaxApplied(null);
       }
-    } catch (error) {
-      console.error('❌ Error fetching rate analysis:', error);
-      setEntries([]);
-      setSavedBaseRate(null);
-      setIsEditMode(false);
-      setFinalTaxApplied(null);
     } finally {
       isFetchingRef.current = false;
     }
