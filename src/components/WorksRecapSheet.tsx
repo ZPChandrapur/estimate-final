@@ -28,7 +28,7 @@ const WorksRecapSheet: React.FC<WorksRecapSheetProps> = ({
   const [subworkTotals, setSubworkTotals] = useState<Record<string, { regular: number; royalty: number; testing: number }>>({});
   const [loading, setLoading] = useState(true);
   const [taxes, setTaxes] = useState<TaxEntry[]>([
-    { id: '1', name: 'GST', percentage: 18, applyTo: 'part_b' },
+    { id: '1', name: 'GST', type: 'percentage', percentage: 18, applyTo: 'part_b' },
   ]);
   const [calculations, setCalculations] = useState<RecapCalculations | null>(null);
   const [saved, setSaved] = useState(false);
@@ -214,9 +214,14 @@ const fetchWorkData = async () => {
       setSubworkTotals(totals);
 
       if (recapJsonData.taxes) {
-        setTaxes(recapJsonData.taxes);
+        const migratedTaxes = recapJsonData.taxes.map((tax: any) => ({
+          ...tax,
+          type: tax.type || 'percentage',
+          percentage: tax.percentage || 0,
+        }));
+        setTaxes(migratedTaxes);
       } else {
-        setTaxes([{ id: '1', name: 'GST', percentage: 18, applyTo: 'part_b' }]);
+        setTaxes([{ id: '1', name: 'GST', type: 'percentage', percentage: 18, applyTo: 'part_b' }]);
       }
 
       if (recapJsonData.unitInputs) {
@@ -300,7 +305,11 @@ const fetchWorkData = async () => {
       );
       const taxAmounts: { [taxId: string]: number } = {};
       applicableTaxes.forEach(tax => {
-        taxAmounts[tax.id] = (subtotal * tax.percentage) / 100;
+        if (tax.type === 'fixed') {
+          taxAmounts[tax.id] = tax.fixedAmount || 0;
+        } else {
+          taxAmounts[tax.id] = (subtotal * (tax.percentage || 0)) / 100;
+        }
       });
       return taxAmounts;
     };
@@ -321,7 +330,11 @@ const fetchWorkData = async () => {
     const partABCombinedTaxes = taxes.filter(tax => tax.applyTo === 'part_a_b_combined');
     const partABCombinedTaxAmounts: { [taxId: string]: number } = {};
     partABCombinedTaxes.forEach(tax => {
-      partABCombinedTaxAmounts[tax.id] = (partABCombinedSubtotal * tax.percentage) / 100;
+      if (tax.type === 'fixed') {
+        partABCombinedTaxAmounts[tax.id] = tax.fixedAmount || 0;
+      } else {
+        partABCombinedTaxAmounts[tax.id] = (partABCombinedSubtotal * (tax.percentage || 0)) / 100;
+      }
     });
     const partABCombinedTaxTotal = Object.values(partABCombinedTaxAmounts).reduce((sum, val) => sum + val, 0);
 
@@ -348,6 +361,7 @@ const fetchWorkData = async () => {
     const newTax: TaxEntry = {
       id: Date.now().toString(),
       name: 'New Tax',
+      type: 'percentage',
       percentage: 0,
       applyTo: 'both',
     };
@@ -584,14 +598,41 @@ const handleSave = async () => {
                   placeholder="Tax Name"
                   className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
                 />
-                <input
-                  type="number"
-                  value={tax.percentage}
-                  onChange={(e) => updateTax(tax.id, 'percentage', parseFloat(e.target.value) || 0)}
-                  placeholder="Percentage"
-                  className="w-24 px-3 py-2 border border-gray-300 rounded text-sm"
-                  step="0.01"
-                />
+                <select
+                  value={tax.type || 'percentage'}
+                  onChange={(e) => {
+                    const newType = e.target.value as 'percentage' | 'fixed';
+                    updateTax(tax.id, 'type', newType);
+                    if (newType === 'percentage') {
+                      updateTax(tax.id, 'fixedAmount', undefined);
+                    } else {
+                      updateTax(tax.id, 'percentage', undefined);
+                    }
+                  }}
+                  className="w-32 px-3 py-2 border border-gray-300 rounded text-sm"
+                >
+                  <option value="percentage">Percentage</option>
+                  <option value="fixed">Fixed Amount</option>
+                </select>
+                {tax.type === 'fixed' ? (
+                  <input
+                    type="number"
+                    value={tax.fixedAmount || 0}
+                    onChange={(e) => updateTax(tax.id, 'fixedAmount', parseFloat(e.target.value) || 0)}
+                    placeholder="Amount"
+                    className="w-32 px-3 py-2 border border-gray-300 rounded text-sm"
+                    step="0.01"
+                  />
+                ) : (
+                  <input
+                    type="number"
+                    value={tax.percentage || 0}
+                    onChange={(e) => updateTax(tax.id, 'percentage', parseFloat(e.target.value) || 0)}
+                    placeholder="Percentage"
+                    className="w-24 px-3 py-2 border border-gray-300 rounded text-sm"
+                    step="0.01"
+                  />
+                )}
                 <select
                   value={tax.applyTo}
                   onChange={(e) => updateTax(tax.id, 'applyTo', e.target.value)}
@@ -706,7 +747,7 @@ const handleSave = async () => {
                   .map((tax) => (
                     <tr key={`part-a-tax-${tax.id}`} className="font-semibold">
                       <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
-                        Add {tax.percentage}% {tax.name}
+                        {tax.type === 'fixed' ? `Add ₹${tax.fixedAmount || 0} ${tax.name}` : `Add ${tax.percentage}% ${tax.name}`}
                       </td>
                       <td className="border border-gray-300 p-3 text-right">{(calculations.partA.taxes[tax.id] || 0).toFixed(0)}</td>
                       {showFundingCols && (
@@ -842,7 +883,7 @@ const handleSave = async () => {
                   .map((tax) => (
                     <tr key={`part-b-tax-${tax.id}`} className="font-semibold">
                       <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
-                        Add {tax.percentage}% {tax.name}
+                        {tax.type === 'fixed' ? `Add ₹${tax.fixedAmount || 0} ${tax.name}` : `Add ${tax.percentage}% ${tax.name}`}
                       </td>
                       <td className="border border-gray-300 p-3 text-right">{(calculations.partB.taxes[tax.id] || 0).toFixed(0)}</td>
                       {showFundingCols && (
@@ -884,7 +925,7 @@ const handleSave = async () => {
                       .map((tax) => (
                         <tr key={`combined-tax-${tax.id}`} className="font-semibold">
                           <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
-                            Add {tax.percentage}% {tax.name}
+                            {tax.type === 'fixed' ? `Add ₹${tax.fixedAmount || 0} ${tax.name}` : `Add ${tax.percentage}% ${tax.name}`}
                           </td>
                           <td className="border border-gray-300 p-3 text-right">{(calculations.partABCombined.taxes[tax.id] || 0).toFixed(0)}</td>
                           {showFundingCols && (
@@ -965,7 +1006,7 @@ const handleSave = async () => {
                       .map((tax) => (
                         <tr key={`part-c-tax-${tax.id}`} className="font-semibold">
                           <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
-                            Add {tax.percentage}% {tax.name}
+                            {tax.type === 'fixed' ? `Add ₹${tax.fixedAmount || 0} ${tax.name}` : `Add ${tax.percentage}% ${tax.name}`}
                           </td>
                           <td className="border border-gray-300 p-3 text-right">{(calculations.partC.taxes[tax.id] || 0).toFixed(0)}</td>
                           {showFundingCols && (

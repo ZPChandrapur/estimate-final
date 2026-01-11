@@ -219,7 +219,9 @@ export interface LanguageContextType {
 export interface TaxEntry {
   id: string;
   name: string;
-  percentage: number;
+  type: 'percentage' | 'fixed';
+  percentage?: number;
+  fixedAmount?: number;
   applyTo: 'part_a' | 'part_b' | 'part_c' | 'both' | 'part_a_b_combined';
 }
 
