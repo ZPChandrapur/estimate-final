@@ -220,7 +220,7 @@ export interface TaxEntry {
   id: string;
   name: string;
   percentage: number;
-  applyTo: 'part_a' | 'part_b' | 'part_c' | 'both';
+  applyTo: 'part_a' | 'part_b' | 'part_c' | 'both' | 'part_a_b_combined';
 }
 
 export interface RecapCalculations {
@@ -235,6 +235,11 @@ export interface RecapCalculations {
     total: number;
   };
   partC: {
+    subtotal: number;
+    taxes: { [taxId: string]: number };
+    total: number;
+  };
+  partABCombined?: {
     subtotal: number;
     taxes: { [taxId: string]: number };
     total: number;

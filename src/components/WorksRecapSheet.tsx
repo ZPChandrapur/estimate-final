@@ -189,16 +189,26 @@ const fetchWorkData = async () => {
     const partBTotal = partBSubtotal + partBTaxTotal;
     const partCTotal = partCSubtotal + partCTaxTotal;
 
+    const partABCombinedSubtotal = partATotal + partBTotal;
+
+    const partABCombinedTaxes = taxes.filter(tax => tax.applyTo === 'part_a_b_combined');
+    const partABCombinedTaxAmounts: { [taxId: string]: number } = {};
+    partABCombinedTaxes.forEach(tax => {
+      partABCombinedTaxAmounts[tax.id] = (partABCombinedSubtotal * tax.percentage) / 100;
+    });
+    const partABCombinedTaxTotal = Object.values(partABCombinedTaxAmounts).reduce((sum, val) => sum + val, 0);
+
     const contingencies = partATotal * 0.005;
     const inspectionCharges = partATotal * 0.005;
-    const dprCharges = Math.min(partATotal * 0.05, 100000);
+    const dprCharges = department === 'pwd' ? 0 : Math.min(partATotal * 0.05, 100000);
 
-    const grandTotal = partATotal + partBTotal + (department === 'pwd' ? 0 : partCTotal) + dprCharges;
+    const grandTotal = partABCombinedSubtotal + partABCombinedTaxTotal + (department === 'pwd' ? 0 : partCTotal) + dprCharges;
 
     const calculationsResult: RecapCalculations = {
       partA: { subtotal: partASubtotal, taxes: partATaxes, total: partATotal },
       partB: { subtotal: partBSubtotal, taxes: partBTaxes, total: partBTotal },
       partC: { subtotal: partCSubtotal, taxes: partCTaxes, total: partCTotal },
+      partABCombined: { subtotal: partABCombinedSubtotal, taxes: partABCombinedTaxAmounts, total: partABCombinedSubtotal + partABCombinedTaxTotal },
       additionalCharges: { contingencies, inspectionCharges, dprCharges },
       grandTotal,
     };
@@ -463,6 +473,7 @@ const handleSave = async () => {
                   <option value="part_a">Part A Only</option>
                   <option value="part_b">Part B Only</option>
                   <option value="part_c">Part C Only</option>
+                  <option value="part_a_b_combined">Part A+B Combined</option>
                   <option value="both">All Parts</option>
                 </select>
                 <button
@@ -736,6 +747,40 @@ const handleSave = async () => {
                   )}
                 </tr>
 
+                {/* Part A + Part B Combined Summary */}
+                {calculations.partABCombined && calculations.partABCombined.subtotal > 0 && (
+                  <>
+                    <tr className="font-bold bg-teal-50">
+                      <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
+                        Total of PART A + PART B
+                      </td>
+                      <td className="border border-gray-300 p-3 text-right">{calculations.partABCombined.subtotal.toFixed(0)}</td>
+                      {showFundingCols && (
+                        <>
+                          <td className="border border-gray-300 p-3 text-right">{(calculations.partABCombined.subtotal * 0.7).toFixed(0)}</td>
+                          <td className="border border-gray-300 p-3 text-right">{(calculations.partABCombined.subtotal * 0.3).toFixed(0)}</td>
+                        </>
+                      )}
+                    </tr>
+                    {taxes
+                      .filter((tax) => tax.applyTo === 'part_a_b_combined')
+                      .map((tax) => (
+                        <tr key={`combined-tax-${tax.id}`} className="font-semibold">
+                          <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
+                            Add {tax.percentage}% {tax.name}
+                          </td>
+                          <td className="border border-gray-300 p-3 text-right">{(calculations.partABCombined.taxes[tax.id] || 0).toFixed(0)}</td>
+                          {showFundingCols && (
+                            <>
+                              <td className="border border-gray-300 p-3 text-right">{((calculations.partABCombined.taxes[tax.id] || 0) * 0.7).toFixed(0)}</td>
+                              <td className="border border-gray-300 p-3 text-right">{((calculations.partABCombined.taxes[tax.id] || 0) * 0.3).toFixed(0)}</td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                  </>
+                )}
+
                 {/* PART C Rows - Only show if not PWD */}
                 {department !== 'pwd' && (
                   <>
@@ -828,22 +873,24 @@ const handleSave = async () => {
                 )}
 
                 {/* Additional Charges & Grand Total */}
-                <tr className="font-semibold">
-                  <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
-                    DPR charges 5% or 1 Lakh whichever is less
-                  </td>
-                  <td className="border border-gray-300 p-3 text-right">
-                    {calculations.additionalCharges.dprCharges.toFixed(0)}
-                  </td>
-                  {showFundingCols && (
-                    <>
-                      <td className="border border-gray-300 p-3 text-right">
-                        {calculations.additionalCharges.dprCharges.toFixed(0)}
-                      </td>
-                      <td className="border border-gray-300 p-3 text-right">0</td>
-                    </>
-                  )}
-                </tr>
+                {department !== 'pwd' && (
+                  <tr className="font-semibold">
+                    <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
+                      DPR charges 5% or 1 Lakh whichever is less
+                    </td>
+                    <td className="border border-gray-300 p-3 text-right">
+                      {calculations.additionalCharges.dprCharges.toFixed(0)}
+                    </td>
+                    {showFundingCols && (
+                      <>
+                        <td className="border border-gray-300 p-3 text-right">
+                          {calculations.additionalCharges.dprCharges.toFixed(0)}
+                        </td>
+                        <td className="border border-gray-300 p-3 text-right">0</td>
+                      </>
+                    )}
+                  </tr>
+                )}
                 <tr className="font-bold bg-yellow-100 text-lg">
                   <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
                     Gross Total Estimated Amount
