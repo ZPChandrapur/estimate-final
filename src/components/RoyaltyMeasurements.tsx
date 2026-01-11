@@ -78,18 +78,21 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
       const itemsWithLeadAnalysis = [];
 
       for (const item of items) {
-        // Check if item has rate analysis
-        const { data: analysis, error: analysisError } = await supabase
+        // Check if item has rate analysis - get all records and use the most recent
+        const { data: analysisRecords, error: analysisError } = await supabase
           .schema('estimate')
           .from('item_rate_analysis')
-          .select('entries')
+          .select('entries, created_at')
           .eq('subwork_item_id', item.sr_no)
-          .maybeSingle();
+          .order('created_at', { ascending: false });
 
         if (analysisError) {
           console.error('Error fetching analysis for item:', item.sr_no, analysisError);
           continue;
         }
+
+        // Get the most recent analysis record
+        const analysis = analysisRecords && analysisRecords.length > 0 ? analysisRecords[0] : null;
 
         // Check if entries contain royalty materials
         if (analysis && analysis.entries && Array.isArray(analysis.entries)) {
