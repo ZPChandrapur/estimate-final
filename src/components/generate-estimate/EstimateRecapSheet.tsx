@@ -18,7 +18,6 @@ interface EstimateRecapSheetProps {
   pageNumber: number;
   recapCalculations?: RecapCalculations;
   taxes?: TaxEntry[];
-  department?: 'water_sanitation' | 'pwd' | 'irrigation';
 }
 
 export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
@@ -29,8 +28,7 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
   pageNumberPosition,
   pageNumber,
   recapCalculations,
-  taxes = [],
-  department = 'water_sanitation'
+  taxes = []
 }) => {
   const getPartASubworks = () => {
     return estimateData.subworks.filter(subwork => {
@@ -51,11 +49,7 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
     return items.reduce((sum, item) => sum + (item.total_item_amount || 0), 0);
   };
 
-  const shouldShowFundingColumns = () => {
-    return department === 'water_sanitation';
-  };
-
-  const showFundingCols = shouldShowFundingColumns();
+  const showFundingCols = true;
   const totalColspan = showFundingCols ? 8 : 6;
 
   return (
@@ -77,7 +71,7 @@ export const EstimateRecapSheet: React.FC<EstimateRecapSheetProps> = ({
           <p className="text-sm">Fund Head: {estimateData.work.fund_head || 'SBM (G.) Phase-II & 15th Finance Commission'}</p>
           <p className="text-sm font-semibold">NAME OF WORK: {estimateData.work.work_name}</p>
           <p className="text-sm">Village: {estimateData.work.village}, Tah: {estimateData.work.taluka}</p>
-          <h3 className="text-lg font-bold mt-4">RECAPITULATION SHEET</h3>
+          <h3 className="text-lg font-bold mt-4">GENERAL ABSTRACT</h3>
         </div>
 
         <table className="w-full border-collapse border border-black text-xs mb-6">

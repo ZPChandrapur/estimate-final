@@ -692,7 +692,7 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                     <p className="text-sm font-semibold">GP : {estimateData.work.grampanchayat}</p>
                     <p className="text-sm font-semibold">Tah : {estimateData.work.taluka}</p>
                     <p className="text-sm">District :- Chandrapur</p>
-                    <h3 className="text-lg font-bold mt-4">RECAPITULATION SHEET</h3>
+                    <h3 className="text-lg font-bold mt-4">GENERAL ABSTRACT</h3>
                   </div>
 
                   <WorksRecapSheet
