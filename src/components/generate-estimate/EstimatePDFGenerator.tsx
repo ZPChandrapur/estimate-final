@@ -194,7 +194,6 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
           ...prev,
           header: {
             ...prev.header,
-            zilla: work.grampanchayat || "",
             division: work.division || "",
             subDivision: work.sub_division || "",
           },
@@ -564,7 +563,6 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
 
   const PageHeader: React.FC<{ pageNumber?: number }> = ({ pageNumber }) => (
     <div className="text-center mb-6 pb-4 border-b-2 border-gray-300">
-      <h1 className="text-lg font-bold text-red-600 mb-2">{documentSettings.header.zilla}</h1>
       <h2 className="text-base font-semibold text-blue-600 mb-1">{documentSettings.header.division}</h2>
       <h3 className="text-sm font-medium text-blue-600 mb-3">{documentSettings.header.subDivision}</h3>
       {pageNumber && documentSettings.pageSettings.showPageNumbers && documentSettings.pageSettings.pageNumberPosition === 'top' && (
@@ -642,16 +640,6 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
               <div>
                 <h5 className="text-sm font-medium text-gray-700 mb-2">Header Settings</h5>
                 <div className="space-y-2">
-                  <input
-                    type="text"
-                    placeholder="Zilla Parishad"
-                    value={documentSettings.header.zilla}
-                    onChange={(e) => setDocumentSettings(prev => ({
-                      ...prev,
-                      header: { ...prev.header, zilla: e.target.value }
-                    }))}
-                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
-                  />
                   <input
                     type="text"
                     placeholder="Division"
