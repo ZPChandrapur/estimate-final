@@ -98,14 +98,14 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
 
   const [documentSettings, setDocumentSettings] = useState<DocumentSettings>({
     header: {
-      zilla: "ZILLA PARISHAD, CHANDRAPUR",
-      division: "RURAL WATER SUPPLY DIVISION, Z.P., CHANDRAPUR",
-      subDivision: "RURAL WATER SUPPLY SUB-DIVISION Z.P., CHANDRAPUR",
+      zilla: "",
+      division: "",
+      subDivision: "",
       title: "ESTIMATE",
     },
     footer: {
-      preparedBy: "Pragati Bahu Uddeshiya Sanstha, Warora, Tah.- Chandrapur",
-      designation: "Sub Divisional Engineer Z.P Rural Water supply Sub-Division, Chandrapur",
+      preparedBy: "",
+      designation: "",
     },
     pageSettings: {
       showPageNumbers: true,
@@ -129,7 +129,7 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
       const { data: work, error: workError } = await supabase
         .schema("estimate")
         .from("works")
-        .select("works_id, work_name, division, sub_division, fund_head, major_head, minor_head, service_head, departmental_head, sanctioning_authority, total_estimated_cost, village, grampanchayat, taluka, district")
+        .select("works_id, work_name, division, sub_division, fund_head, major_head, minor_head, service_head, departmental_head, sanctioning_authority, total_estimated_cost, village, grampanchayat, taluka")
         .eq("works_id", workId)
         .single();
 
@@ -140,8 +140,9 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
           ...prev,
           header: {
             ...prev.header,
-            division: work.division || prev.header.division,
-            subDivision: work.sub_division || prev.header.subDivision,
+            zilla: work.grampanchayat || "",
+            division: work.division || "",
+            subDivision: work.sub_division || "",
           },
         }));
       }
