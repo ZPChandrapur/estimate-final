@@ -408,6 +408,9 @@ const Works: React.FC = () => {
                     Fund Head
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     Total Estimated Cost
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
@@ -463,6 +466,11 @@ const Works: React.FC = () => {
                     <td className="px-4 py-2 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
                         {work.fund_head || '-'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {getStatusBadge(work.status)}
                       </div>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
