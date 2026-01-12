@@ -52,7 +52,7 @@ const fetchWorks = async () => {
     const { data, error } = await supabase
       .schema('estimate')
       .from('works')
-      .select('sr_no, works_id, work_name, division, type, status, created_at, total_estimated_cost')
+      .select('sr_no, works_id, work_name, division, type, status, created_at, total_estimated_cost, village, grampanchayat, taluka')
       .order('sr_no', { ascending: false });
 
     if (error) throw error;

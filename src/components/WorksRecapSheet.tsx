@@ -431,10 +431,7 @@ const handleSave = async () => {
       .from('works')
       .update({
         recap_json: JSON.stringify(recapData),
-        total_estimated_cost:
-          (calculations.partA.subtotal || 0) +
-          (calculations.partB.subtotal || 0) +
-          (calculations.partC.subtotal || 0),
+        total_estimated_cost: calculations.grandTotal || 0,
         updated_at: new Date().toISOString(),
       })
       .eq('works_id', workId);

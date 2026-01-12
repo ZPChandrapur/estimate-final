@@ -129,7 +129,7 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
       const { data: work, error: workError } = await supabase
         .schema("estimate")
         .from("works")
-        .select("works_id, work_name, division, sub_division, fund_head, major_head, minor_head, service_head, departmental_head, sanctioning_authority, total_estimated_cost")
+        .select("works_id, work_name, division, sub_division, fund_head, major_head, minor_head, service_head, departmental_head, sanctioning_authority, total_estimated_cost, village, grampanchayat, taluka, district")
         .eq("works_id", workId)
         .single();
 
