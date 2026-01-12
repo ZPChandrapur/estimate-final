@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Stage, Layer, Line, Circle, Rect, Text, Transformer } from 'react-konva';
+import { Stage, Layer, Line, Circle, Rect, Text, Transformer, Arrow } from 'react-konva';
 import Konva from 'konva';
 import jsPDF from 'jspdf';
 import { X } from 'lucide-react';
@@ -15,12 +15,14 @@ type Tool =
   | 'free-line'
   | 'straight-line'
   | 'polyline'
+  | 'arrow'
   | 'node-circle'
   | 'node-square'
   | 'text'
+  | 'table'
   | 'eraser';
 
-type ShapeKind = 'line' | 'node-circle' | 'node-square' | 'text';
+type ShapeKind = 'line' | 'arrow' | 'node-circle' | 'node-square' | 'text' | 'table';
 
 interface BaseShape {
   id: string;
@@ -54,7 +56,23 @@ interface TextShape extends BaseShape {
   text: string;
 }
 
-type QuarryShape = LineShape | NodeCircleShape | NodeSquareShape | TextShape;
+interface ArrowShape extends BaseShape {
+  kind: 'arrow';
+  points: number[];
+}
+
+interface TableShape extends BaseShape {
+  kind: 'table';
+  x: number;
+  y: number;
+  rows: number;
+  cols: number;
+  cellWidth: number;
+  cellHeight: number;
+  data: string[][];
+}
+
+type QuarryShape = LineShape | ArrowShape | NodeCircleShape | NodeSquareShape | TextShape | TableShape;
 
 const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) => {
   const [title, setTitle] = useState('Quarry Chart');
@@ -64,6 +82,8 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
   const [textLabel, setTextLabel] = useState('');
   const [strokeColor, setStrokeColor] = useState('#111827');
   const [strokeWidth, setStrokeWidth] = useState(2);
+  const [tableRows, setTableRows] = useState(3);
+  const [tableCols, setTableCols] = useState(3);
 
   const [shapes, setShapes] = useState<QuarryShape[]>([]);
   const [history, setHistory] = useState<QuarryShape[][]>([]);
@@ -127,6 +147,16 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
         points: [pos.x, pos.y, pos.x, pos.y]
       };
       setShapes(prev => [...prev, newLine]);
+    } else if (tool === 'arrow') {
+      startPointRef.current = { x: pos.x, y: pos.y };
+      const id = `arrow-${Date.now()}`;
+      const newArrow: ArrowShape = {
+        id,
+        worksId,
+        kind: 'arrow',
+        points: [pos.x, pos.y, pos.x, pos.y]
+      };
+      setShapes(prev => [...prev, newArrow]);
     } else if (tool === 'node-circle') {
       const id = `nodec-${Date.now()}`;
       const node: NodeCircleShape = {
@@ -161,6 +191,22 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
         text: textLabel
       };
       setShapes(prev => [...prev, t]);
+    } else if (tool === 'table') {
+      const id = `table-${Date.now()}`;
+      const emptyData: string[][] = Array(tableRows).fill(null).map(() => Array(tableCols).fill(''));
+      const table: TableShape = {
+        id,
+        worksId,
+        kind: 'table',
+        x: pos.x,
+        y: pos.y,
+        rows: tableRows,
+        cols: tableCols,
+        cellWidth: 80,
+        cellHeight: 30,
+        data: emptyData
+      };
+      setShapes(prev => [...prev, table]);
     } else if (tool === 'eraser') {
       const target = e.target;
       const id = target?.attrs?.id;
@@ -178,6 +224,23 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
 
     setShapes(prev => {
       const next = [...prev];
+
+      if (tool === 'arrow') {
+        const idx = next.findIndex(
+          s => s.worksId === worksId && s.kind === 'arrow' && s.id === next[next.length - 1].id
+        );
+        if (idx === -1) return prev;
+        const last = next[idx] as ArrowShape;
+        const sp = startPointRef.current;
+        if (!sp) return prev;
+        const updated: ArrowShape = {
+          ...last,
+          points: [sp.x, sp.y, pos.x, pos.y]
+        };
+        next[idx] = updated;
+        return next;
+      }
+
       const idx = next.findIndex(
         s => s.worksId === worksId && s.kind === 'line' && s.id === next[next.length - 1].id
       );
@@ -236,6 +299,9 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
           return { ...s, x: dx, y: dy };
         }
         if (s.kind === 'text') {
+          return { ...s, x: dx, y: dy };
+        }
+        if (s.kind === 'table') {
           return { ...s, x: dx, y: dy };
         }
         return s;
@@ -396,10 +462,20 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
                 Route (polyline)
               </button>
               <button
+                onClick={() => setTool('arrow')}
+                className={`px-3 py-1 rounded-md border ${
+                  tool === 'arrow'
+                    ? 'bg-emerald-600 text-white border-emerald-700'
+                    : 'bg-white text-gray-700 border-gray-300'
+                }`}
+              >
+                Arrow →
+              </button>
+              <button
                 onClick={() => setTool('node-circle')}
                 className={`px-3 py-1 rounded-md border ${
                   tool === 'node-circle'
-                    ? 'bg-indigo-600 text-white border-indigo-700'
+                    ? 'bg-blue-600 text-white border-blue-700'
                     : 'bg-white text-gray-700 border-gray-300'
                 }`}
               >
@@ -409,7 +485,7 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
                 onClick={() => setTool('node-square')}
                 className={`px-3 py-1 rounded-md border ${
                   tool === 'node-square'
-                    ? 'bg-indigo-600 text-white border-indigo-700'
+                    ? 'bg-blue-600 text-white border-blue-700'
                     : 'bg-white text-gray-700 border-gray-300'
                 }`}
               >
@@ -424,6 +500,16 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
                 }`}
               >
                 Text label
+              </button>
+              <button
+                onClick={() => setTool('table')}
+                className={`px-3 py-1 rounded-md border ${
+                  tool === 'table'
+                    ? 'bg-amber-600 text-white border-amber-700'
+                    : 'bg-white text-gray-700 border-gray-300'
+                }`}
+              >
+                Table ⊞
               </button>
               <button
                 onClick={() => setTool('eraser')}
@@ -450,6 +536,32 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
               className="border border-gray-300 rounded-md px-2 py-1 text-xs w-48"
               placeholder="Village, quarry, distance..."
             />
+          </div>
+
+          {/* Table config */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Table size (rows × cols)
+            </label>
+            <div className="flex items-center gap-1 text-xs">
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={tableRows}
+                onChange={e => setTableRows(Number(e.target.value || 1))}
+                className="border border-gray-300 rounded-md px-2 py-1 w-14"
+              />
+              <span>×</span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={tableCols}
+                onChange={e => setTableCols(Number(e.target.value || 1))}
+                className="border border-gray-300 rounded-md px-2 py-1 w-14"
+              />
+            </div>
           </div>
 
           {/* Style */}
@@ -563,6 +675,40 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
                       />
                     );
                   }
+                  if (s.kind === 'arrow') {
+                    return (
+                      <Arrow
+                        key={s.id}
+                        id={s.id}
+                        points={s.points}
+                        stroke={strokeColor}
+                        strokeWidth={strokeWidth}
+                        fill={strokeColor}
+                        pointerLength={10}
+                        pointerWidth={10}
+                        draggable={tool === 'select'}
+                        onClick={() => setSelectedId(s.id)}
+                        onDragEnd={e => {
+                          const dx = e.target.x();
+                          const dy = e.target.y();
+                          setShapes(prev =>
+                            prev.map(sh => {
+                              if (sh.id !== s.id || sh.kind !== 'arrow') return sh;
+                              const movedPoints: number[] = [];
+                              for (let i = 0; i < (sh as ArrowShape).points.length; i += 2) {
+                                movedPoints.push(
+                                  (sh as ArrowShape).points[i] + dx,
+                                  (sh as ArrowShape).points[i + 1] + dy
+                                );
+                              }
+                              return { ...(sh as ArrowShape), points: movedPoints };
+                            })
+                          );
+                          e.target.position({ x: 0, y: 0 });
+                        }}
+                      />
+                    );
+                  }
                   if (s.kind === 'node-circle') {
                     return (
                       <Circle
@@ -615,6 +761,44 @@ const QuarryChart: React.FC<QuarryChartProps> = ({ isOpen, onClose, worksId }) =
                           handleDragShape(s.id, e.target.x(), e.target.y())
                         }
                       />
+                    );
+                  }
+                  if (s.kind === 'table') {
+                    const tableElements: React.ReactNode[] = [];
+                    for (let r = 0; r < s.rows; r++) {
+                      for (let c = 0; c < s.cols; c++) {
+                        const cellX = s.x + c * s.cellWidth;
+                        const cellY = s.y + r * s.cellHeight;
+                        tableElements.push(
+                          <Rect
+                            key={`${s.id}-cell-${r}-${c}`}
+                            x={cellX}
+                            y={cellY}
+                            width={s.cellWidth}
+                            height={s.cellHeight}
+                            stroke={strokeColor}
+                            strokeWidth={1}
+                            fill="white"
+                          />
+                        );
+                        if (s.data[r] && s.data[r][c]) {
+                          tableElements.push(
+                            <Text
+                              key={`${s.id}-text-${r}-${c}`}
+                              x={cellX + 5}
+                              y={cellY + s.cellHeight / 2 - 6}
+                              text={s.data[r][c]}
+                              fontSize={10}
+                              fill={strokeColor}
+                            />
+                          );
+                        }
+                      }
+                    }
+                    return (
+                      <React.Fragment key={s.id}>
+                        {tableElements}
+                      </React.Fragment>
                     );
                   }
                   return null;

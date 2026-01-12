@@ -34,6 +34,7 @@ import {
 import WorksRecapSheet from "../WorksRecapSheet";
 import { EstimateRateAnalysis } from "./EstimateRateAnalysis";
 import { EstimateLeadStatement } from "./EstimateLeadStatement";
+import { EstimateQuarryChart } from "./EstimateQuarryChart";
 
 interface RoyaltyMeasurement {
   sr_no: number;
@@ -122,7 +123,9 @@ interface EstimatePDFGeneratorProps {
 
 interface Photo {
   id: string;
-  designphoto: string; 
+  photo_url: string;
+  photo_name?: string;
+  description?: string;
 }
 
 export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
@@ -1505,10 +1508,14 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                           {photosMap[subwork.subworks_id].map((photo) => (
                             <div key={photo.id} className="flex flex-col items-center">
                               <img
-                                src={photo.photo_url || photo.designphoto}
-                                alt={`Design Photo ${photo.id}`}
+                                src={photo.photo_url}
+                                alt={photo.description || `Design Photo ${photo.id}`}
                                 className="max-h-[200mm] object-contain border border-gray-300 rounded shadow-sm"
+                                crossOrigin="anonymous"
                               />
+                              {photo.description && (
+                                <p className="text-sm text-gray-600 mt-2 text-center">{photo.description}</p>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1640,6 +1647,71 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                     PageHeader={PageHeader}
                     PageFooter={PageFooter}
                     startPageNumber={leadStatementStartPage}
+                  />
+                );
+              })()}
+
+              {/* Quarry Chart Page - After lead statement */}
+              {(() => {
+                // Calculate the starting page number for quarry chart
+                let quarryChartStartPage = 4; // Start after cover, details, and recap pages
+
+                // Count all previous pages
+                estimateData.subworks.forEach((subwork) => {
+                  const items = estimateData.subworkItems[subwork.subworks_id] || [];
+
+                  // 1 abstract page
+                  quarryChartStartPage++;
+
+                  // Measurement pages (if any)
+                  const hasAnyMeasurements = items.some(item => {
+                    const itemMeasurements = estimateData.measurements[item.sr_no] || [];
+                    return itemMeasurements.length > 0;
+                  });
+                  if (hasAnyMeasurements) {
+                    quarryChartStartPage += 2; // Two measurement formats
+                  }
+
+                  // Photo pages (if any)
+                  const hasPhotos = !loadingPhotos && photosMap[subwork.subworks_id]?.length > 0;
+                  if (hasPhotos) {
+                    quarryChartStartPage++;
+                  }
+                });
+
+                // Count rate analysis pages
+                const allItems: SubworkItem[] = [];
+                estimateData.subworks.forEach(subwork => {
+                  const items = estimateData.subworkItems[subwork.subworks_id] || [];
+                  allItems.push(...items);
+                });
+
+                const itemsWithRateAnalysis = allItems.filter(item => {
+                  const analysis = estimateData.rateAnalysis[item.sr_no];
+                  const hasAnalysis = analysis && analysis.entries && analysis.entries.length > 0;
+                  const hasRates = item.rates && item.rates.length > 0;
+                  return hasAnalysis || hasRates;
+                });
+
+                const ITEMS_PER_RATE_PAGE = 3;
+                const rateAnalysisPages = Math.ceil(itemsWithRateAnalysis.length / ITEMS_PER_RATE_PAGE);
+                quarryChartStartPage += rateAnalysisPages;
+
+                // Count lead statement pages
+                const LEAD_ITEMS_PER_PAGE = 20;
+                const leadStatementPages = Math.ceil((estimateData.leadStatements?.length || 0) / LEAD_ITEMS_PER_PAGE);
+                quarryChartStartPage += leadStatementPages;
+
+                return (
+                  <EstimateQuarryChart
+                    workName={estimateData.work.work_name}
+                    village={estimateData.work.village || 'N/A'}
+                    grampanchayat={estimateData.work.grampanchayat || 'N/A'}
+                    taluka={estimateData.work.taluka || 'N/A'}
+                    worksId={workId}
+                    PageHeader={PageHeader}
+                    PageFooter={PageFooter}
+                    startPageNumber={quarryChartStartPage}
                   />
                 );
               })()}
