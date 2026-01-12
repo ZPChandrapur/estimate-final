@@ -1174,8 +1174,9 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                     }
                   }
 
-                  // Photo page for this subwork
-                  const photoPage = (
+                  // Photo page for this subwork (only if photos exist)
+                  const hasPhotos = !loadingPhotos && photosMap[subwork.subworks_id]?.length > 0;
+                  const photoPage = hasPhotos ? (
                     <div key={`photos-${subwork.subworks_id}`} className="pdf-page bg-white p-8 min-h-[297mm] flex flex-col" style={{ fontFamily: 'Arial, sans-serif', pageBreakAfter: 'always' }}>
                       <PageHeader pageNumber={pageNumber} />
                       <div className="flex-1">
@@ -1184,36 +1185,28 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                           <h4 className="text-base font-medium">Sub-Work: {subwork.subworks_name}</h4>
                         </div>
 
-                        {loadingPhotos ? (
-                          <div className="flex justify-center items-center h-64">
-                            <p>Loading photos...</p>
-                          </div>
-                        ) : photosMap[subwork.subworks_id]?.length ? (
-                          <div className="grid grid-cols-1 gap-6">
-                            {photosMap[subwork.subworks_id].map((photo) => (
-                              <div key={photo.id} className="flex flex-col items-center">
-                                <img
-                                  src={photo.photo_url || photo.designphoto}
-                                  alt={`Design Photo ${photo.id}`}
-                                  className="max-h-[200mm] object-contain border border-gray-300 rounded shadow-sm"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex justify-center items-center h-64">
-                            <p className="text-gray-500 italic">No photos available for this sub-work.</p>
-                          </div>
-                        )}
+                        <div className="grid grid-cols-1 gap-6">
+                          {photosMap[subwork.subworks_id].map((photo) => (
+                            <div key={photo.id} className="flex flex-col items-center">
+                              <img
+                                src={photo.photo_url || photo.designphoto}
+                                alt={`Design Photo ${photo.id}`}
+                                className="max-h-[200mm] object-contain border border-gray-300 rounded shadow-sm"
+                              />
+                            </div>
+                          ))}
+                        </div>
                       </div>
                       <PageFooter pageNumber={pageNumber} />
                     </div>
-                  );
+                  ) : null;
 
-                  // increment pageNumber for photo after adding measurement pages
-                  pageNumber++;
+                  // increment pageNumber only if photos exist
+                  if (hasPhotos) {
+                    pageNumber++;
+                  }
 
-                  // Compose and return: abstract -> measurement(s) -> traditional measurement -> photos
+                  // Compose and return: abstract -> measurement(s) -> traditional measurement -> photos (if available)
                   return (
                     <React.Fragment key={`group-${subwork.subworks_id}`}>
                       {abstractPage}

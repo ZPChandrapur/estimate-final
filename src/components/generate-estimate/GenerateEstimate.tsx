@@ -85,10 +85,10 @@ const fetchWorks = async () => {
 const fetchCompleteEstimateData = async (worksId: string) => {
   try {
     // 1️⃣ Fetch main work details
-    const { data: work, error: workError } = await supabase
+    const { data: work, error: workError} = await supabase
       .schema('estimate')
       .from('works')
-      .select('works_id, work_name, type, division, sub_division, major_head, minor_head, service_head, departmental_head, fund_head, sanctioning_authority, ssr, total_estimated_cost')
+      .select('works_id, work_name, type, division, sub_division, major_head, minor_head, service_head, departmental_head, fund_head, sanctioning_authority, ssr, total_estimated_cost, village, grampanchayat, taluka')
       .eq('works_id', worksId)
       .single();
 
