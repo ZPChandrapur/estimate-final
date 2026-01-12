@@ -28,7 +28,7 @@ const Works: React.FC = () => {
   const [selectedWorkForPdf, setSelectedWorkForPdf] = useState<Work | null>(null);
   const [savedCalculations, setSavedCalculations] = useState<{ [workId: string]: { calculations: RecapCalculations; taxes: TaxEntry[] } }>({});
   const [newWork, setNewWork] = useState<Partial<Work>>({
-    type: 'Technical Sanction',
+    type: 'TS',
     division: 'Z.P.(Works) Division, Chandrapur'
   });
 
@@ -231,11 +231,11 @@ const Works: React.FC = () => {
 
   const getTypeBadge = (type: string) => {
     const typeConfig = {
-      'Technical Sanction': { bg: 'bg-blue-100', text: 'text-blue-800', label: 'TS' },
-      'Administrative Approval': { bg: 'bg-green-100', text: 'text-green-800', label: 'AA' },
+      'TS': { bg: 'bg-blue-100', text: 'text-blue-800', label: 'TS' },
+      'TA': { bg: 'bg-green-100', text: 'text-green-800', label: 'TA' },
     };
 
-    const config = typeConfig[type as keyof typeof typeConfig] || typeConfig['Technical Sanction'];
+    const config = typeConfig[type as keyof typeof typeConfig] || typeConfig['TS'];
 
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
@@ -369,8 +369,8 @@ const Works: React.FC = () => {
               className="block pl-3 pr-8 py-2 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl bg-white/80 backdrop-blur-sm hover:bg-white transition-all duration-200"
             >
               <option value="all">All Types</option>
-              <option value="Technical Sanction">Technical Sanction (TS)</option>
-              <option value="Administrative Approval">Administrative Approval (AA)</option>
+              <option value="TS">Technical Sanction (TS)</option>
+              <option value="TA">Technical Approval (TA)</option>
             </select>
           </div>
         </div>
@@ -569,11 +569,11 @@ const Works: React.FC = () => {
                   </label>
                   <select
                     value={newWork.type}
-                    onChange={(e) => setNewWork({ ...newWork, type: e.target.value as 'Technical Sanction' | 'Administrative Approval' })}
+                    onChange={(e) => setNewWork({ ...newWork, type: e.target.value as 'TA' | 'TS' })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="Technical Sanction">{t('addWork.technicalSanction')}</option>
-                    <option value="Administrative Approval">{t('addWork.administrativeApproval')}</option>
+                    <option value="TS">Technical Sanction (TS)</option>
+                    <option value="TA">Technical Approval (TA)</option>
                   </select>
                 </div>
 
@@ -592,14 +592,38 @@ const Works: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('addWork.ssr')}
+                    Year
+                  </label>
+                  <select
+                    value={newWork.year || ''}
+                    onChange={(e) => setNewWork({ ...newWork, year: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select Year</option>
+                    <option value="2023-24">2023-24</option>
+                    <option value="2024-25">2024-25</option>
+                    <option value="2025-26">2025-26</option>
+                    <option value="2026-27">2026-27</option>
+                    <option value="2027-28">2027-28</option>
+                    <option value="2028-29">2028-29</option>
+                    <option value="2029-30">2029-30</option>
+                    <option value="2030-31">2030-31</option>
+                    <option value="2031-32">2031-32</option>
+                    <option value="2032-33">2032-33</option>
+                    <option value="2033-34">2033-34</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {newWork.type === 'TS' ? 'Technical Sanction No.' : 'Technical Approval No.'}
                   </label>
                   <input
                     type="text"
                     value={newWork.ssr || ''}
                     onChange={(e) => setNewWork({ ...newWork, ssr: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={t('addWork.enterSSR')}
+                    placeholder={newWork.type === 'TS' ? 'Enter Technical Sanction No.' : 'Enter Technical Approval No.'}
                   />
                 </div>
 
@@ -947,11 +971,11 @@ const Works: React.FC = () => {
                   </label>
                   <select
                     value={newWork.type}
-                    onChange={(e) => setNewWork({ ...newWork, type: e.target.value as 'Technical Sanction' | 'Administrative Approval' })}
+                    onChange={(e) => setNewWork({ ...newWork, type: e.target.value as 'TA' | 'TS' })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="Technical Sanction">Technical Sanction</option>
-                    <option value="Administrative Approval">Administrative Approval</option>
+                    <option value="TS">Technical Sanction (TS)</option>
+                    <option value="TA">Technical Approval (TA)</option>
                   </select>
                 </div>
 
@@ -970,14 +994,38 @@ const Works: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    SSR
+                    Year
+                  </label>
+                  <select
+                    value={newWork.year || ''}
+                    onChange={(e) => setNewWork({ ...newWork, year: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select Year</option>
+                    <option value="2023-24">2023-24</option>
+                    <option value="2024-25">2024-25</option>
+                    <option value="2025-26">2025-26</option>
+                    <option value="2026-27">2026-27</option>
+                    <option value="2027-28">2027-28</option>
+                    <option value="2028-29">2028-29</option>
+                    <option value="2029-30">2029-30</option>
+                    <option value="2030-31">2030-31</option>
+                    <option value="2031-32">2031-32</option>
+                    <option value="2032-33">2032-33</option>
+                    <option value="2033-34">2033-34</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {newWork.type === 'TS' ? 'Technical Sanction No.' : 'Technical Approval No.'}
                   </label>
                   <input
                     type="text"
                     value={newWork.ssr}
                     onChange={(e) => setNewWork({ ...newWork, ssr: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter SSR"
+                    placeholder={newWork.type === 'TS' ? 'Enter Technical Sanction No.' : 'Enter Technical Approval No.'}
                   />
                 </div>
 
@@ -1090,25 +1138,9 @@ const Works: React.FC = () => {
                     placeholder="Enter sanctioning authority"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={newWork.status}
-                    onChange={(e) => setNewWork({ ...newWork, status: e.target.value as Work['status'] })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                </div>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Total Estimated Cost (₹)

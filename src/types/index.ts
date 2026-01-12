@@ -43,10 +43,11 @@ export interface EstimateWork {
 
 export interface Work {
   sr_no: number;
-  type: 'Technical Sanction' | 'Administrative Approval';
+  type: 'TA' | 'TS';
   works_id: string;
   ssr?: string;
   work_name: string;
+  year?: string;
   division?: string;
   sub_division?: string;
   fund_head?: string;
@@ -55,7 +56,7 @@ export interface Work {
   service_head?: string;
   departmental_head?: string;
   sanctioning_authority?: string;
-  status: 'draft' | 'pending' | 'approved' | 'rejected' | 'in_progress' | 'completed';
+  status?: 'draft' | 'pending' | 'approved' | 'rejected' | 'in_progress' | 'completed';
   estimate_status?: 'draft' | 'ready_for_approval' | 'in_approval' | 'approved' | 'rejected' | 'sent_back';
   total_estimated_cost: number;
   created_at: string;
