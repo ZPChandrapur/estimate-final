@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 
 import WorksRecapSheet from "../WorksRecapSheet";
+import { EstimateRateAnalysis } from "./EstimateRateAnalysis";
 
 interface RoyaltyMeasurement {
   sr_no: number;
@@ -1491,124 +1492,66 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                     pageNumber++;
                   }
 
-                  // Rate Analysis Pages (after photos)
-                  const rateAnalysisPages: React.ReactNode[] = [];
-                  items.forEach((item, itemIndex) => {
-                    const analysis = estimateData.rateAnalysis[item.sr_no];
-                    if (analysis && analysis.entries && analysis.entries.length > 0) {
-                      rateAnalysisPages.push(
-                        <div key={`rate-analysis-${item.sr_no}`} className="pdf-page bg-white p-6 min-h-[297mm] flex flex-col" style={{ fontFamily: 'Arial, sans-serif', pageBreakAfter: 'always' }}>
-                          <PageHeader pageNumber={pageNumber} />
-                          <div className="flex-1">
-                            <div className="text-center mb-6">
-                              <h3 className="text-lg font-bold mb-2">RATE ANALYSIS</h3>
-                              <h4 className="text-base font-semibold">Name of Work :- {estimateData.work.work_name}</h4>
-                              <p className="text-sm">at {estimateData.work.village || 'N/A'}, G.P. {estimateData.work.grampanchayat || 'N/A'}, Ta.: {estimateData.work.taluka || 'N/A'}</p>
-                            </div>
-
-                            <table className="w-full border-collapse border border-black text-xs">
-                              <thead>
-                                <tr className="bg-gray-100">
-                                  <th className="border border-black p-2 text-center">Sr.No.</th>
-                                  <th className="border border-black p-2 text-left">Item of Work</th>
-                                  <th className="border border-black p-2 text-center">QTy.</th>
-                                  <th className="border border-black p-2 text-center">Rate/Unit</th>
-                                  <th className="border border-black p-2 text-center">Amount</th>
-                                  <th className="border border-black p-2 text-center">Unit.</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr>
-                                  <td className="border border-black p-2 text-center font-bold">{item.item_number || itemIndex + 1}</td>
-                                  <td className="border border-black p-2" colSpan={5}>
-                                    <div className="font-medium">{item.description_of_item}</div>
-                                  </td>
-                                </tr>
-                                {analysis.entries.map((entry: any, entryIndex: number) => {
-                                  const quantity = entry.quantity || 0;
-                                  const rate = entry.rate || 0;
-                                  const amount = quantity * rate;
-                                  return (
-                                    <tr key={entryIndex}>
-                                      <td className="border border-black p-2"></td>
-                                      <td className="border border-black p-2">
-                                        <div className="pl-4">{entry.label || entry.description || ''}</div>
-                                        {entry.reference && (
-                                          <div className="text-xs text-gray-600 italic pl-4">
-                                            {entry.reference}
-                                          </div>
-                                        )}
-                                      </td>
-                                      <td className="border border-black p-2 text-center">
-                                        {quantity > 0 ? quantity.toFixed(2) : ''}
-                                      </td>
-                                      <td className="border border-black p-2 text-center">
-                                        {rate > 0 ? rate.toFixed(2) : ''}
-                                      </td>
-                                      <td className="border border-black p-2 text-right">
-                                        {amount > 0 ? amount.toFixed(2) : ''}
-                                      </td>
-                                      <td className="border border-black p-2 text-center">
-                                        {entry.unit || ''}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                                <tr className="bg-gray-100 font-bold">
-                                  <td className="border border-black p-2" colSpan={4} style={{ textAlign: 'right', paddingRight: '20px' }}>
-                                    Total Rs
-                                  </td>
-                                  <td className="border border-black p-2 text-right">
-                                    {analysis.entries.reduce((sum: number, entry: any) => {
-                                      const qty = entry.quantity || 0;
-                                      const rt = entry.rate || 0;
-                                      return sum + (qty * rt);
-                                    }, 0).toFixed(2)}
-                                  </td>
-                                  <td className="border border-black p-2"></td>
-                                </tr>
-                                {(() => {
-                                  const total = analysis.entries.reduce((sum: number, entry: any) => {
-                                    const qty = entry.quantity || 0;
-                                    const rt = entry.rate || 0;
-                                    return sum + (qty * rt);
-                                  }, 0);
-                                  const unit = item.ssr_unit || '/cu.m.';
-                                  return (
-                                    <tr className="bg-gray-100 font-bold">
-                                      <td className="border border-black p-2" colSpan={4} style={{ textAlign: 'right', paddingRight: '20px' }}>
-                                        Say Rs.
-                                      </td>
-                                      <td className="border border-black p-2 text-right">
-                                        {Math.round(total).toFixed(2)}
-                                      </td>
-                                      <td className="border border-black p-2 text-center">
-                                        {unit}
-                                      </td>
-                                    </tr>
-                                  );
-                                })()}
-                              </tbody>
-                            </table>
-                          </div>
-                          <PageFooter pageNumber={pageNumber} />
-                        </div>
-                      );
-                      pageNumber++;
-                    }
-                  });
-
-                  // Compose and return: abstract -> measurement(s) -> traditional measurement -> photos (if available) -> rate analysis
+                  // Compose and return: abstract -> measurement(s) -> traditional measurement -> photos (if available)
                   return (
                     <React.Fragment key={`group-${subwork.subworks_id}`}>
                       {abstractPage}
                       {measurementPagesForThis}
                       {traditionalMeasurementForThis}
                       {photoPage}
-                      {rateAnalysisPages}
                     </React.Fragment>
                   );
                 });
+              })()}
+
+              {/* Rate Analysis Pages - All items consolidated */}
+              {(() => {
+                // Calculate the starting page number for rate analysis
+                let rateAnalysisStartPage = 4; // Start after cover, details, and recap pages
+
+                estimateData.subworks.forEach((subwork) => {
+                  const items = estimateData.subworkItems[subwork.subworks_id] || [];
+
+                  // Count pages for this subwork
+                  // 1 abstract page
+                  rateAnalysisStartPage++;
+
+                  // Measurement pages (if any)
+                  const hasAnyMeasurements = items.some(item => {
+                    const itemMeasurements = estimateData.measurements[item.sr_no] || [];
+                    return itemMeasurements.length > 0;
+                  });
+                  if (hasAnyMeasurements) {
+                    rateAnalysisStartPage += 2; // Two measurement formats
+                  }
+
+                  // Photo pages (if any)
+                  const hasPhotos = !loadingPhotos && photosMap[subwork.subworks_id]?.length > 0;
+                  if (hasPhotos) {
+                    rateAnalysisStartPage++;
+                  }
+                });
+
+                // Collect all items from all subworks for rate analysis
+                const allItems: SubworkItem[] = [];
+                estimateData.subworks.forEach(subwork => {
+                  const items = estimateData.subworkItems[subwork.subworks_id] || [];
+                  allItems.push(...items);
+                });
+
+                return (
+                  <EstimateRateAnalysis
+                    workName={estimateData.work.work_name}
+                    village={estimateData.work.village || 'N/A'}
+                    grampanchayat={estimateData.work.grampanchayat || 'N/A'}
+                    taluka={estimateData.work.taluka || 'N/A'}
+                    items={allItems}
+                    rateAnalysis={estimateData.rateAnalysis}
+                    PageHeader={PageHeader}
+                    PageFooter={PageFooter}
+                    startPageNumber={rateAnalysisStartPage}
+                  />
+                );
               })()}
             </div>
           </div>
