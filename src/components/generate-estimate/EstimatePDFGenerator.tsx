@@ -183,9 +183,12 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
       const { data: work, error: workError } = await supabase
         .schema("estimate")
         .from("works")
-        .select("works_id, work_name, division, sub_division, fund_head, major_head, minor_head, service_head, departmental_head, sanctioning_authority, total_estimated_cost, village, grampanchayat, taluka")
+        .select("works_id, work_name, division, sub_division, fund_head, major_head, minor_head, service_head, departmental_head, sanctioning_authority, total_estimated_cost, village, grampanchayat, taluka, district, ssr, type, status, estimate_status, created_at, updated_at, created_by, year, sr_no")
         .eq("works_id", workId)
         .single();
+
+      console.log('📊 Fetched work data:', work);
+      console.log('💰 Total Estimated Cost:', work?.total_estimated_cost, typeof work?.total_estimated_cost);
 
       if (workError) throw workError;
 
