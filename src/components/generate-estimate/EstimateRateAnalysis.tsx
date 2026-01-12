@@ -15,12 +15,23 @@ interface RateAnalysis {
   created_at: string;
 }
 
+interface ItemRate {
+  sr_no?: number;
+  subwork_item_sr_no?: number;
+  description?: string;
+  rate?: number;
+  ssr_unit?: string;
+  ssr_quantity?: number;
+  rate_total_amount?: number;
+}
+
 interface SubworkItem {
   sr_no: number;
   item_number: string;
   description_of_item: string;
   ssr_unit: string;
   category?: string;
+  rates?: ItemRate[];
 }
 
 interface EstimateRateAnalysisProps {
@@ -46,13 +57,15 @@ export const EstimateRateAnalysis: React.FC<EstimateRateAnalysisProps> = ({
   PageFooter,
   startPageNumber
 }) => {
-  // Filter items that have rate analysis
-  const itemsWithAnalysis = items.filter(item => {
+  // Show all items (with or without detailed rate analysis)
+  const itemsToShow = items.filter(item => {
     const analysis = rateAnalysis[item.sr_no];
-    return analysis && analysis.entries && analysis.entries.length > 0;
+    const hasAnalysis = analysis && analysis.entries && analysis.entries.length > 0;
+    const hasRates = item.rates && item.rates.length > 0;
+    return hasAnalysis || hasRates;
   });
 
-  if (itemsWithAnalysis.length === 0) {
+  if (itemsToShow.length === 0) {
     return null;
   }
 
@@ -61,11 +74,11 @@ export const EstimateRateAnalysis: React.FC<EstimateRateAnalysisProps> = ({
   let currentPageItems: SubworkItem[] = [];
   const ITEMS_PER_PAGE = 3; // Adjust based on space needed
 
-  itemsWithAnalysis.forEach((item, index) => {
+  itemsToShow.forEach((item, index) => {
     currentPageItems.push(item);
 
     // Create a new page when we reach the limit or it's the last item
-    if (currentPageItems.length === ITEMS_PER_PAGE || index === itemsWithAnalysis.length - 1) {
+    if (currentPageItems.length === ITEMS_PER_PAGE || index === itemsToShow.length - 1) {
       pages.push(
         <div key={`rate-analysis-page-${currentPageNumber}`} className="pdf-page bg-white p-6 min-h-[297mm] flex flex-col" style={{ fontFamily: 'Arial, sans-serif', pageBreakAfter: 'always' }}>
           <PageHeader pageNumber={currentPageNumber} />
@@ -90,10 +103,71 @@ export const EstimateRateAnalysis: React.FC<EstimateRateAnalysisProps> = ({
               <tbody>
                 {currentPageItems.map((item) => {
                   const analysis = rateAnalysis[item.sr_no];
-                  if (!analysis || !analysis.entries) return null;
+                  const hasDetailedAnalysis = analysis && analysis.entries && analysis.entries.length > 0;
 
-                  const entries = analysis.entries;
-                  const totalAmount = entries.reduce((sum, entry) => sum + (entry.amount || 0), 0);
+                  // Calculate total based on whether we have detailed analysis or basic rates
+                  let totalAmount = 0;
+                  let displayRows: React.ReactNode[] = [];
+
+                  if (hasDetailedAnalysis) {
+                    // Item has detailed rate analysis
+                    const entries = analysis.entries;
+                    totalAmount = entries.reduce((sum, entry) => sum + (entry.amount || 0), 0);
+
+                    displayRows = entries.map((entry, entryIndex) => {
+                      const quantity = entry.factor || 0;
+                      const rate = entry.value || 0;
+                      const amount = entry.amount || 0;
+
+                      return (
+                        <tr key={entryIndex}>
+                          <td className="border border-black p-2"></td>
+                          <td className="border border-black p-2">
+                            <div className="pl-4">{entry.label || ''}</div>
+                          </td>
+                          <td className="border border-black p-2 text-center">
+                            {quantity > 0 ? quantity.toFixed(2) : ''}
+                          </td>
+                          <td className="border border-black p-2 text-center">
+                            {rate > 0 ? rate.toFixed(2) : ''}
+                          </td>
+                          <td className="border border-black p-2 text-right">
+                            {amount > 0 ? amount.toFixed(2) : ''}
+                          </td>
+                          <td className="border border-black p-2 text-center"></td>
+                        </tr>
+                      );
+                    });
+                  } else if (item.rates && item.rates.length > 0) {
+                    // Item has basic rates from item_rates table
+                    const rates = item.rates;
+                    totalAmount = rates.reduce((sum, rate) => sum + (Number(rate.rate_total_amount) || 0), 0);
+
+                    displayRows = rates.map((rate, rateIndex) => {
+                      const quantity = Number(rate.ssr_quantity) || 0;
+                      const rateValue = Number(rate.rate) || 0;
+                      const amount = Number(rate.rate_total_amount) || 0;
+
+                      return (
+                        <tr key={rateIndex}>
+                          <td className="border border-black p-2"></td>
+                          <td className="border border-black p-2">
+                            <div className="pl-4">{rate.description || 'Default Rate'}</div>
+                          </td>
+                          <td className="border border-black p-2 text-center">
+                            {quantity > 0 ? quantity.toFixed(2) : ''}
+                          </td>
+                          <td className="border border-black p-2 text-center">
+                            {rateValue > 0 ? rateValue.toFixed(2) : ''}
+                          </td>
+                          <td className="border border-black p-2 text-right">
+                            {amount > 0 ? amount.toFixed(2) : ''}
+                          </td>
+                          <td className="border border-black p-2 text-center"></td>
+                        </tr>
+                      );
+                    });
+                  }
 
                   return (
                     <React.Fragment key={item.sr_no}>
@@ -105,32 +179,8 @@ export const EstimateRateAnalysis: React.FC<EstimateRateAnalysisProps> = ({
                         </td>
                       </tr>
 
-                      {/* Entry Rows */}
-                      {entries.map((entry, entryIndex) => {
-                        // For entries, the structure is: label, type, value (rate), factor (quantity), amount
-                        const quantity = entry.factor || 0;
-                        const rate = entry.value || 0;
-                        const amount = entry.amount || 0;
-
-                        return (
-                          <tr key={entryIndex}>
-                            <td className="border border-black p-2"></td>
-                            <td className="border border-black p-2">
-                              <div className="pl-4">{entry.label || ''}</div>
-                            </td>
-                            <td className="border border-black p-2 text-center">
-                              {quantity > 0 ? quantity.toFixed(2) : ''}
-                            </td>
-                            <td className="border border-black p-2 text-center">
-                              {rate > 0 ? rate.toFixed(2) : ''}
-                            </td>
-                            <td className="border border-black p-2 text-right">
-                              {amount > 0 ? amount.toFixed(2) : ''}
-                            </td>
-                            <td className="border border-black p-2 text-center"></td>
-                          </tr>
-                        );
-                      })}
+                      {/* Entry Rows (either detailed analysis or basic rates) */}
+                      {displayRows}
 
                       {/* Total Rs Row */}
                       <tr className="bg-gray-100 font-bold">
