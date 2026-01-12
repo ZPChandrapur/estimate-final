@@ -33,6 +33,7 @@ import {
 
 import WorksRecapSheet from "../WorksRecapSheet";
 import { EstimateRateAnalysis } from "./EstimateRateAnalysis";
+import { EstimateLeadStatement } from "./EstimateLeadStatement";
 
 interface RoyaltyMeasurement {
   sr_no: number;
@@ -64,6 +65,20 @@ interface RateAnalysis {
   created_at: string;
 }
 
+interface LeadStatementItem {
+  id: string;
+  works_id: string;
+  sr_no: number;
+  material: string;
+  material_type?: string;
+  reference: string;
+  lead_in_km: number;
+  lead_charges: number;
+  total_rate: number;
+  unit: string;
+  unit_from_lead_chart?: string;
+}
+
 interface EstimateData {
   work: Work;
   subworks: SubWork[];
@@ -75,6 +90,7 @@ interface EstimateData {
   testingMeasurements: Record<string, TestingMeasurement[]>;
   rateAnalysis: Record<string, RateAnalysis>;
   subworkTotals: Record<string, { regular: number; royalty: number; testing: number }>;
+  leadStatements: LeadStatementItem[];
 }
 
 interface DocumentSettings {
@@ -204,6 +220,7 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
           testingMeasurements: {},
           rateAnalysis: {},
           subworkTotals: {},
+          leadStatements: [],
         });
         return;
       }
@@ -383,6 +400,18 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
         }
       });
 
+      // Fetch lead statements for the work
+      const { data: leadStatements, error: leadStatementsError } = await supabase
+        .schema('estimate')
+        .from('lead_statements')
+        .select('*')
+        .eq('works_id', workId)
+        .order('sr_no', { ascending: true });
+
+      if (leadStatementsError) {
+        console.error('Error fetching lead statements:', leadStatementsError);
+      }
+
       // ✅ Update state with all data
       setEstimateData({
         work,
@@ -395,6 +424,7 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
         testingMeasurements,
         rateAnalysis,
         subworkTotals,
+        leadStatements: leadStatements || [],
       });
 
     } catch (error) {
@@ -1550,6 +1580,66 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                     PageHeader={PageHeader}
                     PageFooter={PageFooter}
                     startPageNumber={rateAnalysisStartPage}
+                  />
+                );
+              })()}
+
+              {/* Lead Statement Pages - After rate analysis */}
+              {(() => {
+                // Calculate the starting page number for lead statement
+                let leadStatementStartPage = 4; // Start after cover, details, and recap pages
+
+                // Count all previous pages
+                estimateData.subworks.forEach((subwork) => {
+                  const items = estimateData.subworkItems[subwork.subworks_id] || [];
+
+                  // 1 abstract page
+                  leadStatementStartPage++;
+
+                  // Measurement pages (if any)
+                  const hasAnyMeasurements = items.some(item => {
+                    const itemMeasurements = estimateData.measurements[item.sr_no] || [];
+                    return itemMeasurements.length > 0;
+                  });
+                  if (hasAnyMeasurements) {
+                    leadStatementStartPage += 2; // Two measurement formats
+                  }
+
+                  // Photo pages (if any)
+                  const hasPhotos = !loadingPhotos && photosMap[subwork.subworks_id]?.length > 0;
+                  if (hasPhotos) {
+                    leadStatementStartPage++;
+                  }
+                });
+
+                // Count rate analysis pages
+                const allItems: SubworkItem[] = [];
+                estimateData.subworks.forEach(subwork => {
+                  const items = estimateData.subworkItems[subwork.subworks_id] || [];
+                  allItems.push(...items);
+                });
+
+                const itemsWithRateAnalysis = allItems.filter(item => {
+                  const analysis = estimateData.rateAnalysis[item.sr_no];
+                  const hasAnalysis = analysis && analysis.entries && analysis.entries.length > 0;
+                  const hasRates = item.rates && item.rates.length > 0;
+                  return hasAnalysis || hasRates;
+                });
+
+                const ITEMS_PER_RATE_PAGE = 3;
+                const rateAnalysisPages = Math.ceil(itemsWithRateAnalysis.length / ITEMS_PER_RATE_PAGE);
+                leadStatementStartPage += rateAnalysisPages;
+
+                return (
+                  <EstimateLeadStatement
+                    workName={estimateData.work.work_name}
+                    village={estimateData.work.village || 'N/A'}
+                    grampanchayat={estimateData.work.grampanchayat || 'N/A'}
+                    taluka={estimateData.work.taluka || 'N/A'}
+                    leadStatements={estimateData.leadStatements}
+                    PageHeader={PageHeader}
+                    PageFooter={PageFooter}
+                    startPageNumber={leadStatementStartPage}
                   />
                 );
               })()}
