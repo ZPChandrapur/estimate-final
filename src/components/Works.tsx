@@ -28,7 +28,7 @@ const Works: React.FC = () => {
   const [selectedWorkForPdf, setSelectedWorkForPdf] = useState<Work | null>(null);
   const [savedCalculations, setSavedCalculations] = useState<{ [workId: string]: { calculations: RecapCalculations; taxes: TaxEntry[] } }>({});
   const [newWork, setNewWork] = useState<Partial<Work>>({
-    type: 'TS',
+    type: 'Technical Sanction',
     division: 'Z.P.(Works) Division, Chandrapur'
   });
 
@@ -369,8 +369,8 @@ const Works: React.FC = () => {
               className="block pl-3 pr-8 py-2 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl bg-white/80 backdrop-blur-sm hover:bg-white transition-all duration-200"
             >
               <option value="all">All Types</option>
-              <option value="TS">Technical Sanction (TS)</option>
-              <option value="TA">Technical Approval (TA)</option>
+              <option value="Technical Sanction">Technical Sanction (TS)</option>
+              <option value="Administrative Approval">Administrative Approval (AA)</option>
             </select>
           </div>
         </div>
@@ -568,11 +568,11 @@ const Works: React.FC = () => {
                   </label>
                   <select
                     value={newWork.type}
-                    onChange={(e) => setNewWork({ ...newWork, type: e.target.value as 'TA' | 'TS' })}
+                    onChange={(e) => setNewWork({ ...newWork, type: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="TS">Technical Sanction (TS)</option>
-                    <option value="TA">Technical Approval (TA)</option>
+                    <option value="Technical Sanction">Technical Sanction (TS)</option>
+                    <option value="Administrative Approval">Administrative Approval (AA)</option>
                   </select>
                 </div>
 
@@ -970,11 +970,11 @@ const Works: React.FC = () => {
                   </label>
                   <select
                     value={newWork.type}
-                    onChange={(e) => setNewWork({ ...newWork, type: e.target.value as 'TA' | 'TS' })}
+                    onChange={(e) => setNewWork({ ...newWork, type: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="TS">Technical Sanction (TS)</option>
-                    <option value="TA">Technical Approval (TA)</option>
+                    <option value="Technical Sanction">Technical Sanction (TS)</option>
+                    <option value="Administrative Approval">Administrative Approval (AA)</option>
                   </select>
                 </div>
 
