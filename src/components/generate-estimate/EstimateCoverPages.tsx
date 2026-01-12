@@ -34,17 +34,7 @@ export const EstimateCoverPages: React.FC<EstimateCoverPagesProps> = ({
   };
 
   const calculateTotalEstimate = () => {
-    const costValue = work.total_estimated_cost;
-    console.log('🔍 EstimateCoverPages - Total Estimated Cost:', costValue, typeof costValue);
-    console.log('🔍 EstimateCoverPages - Work Object:', work);
-    if (typeof costValue === 'string') {
-      const parsed = parseFloat(costValue) || 0;
-      console.log('✅ Parsed as string:', parsed);
-      return parsed;
-    }
-    const converted = Number(costValue) || 0;
-    console.log('✅ Converted as number:', converted);
-    return converted;
+    return parseFloat(work.total_estimated_cost || '0');
   };
 
   return (
