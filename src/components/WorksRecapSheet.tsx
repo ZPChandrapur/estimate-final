@@ -32,6 +32,7 @@ const WorksRecapSheet: React.FC<WorksRecapSheetProps> = ({
   ]);
   const [calculations, setCalculations] = useState<RecapCalculations | null>(null);
   const [saved, setSaved] = useState(false);
+  const [department, setDepartment] = useState<'water_sanitation' | 'pwd' | 'irrigation'>('water_sanitation');
 
   const [localUnitInputs, setLocalUnitInputs] = useState<{ [subworkId: string]: number }>({});
   const unitInputs = externalUnitInputs ?? localUnitInputs;
@@ -228,6 +229,12 @@ const fetchWorkData = async () => {
       } else {
         setLocalUnitInputs({});
       }
+
+      if (recapJsonData.department) {
+        setDepartment(recapJsonData.department);
+      } else {
+        setDepartment('water_sanitation');
+      }
     } else {
       // If no recap_json, fallback to normal fetching (already correct)
       setWork(workData);
@@ -333,9 +340,9 @@ const fetchWorkData = async () => {
 
     const contingencies = partATotal * 0.005;
     const inspectionCharges = partATotal * 0.005;
-    const dprCharges = Math.min(partATotal * 0.05, 100000);
+    const dprCharges = department === 'pwd' ? 0 : Math.min(partATotal * 0.05, 100000);
 
-    const grandTotal = partABCombinedSubtotal + partABCombinedTaxTotal + partCTotal + dprCharges;
+    const grandTotal = partABCombinedSubtotal + partABCombinedTaxTotal + (department === 'pwd' ? 0 : partCTotal) + dprCharges;
 
     const calculationsResult: RecapCalculations = {
       partA: { subtotal: partASubtotal, taxes: partATaxes, total: partATotal },
@@ -414,6 +421,7 @@ const handleSave = async () => {
       taxes,
       calculations,
       unitInputs,
+      department,
       savedAt: new Date().toISOString(),
     };
 
@@ -479,8 +487,12 @@ const handleSave = async () => {
     });
   };
 
-  const showFundingCols = true;
-  const showTypeColumn = true;
+  const shouldShowFundingColumns = () => {
+    return department === 'water_sanitation';
+  };
+
+  const showFundingCols = shouldShowFundingColumns();
+  const showTypeColumn = department !== 'pwd';
   const baseColumns = showTypeColumn ? 6 : 5;
   const totalColspan = showFundingCols ? baseColumns + 2 : baseColumns;
 
@@ -516,24 +528,47 @@ const handleSave = async () => {
           <p>
             <span className="font-medium">Village:</span> {work.village}
           </p>
-          {!readonly && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <button
-                onClick={handleSave}
-                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${saved ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Department
+            </label>
+            <div className="flex items-center space-x-3">
+              <select
+                value={department}
+                onChange={(e) => {
+                  setDepartment(e.target.value as 'water_sanitation' | 'pwd' | 'irrigation');
+                  setSaved(false);
+                }}
+                disabled={readonly}
+                className="flex-1 max-w-xs px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
-                {saved ? (
-                  <>
-                    <Check className="w-4 h-4 mr-1" /> Saved
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-1" /> Save
-                  </>
-                )}
-              </button>
+                <option value="water_sanitation">Water and Sanitation (SBM/15th FC)</option>
+                <option value="pwd">PWD</option>
+                <option value="irrigation">Irrigation</option>
+              </select>
+              {!readonly && (
+                <button
+                  onClick={handleSave}
+                  className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${saved ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                >
+                  {saved ? (
+                    <>
+                      <Check className="w-4 h-4 mr-1" /> Saved
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-1" /> Save
+                    </>
+                  )}
+                </button>
+              )}
             </div>
-          )}
+            <p className="mt-2 text-xs text-gray-500">
+              {department === 'water_sanitation'
+                ? 'SBM (G) and 15th FC funding columns will be shown'
+                : 'SBM (G) and 15th FC funding columns will be hidden'}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -640,7 +675,7 @@ const handleSave = async () => {
               <thead>
                 <tr className="bg-gray-100">
                   <th className="border border-gray-300 p-3 min-w-[40px] text-center">Sr. No</th>
-                  {showTypeColumn && (
+                  {department !== 'pwd' && (
                     <th className="border border-gray-300 p-3 min-w-[120px]">Type of Work</th>
                   )}
                   <th className="border border-gray-300 p-3 min-w-[200px]">Item of Work</th>
@@ -913,8 +948,8 @@ const handleSave = async () => {
                   </>
                 )}
 
-                {/* PART C Rows */}
-                {true && (
+                {/* PART C Rows - Only show if not PWD */}
+                {department !== 'pwd' && (
                   <>
                     <tr className="bg-gray-200 font-bold">
                       <td colSpan={totalColspan} className="border border-gray-300 p-3">
@@ -1005,7 +1040,7 @@ const handleSave = async () => {
                 )}
 
                 {/* Additional Charges & Grand Total */}
-                {true && (
+                {department !== 'pwd' && (
                   <tr className="font-semibold">
                     <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
                       DPR charges 5% or 1 Lakh whichever is less
