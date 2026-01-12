@@ -34,23 +34,7 @@ export const EstimateCoverPages: React.FC<EstimateCoverPagesProps> = ({
   };
 
   const calculateTotalEstimate = () => {
-    let total = 0;
-    if (estimateData.subworkTotals) {
-      estimateData.subworks.forEach(subwork => {
-        const totals = estimateData.subworkTotals[subwork.subworks_id];
-        if (totals) {
-          total += totals.regular + totals.royalty + totals.testing;
-        }
-      });
-    } else {
-      estimateData.subworks.forEach(subwork => {
-        const items = estimateData.subworkItems[subwork.subworks_id] || [];
-        items.forEach(item => {
-          total += item.total_item_amount || 0;
-        });
-      });
-    }
-    return total;
+    return parseFloat(work.total_estimated_cost || '0');
   };
 
   return (

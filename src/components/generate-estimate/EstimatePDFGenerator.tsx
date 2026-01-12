@@ -970,9 +970,9 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
 
                                 const royaltyData = isRoyalty && estimateData.subworkTotals ?
                                   Object.values(estimateData.royaltyMeasurements[item.sr_no] || []).reduce((acc, rm) => ({
-                                    hb_metal: acc.hb_metal + (rm.hb_metal || 0),
-                                    murum: acc.murum + (rm.murum || 0),
-                                    sand: acc.sand + (rm.sand || 0)
+                                    hb_metal: acc.hb_metal + (parseFloat(rm.hb_metal as any) || 0),
+                                    murum: acc.murum + (parseFloat(rm.murum as any) || 0),
+                                    sand: acc.sand + (parseFloat(rm.sand as any) || 0)
                                   }), { hb_metal: 0, murum: 0, sand: 0 }) : null;
 
                                 const testingData = isTesting && estimateData.testingMeasurements ?
@@ -1205,9 +1205,9 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
 
                                     const itemTotal = itemMeasurements.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0);
                                     const royaltyTotal = {
-                                      hb_metal: royaltyMeasurements.reduce((sum, r) => sum + (r.hb_metal || 0), 0),
-                                      murum: royaltyMeasurements.reduce((sum, r) => sum + (r.murum || 0), 0),
-                                      sand: royaltyMeasurements.reduce((sum, r) => sum + (r.sand || 0), 0),
+                                      hb_metal: royaltyMeasurements.reduce((sum, r) => sum + (parseFloat(r.hb_metal as any) || 0), 0),
+                                      murum: royaltyMeasurements.reduce((sum, r) => sum + (parseFloat(r.murum as any) || 0), 0),
+                                      sand: royaltyMeasurements.reduce((sum, r) => sum + (parseFloat(r.sand as any) || 0), 0),
                                     };
                                     const testingTotal = testingMeasurements.reduce((sum, t) => sum + (t.required_tests || 0), 0);
 
