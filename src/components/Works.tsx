@@ -390,25 +390,25 @@ const Works: React.FC = () => {
                     Works ID
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                    Year
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     Type
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                    TS/TA No
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     Work Name
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                    Division
+                    Sub Division
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                    Status
+                    Fund Head
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                    Cost Without Tax
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                    Cost With Tax
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                    Created
+                    Total Estimated Cost
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     Approval
@@ -438,37 +438,31 @@ const Works: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {work.year || '-'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
                       {getTypeBadge(work.type)}
                     </td>
-                    <td className="px-4 py-2">
-                      <div className="text-sm font-medium text-gray-900">
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {work.ssr || '-'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 max-w-xs">
+                      <div className="text-sm font-medium text-gray-900 truncate" title={work.work_name}>
                         {work.work_name}
                       </div>
-                      {work.ssr && (
-                        <div className="text-xs text-gray-500">
-                          SSR: {work.ssr}
-                        </div>
-                      )}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
                       <div className="text-sm text-gray-900">
-                        {work.division || '-'}
+                        {work.sub_division || '-'}
                       </div>
-                      {work.sub_division && (
-                        <div className="text-xs text-gray-500">
-                          {work.sub_division}
-                        </div>
-                      )}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {getStatusBadge(work.status)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <div className="flex items-center text-sm font-medium text-gray-900">
-                        <IndianRupee className="w-4 h-4 mr-1" />
-                        {formatCurrency(work.total_estimated_cost)}
+                        {work.fund_head || '-'}
                       </div>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
@@ -476,9 +470,6 @@ const Works: React.FC = () => {
                         <IndianRupee className="w-4 h-4 mr-1" />
                          {work.recap_json ? formatCurrency(JSON.parse(work.recap_json).calculations?.grandTotal || 0) : '-'}
                       </div>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(work.created_at).toLocaleDateString('hi-IN')}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <EstimateApprovalActions
