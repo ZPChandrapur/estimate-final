@@ -33,6 +33,36 @@ import {
 
 import WorksRecapSheet from "../WorksRecapSheet";
 
+interface RoyaltyMeasurement {
+  sr_no: number;
+  subwork_id: number;
+  subwork_item_id: number;
+  measurement: number;
+  metal_factor: number;
+  hb_metal: number;
+  murum_factor: number;
+  murum: number;
+  sand_factor: number;
+  sand: number;
+}
+
+interface TestingMeasurement {
+  sr_no: number;
+  subwork_id: number;
+  subwork_item_id: number;
+  quantity: number;
+  description: string;
+  required_tests: number;
+  total: number;
+}
+
+interface RateAnalysis {
+  sr_no: number;
+  subwork_item_id: number;
+  entries: any[];
+  created_at: string;
+}
+
 interface EstimateData {
   work: Work;
   subworks: SubWork[];
@@ -40,6 +70,10 @@ interface EstimateData {
   measurements: Record<string, ItemMeasurement[]>;
   leads: Record<string, ItemLead[]>;
   materials: Record<string, ItemMaterial[]>;
+  royaltyMeasurements: Record<string, RoyaltyMeasurement[]>;
+  testingMeasurements: Record<string, TestingMeasurement[]>;
+  rateAnalysis: Record<string, RateAnalysis>;
+  subworkTotals: Record<string, { regular: number; royalty: number; testing: number }>;
 }
 
 interface DocumentSettings {
@@ -165,6 +199,10 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
           measurements: {},
           leads: {},
           materials: {},
+          royaltyMeasurements: {},
+          testingMeasurements: {},
+          rateAnalysis: {},
+          subworkTotals: {},
         });
         return;
       }
@@ -219,6 +257,131 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
         measurements[item.sr_no] = related;
       });
 
+      // 8️⃣ Fetch royalty measurements
+      const subworkSrNos = subworks.map(sw => sw.sr_no).filter(Boolean);
+      const { data: allRoyaltyMeasurements, error: royaltyError } = await supabase
+        .schema("estimate")
+        .from("royalty_measurements")
+        .select("*")
+        .in("subwork_id", subworkSrNos);
+
+      if (royaltyError) console.error("Error fetching royalty measurements:", royaltyError);
+
+      const royaltyMeasurements: Record<string, RoyaltyMeasurement[]> = {};
+      allItems.forEach(item => {
+        const related = (allRoyaltyMeasurements || []).filter(
+          r => r.subwork_item_id === item.sr_no
+        );
+        royaltyMeasurements[item.sr_no] = related;
+      });
+
+      // 9️⃣ Fetch testing measurements
+      const { data: allTestingMeasurements, error: testingError } = await supabase
+        .schema("estimate")
+        .from("testing_measurements")
+        .select("*")
+        .in("subwork_item_id", itemSrNos);
+
+      if (testingError) console.error("Error fetching testing measurements:", testingError);
+
+      const testingMeasurements: Record<string, TestingMeasurement[]> = {};
+      allItems.forEach(item => {
+        const related = (allTestingMeasurements || []).filter(
+          t => t.subwork_item_id === item.sr_no
+        );
+        testingMeasurements[item.sr_no] = related;
+      });
+
+      // 10️⃣ Fetch rate analysis for all items
+      const { data: allRateAnalysis, error: rateAnalysisError } = await supabase
+        .schema("estimate")
+        .from("item_rate_analysis")
+        .select("*")
+        .in("subwork_item_id", itemSrNos)
+        .order("created_at", { ascending: false });
+
+      if (rateAnalysisError) console.error("Error fetching rate analysis:", rateAnalysisError);
+
+      const rateAnalysis: Record<string, RateAnalysis> = {};
+      allItems.forEach(item => {
+        const related = (allRateAnalysis || []).find(
+          ra => ra.subwork_item_id === item.sr_no
+        );
+        if (related) {
+          rateAnalysis[item.sr_no] = related;
+        }
+      });
+
+      // 11️⃣ Calculate subwork totals
+      const subworkIdToSrNo: Record<string, number> = {};
+      const subworkSrNoToId: Record<number, string> = {};
+      subworks.forEach(sw => {
+        subworkIdToSrNo[sw.subworks_id] = sw.sr_no;
+        subworkSrNoToId[sw.sr_no] = sw.subworks_id;
+      });
+
+      const royaltyTotalsPerSubwork: Record<string, { hb_metal: number; murum: number; sand: number }> = {};
+      (allRoyaltyMeasurements || []).forEach(measurement => {
+        const subworkSrNo = measurement.subwork_id;
+        const subworkId = subworkSrNoToId[subworkSrNo];
+        if (!subworkId) return;
+
+        if (!royaltyTotalsPerSubwork[subworkId]) {
+          royaltyTotalsPerSubwork[subworkId] = { hb_metal: 0, murum: 0, sand: 0 };
+        }
+        royaltyTotalsPerSubwork[subworkId].hb_metal += Number(measurement.hb_metal) || 0;
+        royaltyTotalsPerSubwork[subworkId].murum += Number(measurement.murum) || 0;
+        royaltyTotalsPerSubwork[subworkId].sand += Number(measurement.sand) || 0;
+      });
+
+      const testingTotalsPerItem: Record<number, number> = {};
+      (allTestingMeasurements || []).forEach(measurement => {
+        testingTotalsPerItem[measurement.subwork_item_id] = Number(measurement.required_tests) || 0;
+      });
+
+      const subworkTotals: Record<string, { regular: number; royalty: number; testing: number }> = {};
+      subworkIds.forEach(id => {
+        subworkTotals[id] = { regular: 0, royalty: 0, testing: 0 };
+      });
+
+      allItems.forEach(item => {
+        const subworkId = item.subwork_id;
+        const category = item.category;
+        const itemRates = (allRates || []).filter(r => r.subwork_item_sr_no === item.sr_no);
+
+        if (!subworkTotals[subworkId]) {
+          subworkTotals[subworkId] = { regular: 0, royalty: 0, testing: 0 };
+        }
+
+        let totalItemAmt = 0;
+
+        if (category === 'royalty' && royaltyTotalsPerSubwork[subworkId]) {
+          const royaltyData = royaltyTotalsPerSubwork[subworkId];
+          itemRates.forEach(rate => {
+            const rateDesc = (rate.description || '').toLowerCase();
+            let quantity = 0;
+            if (rateDesc.includes('metal')) {
+              quantity = royaltyData.hb_metal;
+            } else if (rateDesc.includes('murum')) {
+              quantity = royaltyData.murum;
+            } else if (rateDesc.includes('sand')) {
+              quantity = royaltyData.sand;
+            }
+            totalItemAmt += quantity * Number(rate.rate || 0);
+          });
+          subworkTotals[subworkId].royalty += totalItemAmt;
+        } else if (category === 'testing' && item.sr_no && testingTotalsPerItem[item.sr_no]) {
+          const testingQty = testingTotalsPerItem[item.sr_no];
+          itemRates.forEach(rate => {
+            totalItemAmt += testingQty * Number(rate.rate || 0);
+          });
+          subworkTotals[subworkId].testing += totalItemAmt;
+        } else {
+          totalItemAmt = itemRates.reduce((sum, rate) => sum + (Number(rate.rate_total_amount) || 0), 0);
+          subworkTotals[subworkId].regular += totalItemAmt;
+        }
+      });
+
       // ✅ Update state with all data
       setEstimateData({
         work,
@@ -227,6 +390,10 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
         measurements,
         leads: {},
         materials: {},
+        royaltyMeasurements,
+        testingMeasurements,
+        rateAnalysis,
+        subworkTotals,
       });
 
     } catch (error) {
@@ -764,6 +931,18 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                               items.map((item, index) => {
                                 const rates = item.rates || [];
                                 const showMultiRates = rates.length > 0;
+                                const isRoyalty = item.category === 'royalty';
+                                const isTesting = item.category === 'testing';
+
+                                const royaltyData = isRoyalty && estimateData.subworkTotals ?
+                                  Object.values(estimateData.royaltyMeasurements[item.sr_no] || []).reduce((acc, rm) => ({
+                                    hb_metal: acc.hb_metal + (rm.hb_metal || 0),
+                                    murum: acc.murum + (rm.murum || 0),
+                                    sand: acc.sand + (rm.sand || 0)
+                                  }), { hb_metal: 0, murum: 0, sand: 0 }) : null;
+
+                                const testingData = isTesting && estimateData.testingMeasurements ?
+                                  estimateData.testingMeasurements[item.sr_no] || [] : [];
 
                                 return (
                                   <tr key={item.sr_no || index}>
@@ -798,13 +977,22 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                                     <td className="border border-black p-2 align-top text-center">
                                       {showMultiRates ? (
                                         <div className="space-y-1">
-                                          {rates.map((rate, i) => (
-                                            <div key={i} className="bg-gray-50 px-2 py-1 rounded text-xs">
-                                              {rate.ssr_quantity !== null && rate.ssr_quantity !== undefined
-                                                ? Number(rate.ssr_quantity).toLocaleString("hi-IN", { maximumFractionDigits: 3 })
-                                                : 0}
-                                            </div>
-                                          ))}
+                                          {rates.map((rate, i) => {
+                                            let quantity = rate.ssr_quantity || 0;
+                                            if (isRoyalty && royaltyData) {
+                                              const rateDesc = (rate.description || '').toLowerCase();
+                                              if (rateDesc.includes('metal')) quantity = royaltyData.hb_metal;
+                                              else if (rateDesc.includes('murum')) quantity = royaltyData.murum;
+                                              else if (rateDesc.includes('sand')) quantity = royaltyData.sand;
+                                            } else if (isTesting && testingData.length > 0) {
+                                              quantity = testingData[0].required_tests || 0;
+                                            }
+                                            return (
+                                              <div key={i} className="bg-gray-50 px-2 py-1 rounded text-xs">
+                                                {Number(quantity).toLocaleString("hi-IN", { maximumFractionDigits: 3 })}
+                                              </div>
+                                            );
+                                          })}
                                         </div>
                                       ) : (
                                         item.ssr_quantity !== null && item.ssr_quantity !== undefined
@@ -845,14 +1033,23 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                                     <td className="border border-black p-2 align-top text-right">
                                       {showMultiRates ? (
                                         <div className="space-y-1">
-                                          {rates.map((rate, i) => (
-                                            <div key={i} className="bg-gray-50 px-2 py-1 rounded text-xs">
-                                              {(rate.ssr_quantity && rate.rate
-                                                ? (Number(rate.ssr_quantity) * Number(rate.rate))
-                                                : 0
-                                              ).toLocaleString("hi-IN", { maximumFractionDigits: 2 })}
-                                            </div>
-                                          ))}
+                                          {rates.map((rate, i) => {
+                                            let quantity = rate.ssr_quantity || 0;
+                                            if (isRoyalty && royaltyData) {
+                                              const rateDesc = (rate.description || '').toLowerCase();
+                                              if (rateDesc.includes('metal')) quantity = royaltyData.hb_metal;
+                                              else if (rateDesc.includes('murum')) quantity = royaltyData.murum;
+                                              else if (rateDesc.includes('sand')) quantity = royaltyData.sand;
+                                            } else if (isTesting && testingData.length > 0) {
+                                              quantity = testingData[0].required_tests || 0;
+                                            }
+                                            const amount = quantity * Number(rate.rate || 0);
+                                            return (
+                                              <div key={i} className="bg-gray-50 px-2 py-1 rounded text-xs">
+                                                {amount.toLocaleString("hi-IN", { maximumFractionDigits: 2 })}
+                                              </div>
+                                            );
+                                          })}
                                         </div>
                                       ) : (
                                         item.total_item_amount !== null && item.total_item_amount !== undefined
@@ -964,9 +1161,21 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                                 </thead>
                                 <tbody>
                                   {items.map((item, itemIndex) => {
+                                    const isRoyalty = item.category === 'royalty';
+                                    const isTesting = item.category === 'testing';
                                     const itemMeasurements = estimateData.measurements[item.sr_no] || [];
-                                    if (itemMeasurements.length === 0) return null;
+                                    const royaltyMeasurements = estimateData.royaltyMeasurements[item.sr_no] || [];
+                                    const testingMeasurements = estimateData.testingMeasurements[item.sr_no] || [];
+
+                                    if (itemMeasurements.length === 0 && royaltyMeasurements.length === 0 && testingMeasurements.length === 0) return null;
+
                                     const itemTotal = itemMeasurements.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0);
+                                    const royaltyTotal = {
+                                      hb_metal: royaltyMeasurements.reduce((sum, r) => sum + (r.hb_metal || 0), 0),
+                                      murum: royaltyMeasurements.reduce((sum, r) => sum + (r.murum || 0), 0),
+                                      sand: royaltyMeasurements.reduce((sum, r) => sum + (r.sand || 0), 0),
+                                    };
+                                    const testingTotal = testingMeasurements.reduce((sum, t) => sum + (t.required_tests || 0), 0);
 
                                     return (
                                       <React.Fragment key={item.sr_no}>
@@ -1015,18 +1224,94 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                                           </tr>
                                         ))}
 
-                                        <tr className="bg-gray-100">
-                                          <td className="border border-black p-3 text-right font-bold text-sm pr-4" style={{ border: '1px solid black', padding: '12px', textAlign: 'right', fontWeight: 'bold', paddingRight: '16px' }}>
-                                            Total
-                                          </td>
-                                          <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
-                                          <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
-                                          <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
-                                          <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
-                                          <td className="border border-black p-3 text-center font-bold text-lg text-green-600" style={{ border: '1px solid black', padding: '12px', textAlign: 'center', fontWeight: 'bold', fontSize: '16px', color: '#16a34a' }}>
-                                            {itemTotal.toFixed(2)}
-                                          </td>
-                                        </tr>
+                                        {isRoyalty && royaltyMeasurements.length > 0 && (
+                                          <>
+                                            <tr className="bg-yellow-50">
+                                              <td colSpan={6} className="border border-black p-2 font-bold text-sm" style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>
+                                                Royalty Measurements:
+                                              </td>
+                                            </tr>
+                                            {royaltyTotal.hb_metal > 0 && (
+                                              <tr>
+                                                <td className="border border-black p-3 text-right pr-4 text-sm" style={{ border: '1px solid black', padding: '12px', textAlign: 'right', paddingRight: '16px' }}>
+                                                  Metal (H.B Metal)
+                                                </td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3 text-center text-sm font-bold text-orange-600" style={{ border: '1px solid black', padding: '12px', textAlign: 'center', fontWeight: 'bold', color: '#ea580c' }}>
+                                                  {royaltyTotal.hb_metal.toFixed(2)} CUM
+                                                </td>
+                                              </tr>
+                                            )}
+                                            {royaltyTotal.murum > 0 && (
+                                              <tr>
+                                                <td className="border border-black p-3 text-right pr-4 text-sm" style={{ border: '1px solid black', padding: '12px', textAlign: 'right', paddingRight: '16px' }}>
+                                                  MURUM
+                                                </td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3 text-center text-sm font-bold text-orange-600" style={{ border: '1px solid black', padding: '12px', textAlign: 'center', fontWeight: 'bold', color: '#ea580c' }}>
+                                                  {royaltyTotal.murum.toFixed(2)} CUM
+                                                </td>
+                                              </tr>
+                                            )}
+                                            {royaltyTotal.sand > 0 && (
+                                              <tr>
+                                                <td className="border border-black p-3 text-right pr-4 text-sm" style={{ border: '1px solid black', padding: '12px', textAlign: 'right', paddingRight: '16px' }}>
+                                                  Sand
+                                                </td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                                <td className="border border-black p-3 text-center text-sm font-bold text-orange-600" style={{ border: '1px solid black', padding: '12px', textAlign: 'center', fontWeight: 'bold', color: '#ea580c' }}>
+                                                  {royaltyTotal.sand.toFixed(2)} CUM
+                                                </td>
+                                              </tr>
+                                            )}
+                                          </>
+                                        )}
+
+                                        {isTesting && testingMeasurements.length > 0 && (
+                                          <>
+                                            <tr className="bg-blue-50">
+                                              <td colSpan={6} className="border border-black p-2 font-bold text-sm" style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>
+                                                Testing Measurements:
+                                              </td>
+                                            </tr>
+                                            <tr>
+                                              <td className="border border-black p-3 text-right pr-4 text-sm" style={{ border: '1px solid black', padding: '12px', textAlign: 'right', paddingRight: '16px' }}>
+                                                {testingMeasurements[0]?.description || 'Tests Required'}
+                                              </td>
+                                              <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                              <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                              <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                              <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                              <td className="border border-black p-3 text-center text-sm font-bold text-blue-600" style={{ border: '1px solid black', padding: '12px', textAlign: 'center', fontWeight: 'bold', color: '#2563eb' }}>
+                                                {testingTotal.toFixed(0)} /SET
+                                              </td>
+                                            </tr>
+                                          </>
+                                        )}
+
+                                        {!isRoyalty && !isTesting && (
+                                          <tr className="bg-gray-100">
+                                            <td className="border border-black p-3 text-right font-bold text-sm pr-4" style={{ border: '1px solid black', padding: '12px', textAlign: 'right', fontWeight: 'bold', paddingRight: '16px' }}>
+                                              Total
+                                            </td>
+                                            <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                            <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                            <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                            <td className="border border-black p-3" style={{ border: '1px solid black', padding: '12px' }}></td>
+                                            <td className="border border-black p-3 text-center font-bold text-lg text-green-600" style={{ border: '1px solid black', padding: '12px', textAlign: 'center', fontWeight: 'bold', fontSize: '16px', color: '#16a34a' }}>
+                                              {itemTotal.toFixed(2)}
+                                            </td>
+                                          </tr>
+                                        )}
                                       </React.Fragment>
                                     );
                                   })}
@@ -1206,13 +1491,121 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                     pageNumber++;
                   }
 
-                  // Compose and return: abstract -> measurement(s) -> traditional measurement -> photos (if available)
+                  // Rate Analysis Pages (after photos)
+                  const rateAnalysisPages: React.ReactNode[] = [];
+                  items.forEach((item, itemIndex) => {
+                    const analysis = estimateData.rateAnalysis[item.sr_no];
+                    if (analysis && analysis.entries && analysis.entries.length > 0) {
+                      rateAnalysisPages.push(
+                        <div key={`rate-analysis-${item.sr_no}`} className="pdf-page bg-white p-6 min-h-[297mm] flex flex-col" style={{ fontFamily: 'Arial, sans-serif', pageBreakAfter: 'always' }}>
+                          <PageHeader pageNumber={pageNumber} />
+                          <div className="flex-1">
+                            <div className="text-center mb-6">
+                              <h3 className="text-lg font-bold mb-2">RATE ANALYSIS</h3>
+                              <h4 className="text-base font-semibold">Name of Work :- {estimateData.work.work_name}</h4>
+                              <p className="text-sm">at {estimateData.work.village || 'N/A'}, G.P. {estimateData.work.grampanchayat || 'N/A'}, Ta.: {estimateData.work.taluka || 'N/A'}</p>
+                            </div>
+
+                            <table className="w-full border-collapse border border-black text-xs">
+                              <thead>
+                                <tr className="bg-gray-100">
+                                  <th className="border border-black p-2 text-center">Sr.No.</th>
+                                  <th className="border border-black p-2 text-left">Item of Work</th>
+                                  <th className="border border-black p-2 text-center">QTy.</th>
+                                  <th className="border border-black p-2 text-center">Rate/Unit</th>
+                                  <th className="border border-black p-2 text-center">Amount</th>
+                                  <th className="border border-black p-2 text-center">Unit.</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td className="border border-black p-2 text-center font-bold">{item.item_number || itemIndex + 1}</td>
+                                  <td className="border border-black p-2" colSpan={5}>
+                                    <div className="font-medium">{item.description_of_item}</div>
+                                  </td>
+                                </tr>
+                                {analysis.entries.map((entry: any, entryIndex: number) => {
+                                  const quantity = entry.quantity || 0;
+                                  const rate = entry.rate || 0;
+                                  const amount = quantity * rate;
+                                  return (
+                                    <tr key={entryIndex}>
+                                      <td className="border border-black p-2"></td>
+                                      <td className="border border-black p-2">
+                                        <div className="pl-4">{entry.label || entry.description || ''}</div>
+                                        {entry.reference && (
+                                          <div className="text-xs text-gray-600 italic pl-4">
+                                            {entry.reference}
+                                          </div>
+                                        )}
+                                      </td>
+                                      <td className="border border-black p-2 text-center">
+                                        {quantity > 0 ? quantity.toFixed(2) : ''}
+                                      </td>
+                                      <td className="border border-black p-2 text-center">
+                                        {rate > 0 ? rate.toFixed(2) : ''}
+                                      </td>
+                                      <td className="border border-black p-2 text-right">
+                                        {amount > 0 ? amount.toFixed(2) : ''}
+                                      </td>
+                                      <td className="border border-black p-2 text-center">
+                                        {entry.unit || ''}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                                <tr className="bg-gray-100 font-bold">
+                                  <td className="border border-black p-2" colSpan={4} style={{ textAlign: 'right', paddingRight: '20px' }}>
+                                    Total Rs
+                                  </td>
+                                  <td className="border border-black p-2 text-right">
+                                    {analysis.entries.reduce((sum: number, entry: any) => {
+                                      const qty = entry.quantity || 0;
+                                      const rt = entry.rate || 0;
+                                      return sum + (qty * rt);
+                                    }, 0).toFixed(2)}
+                                  </td>
+                                  <td className="border border-black p-2"></td>
+                                </tr>
+                                {(() => {
+                                  const total = analysis.entries.reduce((sum: number, entry: any) => {
+                                    const qty = entry.quantity || 0;
+                                    const rt = entry.rate || 0;
+                                    return sum + (qty * rt);
+                                  }, 0);
+                                  const unit = item.ssr_unit || '/cu.m.';
+                                  return (
+                                    <tr className="bg-gray-100 font-bold">
+                                      <td className="border border-black p-2" colSpan={4} style={{ textAlign: 'right', paddingRight: '20px' }}>
+                                        Say Rs.
+                                      </td>
+                                      <td className="border border-black p-2 text-right">
+                                        {Math.round(total).toFixed(2)}
+                                      </td>
+                                      <td className="border border-black p-2 text-center">
+                                        {unit}
+                                      </td>
+                                    </tr>
+                                  );
+                                })()}
+                              </tbody>
+                            </table>
+                          </div>
+                          <PageFooter pageNumber={pageNumber} />
+                        </div>
+                      );
+                      pageNumber++;
+                    }
+                  });
+
+                  // Compose and return: abstract -> measurement(s) -> traditional measurement -> photos (if available) -> rate analysis
                   return (
                     <React.Fragment key={`group-${subwork.subworks_id}`}>
                       {abstractPage}
                       {measurementPagesForThis}
                       {traditionalMeasurementForThis}
                       {photoPage}
+                      {rateAnalysisPages}
                     </React.Fragment>
                   );
                 });
