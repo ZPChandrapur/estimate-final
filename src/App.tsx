@@ -28,7 +28,7 @@ import { initializeAuthReceiver } from './utils/authReceiver';
 
 function App() {
   useEffect(() => {
-    initializeAuthReceiver('pesa');
+    initializeAuthReceiver('estimate');
   }, []);
 
   return (
