@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -23,7 +23,14 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 import RateAnalysis from './components/RateAnalysis';
 import MeasurementBookApp from './components/mb/MeasurementBookApp';
 
+// Auth Receiver
+import { initializeAuthReceiver } from './utils/authReceiver';
+
 function App() {
+  useEffect(() => {
+    initializeAuthReceiver('pesa');
+  }, []);
+
   return (
     <AuthProvider>
       <LanguageProvider>
