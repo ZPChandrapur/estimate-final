@@ -167,6 +167,7 @@ const resources = {
       'addWork.sanctioningAuthority': 'Sanctioning Authority',
       'addWork.technicalSanction': 'Technical Sanction (TS)',
       'addWork.administrativeApproval': 'Administrative Approval (AA)',
+      'addWork.technicalApproval': 'Technical Sanction (TS)',
       'addWork.enterWorkName': 'Enter work name',
       'addWork.enterSSR': 'Enter SSR',
       'addWork.enterDivision': 'Enter division',
