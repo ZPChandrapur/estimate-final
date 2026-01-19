@@ -12,7 +12,11 @@ import {
   FolderTree,
   CheckCircle,
   AlertCircle,
-  X
+  X,
+  Edit,
+  ChevronLeft,
+  ChevronRight,
+  Filter
 } from 'lucide-react';
 
 interface WorkManagementProps {
@@ -68,13 +72,18 @@ interface Subwork {
 
 const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
   const { user } = useAuth();
+  const [showForm, setShowForm] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [projects, setProjects] = useState<MBProject[]>([]);
+  const [allProjects, setAllProjects] = useState<MBProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [estimateWorks, setEstimateWorks] = useState<EstimateWork[]>([]);
   const [showWorksList, setShowWorksList] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchFilter, setSearchFilter] = useState('');
+  const itemsPerPage = 10;
 
   const [workDetails, setWorkDetails] = useState({
     project_code: '',
@@ -167,9 +176,65 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
 
       if (error) throw error;
       setProjects(data || []);
+      setAllProjects(data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
     }
+  };
+
+  const filteredProjects = allProjects.filter(project =>
+    project.project_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+    project.project_code.toLowerCase().includes(searchFilter.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
+  const paginatedProjects = filteredProjects.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handleEditProject = (projectId: string) => {
+    setSelectedProject(projectId);
+    setShowForm(true);
+    setCurrentStep(0);
+  };
+
+  const handleCreateNew = () => {
+    setSelectedProject('');
+    setShowForm(true);
+    setCurrentStep(0);
+    setWorkDetails({
+      project_code: '',
+      project_name: '',
+      works_id: '',
+      tender_no: '',
+      tender_submission_date: '',
+      tender_opening_date: '',
+      work_order_date: '',
+      start_date: '',
+      work_duration_months: '',
+      work_duration_days: '',
+      work_end_date: '',
+      work_order_outward_no: '',
+      agreement_reference_no: '',
+      state: 'Maharashtra',
+      city_location: '',
+      region: '',
+      tender_type: '',
+      type_of_work: '',
+      select_programme: '',
+      select_scheme: '',
+      consider_escalation: false,
+      cost_put_to_tender: '',
+      above_below_percentage: '',
+      above_below_percentage_cl38: '',
+      quoted_amount: '',
+      total_security_deposit: '',
+      initial_security_deposit: '',
+      additional_security_deposit: '',
+      cl38_amount: '',
+      retention_money_deposit: ''
+    });
   };
 
   const fetchEstimateWorks = async () => {
@@ -594,17 +659,152 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+        {!showForm ? (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => onNavigate('dashboard')}
+                  className="flex items-center px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Dashboard
+                </button>
+                <h2 className="text-2xl font-bold text-gray-900">Work Management</h2>
+              </div>
+              <button
+                onClick={handleCreateNew}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create New Project
+              </button>
+            </div>
+
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center space-x-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Search by project name or code..."
+                    value={searchFilter}
+                    onChange={(e) => {
+                      setSearchFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <Filter className="w-4 h-4 mr-2" />
+                  {filteredProjects.length} Projects
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Project Code
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Project Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedProjects.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                        No projects found. Create your first project to get started.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedProjects.map((project) => (
+                      <tr key={project.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {project.project_code}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {project.project_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            project.status === 'active' ? 'bg-green-100 text-green-800' :
+                            project.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {project.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => handleEditProject(project.id)}
+                            className="inline-flex items-center px-3 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing {Math.min((currentPage - 1) * itemsPerPage + 1, filteredProjects.length)} to{' '}
+                  {Math.min(currentPage * itemsPerPage, filteredProjects.length)} of {filteredProjects.length} projects
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <span className="text-sm text-gray-700">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => onNavigate('dashboard')}
+                onClick={() => {
+                  setShowForm(false);
+                  setSelectedProject('');
+                }}
                 className="flex items-center px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
+                Back to Projects List
               </button>
-              <h2 className="text-2xl font-bold text-gray-900">Work Management</h2>
+              <h2 className="text-2xl font-bold text-gray-900">{selectedProject ? 'Edit Project' : 'Create New Project'}</h2>
             </div>
           </div>
 
@@ -1410,6 +1610,7 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

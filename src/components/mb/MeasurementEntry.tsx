@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { ArrowLeft, Plus, Save, Send, Calculator, Edit2, Trash2, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Plus, Save, Send, Calculator, Edit2, Trash2, Eye, ChevronDown, ChevronUp, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface MeasurementEntryProps {
   onNavigate: (page: string) => void;
@@ -60,6 +60,7 @@ interface MeasurementFormData {
 
 const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
   const { user } = useAuth();
+  const [showMeasurementView, setShowMeasurementView] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [boqItems, setBoqItems] = useState<BOQItem[]>([]);
   const [selectedBoqItem, setSelectedBoqItem] = useState<BOQItem | null>(null);
@@ -72,6 +73,10 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
   const [selectedProject, setSelectedProject] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchFilter, setSearchFilter] = useState('');
+  const [projectsWithStats, setProjectsWithStats] = useState<Array<Project & {measurements_count: number}>>([]);
+  const itemsPerPage = 10;
 
   const [formData, setFormData] = useState<MeasurementFormData>({
     project_id: '',
@@ -106,18 +111,51 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
 
   const fetchProjects = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: projectsData, error } = await supabase
         .schema('estimate')
         .from('mb_projects')
         .select('*')
-        .eq('status', 'active')
+        .in('status', ['active', 'in_progress'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProjects(data || []);
+      setProjects(projectsData || []);
+
+      const projectsWithMeasurements = await Promise.all(
+        (projectsData || []).map(async (project) => {
+          const { data: measurementData, error: measurementError } = await supabase
+            .schema('estimate')
+            .from('mb_measurements')
+            .select('id')
+            .eq('project_id', project.id);
+
+          return {
+            ...project,
+            measurements_count: measurementData?.length || 0
+          };
+        })
+      );
+
+      setProjectsWithStats(projectsWithMeasurements);
     } catch (error) {
       console.error('Error fetching projects:', error);
     }
+  };
+
+  const filteredProjects = projectsWithStats.filter(project =>
+    project.project_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+    project.project_code.toLowerCase().includes(searchFilter.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
+  const paginatedProjects = filteredProjects.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handleViewMeasurements = (projectId: string) => {
+    setSelectedProject(projectId);
+    setShowMeasurementView(true);
   };
 
   const fetchBOQItems = async (projectId: string) => {
@@ -391,17 +429,153 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="mb-6">
-          <button
-            onClick={() => onNavigate('dashboard')}
-            className="flex items-center text-blue-600 hover:text-blue-800 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900">Measurement Entry</h1>
-          <p className="text-gray-600 mt-2">Select BOQ items and record measurements</p>
-        </div>
+        {!showMeasurementView ? (
+          <div>
+            <div className="mb-6">
+              <button
+                onClick={() => onNavigate('dashboard')}
+                className="flex items-center text-blue-600 hover:text-blue-800 mb-4"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Dashboard
+              </button>
+              <h1 className="text-3xl font-bold text-gray-900">Measurement Entry</h1>
+              <p className="text-gray-600 mt-2">Select projects to enter measurements</p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center space-x-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      placeholder="Search by project name or code..."
+                      value={searchFilter}
+                      onChange={(e) => {
+                        setSearchFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Filter className="w-4 h-4 mr-2" />
+                    {filteredProjects.length} Projects
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Project Code
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Project Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Measurements
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {paginatedProjects.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                          No projects found
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedProjects.map((project) => (
+                        <tr key={project.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {project.project_code}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {project.project_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {project.measurements_count} entries
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              project.status === 'active' ? 'bg-green-100 text-green-800' :
+                              project.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {project.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                              onClick={() => handleViewMeasurements(project.id)}
+                              className="inline-flex items-center px-3 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              Enter Measurements
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                  <div className="text-sm text-gray-700">
+                    Showing {Math.min((currentPage - 1) * itemsPerPage + 1, filteredProjects.length)} to{' '}
+                    {Math.min(currentPage * itemsPerPage, filteredProjects.length)} of {filteredProjects.length} projects
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <span className="text-sm text-gray-700">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="mb-6">
+              <button
+                onClick={() => {
+                  setShowMeasurementView(false);
+                  setSelectedProject('');
+                }}
+                className="flex items-center text-blue-600 hover:text-blue-800 mb-4"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Projects
+              </button>
+              <h1 className="text-3xl font-bold text-gray-900">Measurement Entry</h1>
+              <p className="text-gray-600 mt-2">Select BOQ items and record measurements</p>
+            </div>
 
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
@@ -839,6 +1013,8 @@ const MeasurementEntry: React.FC<MeasurementEntryProps> = ({ onNavigate }) => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
             <p className="text-gray-500">No BOQ items found for this project. Please upload BOQ first.</p>
           </div>
+        )}
+        </div>
         )}
       </div>
     </div>

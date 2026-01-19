@@ -12,7 +12,10 @@ import {
   AlertCircle,
   CheckCircle,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Eye
 } from 'lucide-react';
 import { createBOQTemplateData, numberToWords, BOQTemplateRow } from '../../lib/boqUtils';
 
@@ -54,6 +57,7 @@ interface Work {
 
 const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
   const { user } = useAuth();
+  const [showBOQView, setShowBOQView] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [boqItems, setBoqItems] = useState<BOQItem[]>([]);
@@ -67,6 +71,10 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
   const [showEstimateImport, setShowEstimateImport] = useState(false);
   const [availableWorks, setAvailableWorks] = useState<Work[]>([]);
   const [selectedWork, setSelectedWork] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchFilter, setSearchFilter] = useState('');
+  const [projectsWithStats, setProjectsWithStats] = useState<Array<Project & {boq_count: number, total_amount: number}>>([]);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     fetchProjects();
@@ -80,7 +88,7 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
 
   const fetchProjects = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: projectsData, error } = await supabase
         .schema('estimate')
         .from('mb_projects')
         .select('*')
@@ -88,11 +96,45 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProjects(data || []);
+      setProjects(projectsData || []);
+
+      const projectsWithBoq = await Promise.all(
+        (projectsData || []).map(async (project) => {
+          const { data: boqData, error: boqError } = await supabase
+            .schema('estimate')
+            .from('mb_boq_items')
+            .select('id, amount')
+            .eq('project_id', project.id);
+
+          return {
+            ...project,
+            boq_count: boqData?.length || 0,
+            total_amount: boqData?.reduce((sum, item) => sum + Number(item.amount || 0), 0) || 0
+          };
+        })
+      );
+
+      setProjectsWithStats(projectsWithBoq);
     } catch (error) {
       console.error('Error fetching projects:', error);
       setError('Failed to fetch projects');
     }
+  };
+
+  const filteredProjects = projectsWithStats.filter(project =>
+    project.project_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+    project.project_code.toLowerCase().includes(searchFilter.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
+  const paginatedProjects = filteredProjects.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handleViewBOQ = (projectId: string) => {
+    setSelectedProject(projectId);
+    setShowBOQView(true);
   };
 
   const fetchBOQItems = async (projectId: string) => {
@@ -520,7 +562,14 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => onNavigate('dashboard')}
+                onClick={() => {
+                  if (showBOQView) {
+                    setShowBOQView(false);
+                    setSelectedProject('');
+                  } else {
+                    onNavigate('dashboard');
+                  }
+                }}
                 className="flex items-center text-gray-600 hover:text-gray-900"
               >
                 <ArrowLeft className="w-5 h-5 mr-2" />
@@ -533,6 +582,129 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {!showBOQView ? (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center space-x-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Search by project name or code..."
+                    value={searchFilter}
+                    onChange={(e) => {
+                      setSearchFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <Filter className="w-4 h-4 mr-2" />
+                  {filteredProjects.length} Projects
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Project Code
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Project Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      BOQ Items
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedProjects.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                        No projects found
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedProjects.map((project) => (
+                      <tr key={project.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {project.project_code}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {project.project_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {project.boq_count} items
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          ₹{project.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            project.boq_count > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {project.boq_count > 0 ? 'BOQ Uploaded' : 'Pending'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => handleViewBOQ(project.id)}
+                            className="inline-flex items-center px-3 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            Manage BOQ
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing {Math.min((currentPage - 1) * itemsPerPage + 1, filteredProjects.length)} to{' '}
+                  {Math.min(currentPage * itemsPerPage, filteredProjects.length)} of {filteredProjects.length} projects
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <span className="text-sm text-gray-700">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div>
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
             <AlertCircle className="w-5 h-5 text-red-600 mr-3 flex-shrink-0 mt-0.5" />
@@ -863,6 +1035,8 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">Loading BOQ items...</p>
           </div>
+        )}
+        </div>
         )}
       </div>
     </div>
