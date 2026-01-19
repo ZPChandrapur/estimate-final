@@ -838,7 +838,7 @@ const fetchDesignPhotos = async (subworkId: string): Promise<Photo[]> => {
                     <div className="grid grid-cols-1 gap-4 text-sm">
                       <div className="space-y-2">
                         <div className="flex">
-                          <span className="w-48 font-medium">Administrative Approval No.</span>
+                          <span className="w-48 font-medium">Techincal Approval No.</span>
                           <span className="mr-2">:-</span>
                           <span>-</span>
                         </div>
