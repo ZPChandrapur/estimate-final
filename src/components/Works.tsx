@@ -370,7 +370,7 @@ const Works: React.FC = () => {
             >
               <option value="all">All Types</option>
               <option value="Technical Sanction">Technical Sanction (TS)</option>
-              <option value="Administrative Approval">Administrative Approval (AA)</option>
+              <option value="Administrative Approval">Technical Approval (TA)</option>
             </select>
           </div>
         </div>
