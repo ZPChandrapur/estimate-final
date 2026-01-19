@@ -369,8 +369,8 @@ const Works: React.FC = () => {
               className="block pl-3 pr-8 py-2 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-xl bg-white/80 backdrop-blur-sm hover:bg-white transition-all duration-200"
             >
               <option value="all">All Types</option>
-              <option value="Technical Sanction">Technical Sanction (TS)</option>
               <option value="Administrative Approval">Technical Approval (TA)</option>
+              <option value="Technical Sanction">Technical Sanction (TS)</option>
             </select>
           </div>
         </div>
