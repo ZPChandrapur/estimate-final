@@ -83,11 +83,15 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchFilter, setSearchFilter] = useState('');
+  const [workTypeFilter, setWorkTypeFilter] = useState<'ALL' | 'TS' | 'TA'>('ALL');
   const itemsPerPage = 10;
 
   const [workDetails, setWorkDetails] = useState({
     project_code: '',
     project_name: '',
+    work_type: 'TA',
+    technical_sanction_no: '',
+    technical_approval_no: '',
     works_id: '',
     tender_no: '',
     tender_submission_date: '',
@@ -170,7 +174,7 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
       const { data, error } = await supabase
         .schema('estimate')
         .from('mb_projects')
-        .select('id, project_code, project_name, works_id, status')
+        .select('id, project_code, project_name, works_id, status, work_type, technical_sanction_no, technical_approval_no')
         .in('status', ['active', 'in_progress'])
         .order('created_at', { ascending: false });
 
@@ -182,10 +186,15 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
     }
   };
 
-  const filteredProjects = allProjects.filter(project =>
-    project.project_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-    project.project_code.toLowerCase().includes(searchFilter.toLowerCase())
-  );
+  const filteredProjects = allProjects.filter(project => {
+    const matchesSearch = project.project_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      project.project_code.toLowerCase().includes(searchFilter.toLowerCase());
+
+    const matchesType = workTypeFilter === 'ALL' ||
+      (project as any).work_type === workTypeFilter;
+
+    return matchesSearch && matchesType;
+  });
 
   const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
   const paginatedProjects = filteredProjects.slice(
@@ -206,6 +215,9 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
     setWorkDetails({
       project_code: '',
       project_name: '',
+      work_type: 'TA',
+      technical_sanction_no: '',
+      technical_approval_no: '',
       works_id: '',
       tender_no: '',
       tender_submission_date: '',
@@ -302,6 +314,9 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
         setWorkDetails({
           project_code: project.project_code || '',
           project_name: project.project_name || '',
+          work_type: (project as any).work_type || 'TA',
+          technical_sanction_no: (project as any).technical_sanction_no || '',
+          technical_approval_no: (project as any).technical_approval_no || '',
           works_id: project.works_id || '',
           tender_no: project.tender_no || '',
           tender_submission_date: project.tender_submission_date || '',
@@ -407,6 +422,9 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
       const projectData = {
         project_code: workDetails.project_code,
         project_name: workDetails.project_name,
+        work_type: workDetails.work_type,
+        technical_sanction_no: workDetails.work_type === 'TS' ? workDetails.technical_sanction_no : null,
+        technical_approval_no: workDetails.work_type === 'TA' ? workDetails.technical_approval_no : null,
         works_id: workDetails.works_id || null,
         tender_no: workDetails.tender_no || null,
         tender_submission_date: workDetails.tender_submission_date || null,
@@ -682,6 +700,47 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
             </div>
 
             <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center space-x-4 mb-4">
+                <button
+                  onClick={() => {
+                    setWorkTypeFilter('ALL');
+                    setCurrentPage(1);
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    workTypeFilter === 'ALL'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  All Projects
+                </button>
+                <button
+                  onClick={() => {
+                    setWorkTypeFilter('TS');
+                    setCurrentPage(1);
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    workTypeFilter === 'TS'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Technical Sanction (TS)
+                </button>
+                <button
+                  onClick={() => {
+                    setWorkTypeFilter('TA');
+                    setCurrentPage(1);
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    workTypeFilter === 'TA'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Technical Approval (TA)
+                </button>
+              </div>
               <div className="flex items-center space-x-4">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -714,6 +773,12 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
                       Project Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {workTypeFilter === 'TS' ? 'TS Number' : workTypeFilter === 'TA' ? 'TA Number' : 'TS/TA Number'}
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -724,7 +789,7 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {paginatedProjects.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                         No projects found. Create your first project to get started.
                       </td>
                     </tr>
@@ -736,6 +801,19 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900">
                           {project.project_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            (project as any).work_type === 'TS' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800'
+                          }`}>
+                            {(project as any).work_type === 'TS' ? 'Technical Sanction' : 'Technical Approval'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {(project as any).work_type === 'TS'
+                            ? ((project as any).technical_sanction_no || '-')
+                            : ((project as any).technical_approval_no || '-')
+                          }
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -929,6 +1007,40 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Work Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={workDetails.work_type}
+                      onChange={(e) => setWorkDetails({ ...workDetails, work_type: e.target.value as 'TS' | 'TA' })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    >
+                      <option value="TA">Technical Approval (TA)</option>
+                      <option value="TS">Technical Sanction (TS)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {workDetails.work_type === 'TS' ? 'Technical Sanction No.' : 'Technical Approval No.'}
+                    </label>
+                    <input
+                      type="text"
+                      value={workDetails.work_type === 'TS' ? workDetails.technical_sanction_no : workDetails.technical_approval_no}
+                      onChange={(e) => {
+                        if (workDetails.work_type === 'TS') {
+                          setWorkDetails({ ...workDetails, technical_sanction_no: e.target.value });
+                        } else {
+                          setWorkDetails({ ...workDetails, technical_approval_no: e.target.value });
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder={workDetails.work_type === 'TS' ? 'Enter Technical Sanction No.' : 'Enter Technical Approval No.'}
+                    />
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Estimate Number <span className="text-red-500">*</span>
