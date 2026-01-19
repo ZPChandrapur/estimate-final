@@ -408,7 +408,7 @@ const handleMeasurementExcelUpload = async (
     }
   };
 
-  const handleAddMeasurement = async () => {
+  const handleAddMeasurement = async () => {debugger;
     if (!user) return;
 
     // Validate that a rate is selected
