@@ -406,7 +406,7 @@ const fetchCompleteEstimateData = async (worksId: string) => {
   const getTypeBadge = (type: string) => {
     const typeConfig = {
       'Technical Sanction': { bg: 'bg-gradient-to-r from-blue-100 to-indigo-200', text: 'text-blue-800', label: 'TS' },
-      'Administrative Approval': { bg: 'bg-gradient-to-r from-green-100 to-emerald-200', text: 'text-green-800', label: 'AA' },
+      'Technical Approval': { bg: 'bg-gradient-to-r from-green-100 to-emerald-200', text: 'text-green-800', label: 'TA' },
     };
 
     const config = typeConfig[type as keyof typeof typeConfig] || typeConfig['Technical Sanction'];
