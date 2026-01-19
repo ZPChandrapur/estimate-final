@@ -502,8 +502,8 @@ const fetchCompleteEstimateData = async (worksId: string) => {
               className="block pl-3 pr-8 py-3 text-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 rounded-xl bg-white/80 backdrop-blur-sm hover:bg-white transition-all duration-200 shadow-lg"
             >
               <option value="all">All Types</option>
-              <option value="Technical Sanction">Technical Sanction (TS)</option>
-              <option value="Administrative Approval">Administrative Approval (AA)</option>
+              <option value="Technical Approval">Technical Approval (TA)</option>
+              <option value="Technical Sanction">Technical Sanction (TS)</option> 
             </select>
           </div>
 
