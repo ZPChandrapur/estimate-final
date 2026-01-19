@@ -86,38 +86,38 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
     try {
       setLoading(true);
 
-      const [worksResponse, boqResponse, measurementsResponse, billsResponse] = await Promise.all([
+      const [projectsResponse, boqItemsResponse, measurementsResponse, billsResponse] = await Promise.all([
         supabase
           .schema('estimate')
-          .from('mb_works')
+          .from('mb_projects')
           .select('status'),
         supabase
           .schema('estimate')
-          .from('mb_boq')
-          .select('total_amount'),
+          .from('mb_boq_items')
+          .select('amount'),
         supabase
           .schema('estimate')
           .from('mb_measurements')
-          .select('quantity, rate'),
+          .select('amount'),
         supabase
           .schema('estimate')
           .from('mb_bills')
           .select('current_bill_amount, approval_status')
       ]);
 
-      const works = worksResponse.data || [];
-      const boqs = boqResponse.data || [];
+      const projects = projectsResponse.data || [];
+      const boqItems = boqItemsResponse.data || [];
       const measurements = measurementsResponse.data || [];
       const bills = billsResponse.data || [];
 
-      const totalWorks = works.length;
-      const activeWorks = works.filter(w => w.status === 'active' || w.status === 'in_progress').length;
-      const completedWorks = works.filter(w => w.status === 'completed').length;
+      const totalProjects = projects.length;
+      const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'in_progress').length;
+      const completedProjects = projects.filter(p => p.status === 'completed').length;
 
-      const totalBoqAmount = boqs.reduce((sum, boq) => sum + Number(boq.total_amount || 0), 0);
+      const totalBoqAmount = boqItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
       const totalExecutedAmount = measurements.reduce((sum, m) => {
-        return sum + (Number(m.quantity || 0) * Number(m.rate || 0));
+        return sum + Number(m.amount || 0);
       }, 0);
 
       const totalBills = bills.length;
@@ -128,9 +128,9 @@ const MBDashboard: React.FC<MBDashboardProps> = ({ onNavigate, currentPage }) =>
       ).length;
 
       setSummary({
-        total_works: totalWorks,
-        active_works: activeWorks,
-        completed_works: completedWorks,
+        total_works: totalProjects,
+        active_works: activeProjects,
+        completed_works: completedProjects,
         total_boq_amount: totalBoqAmount,
         total_executed_amount: totalExecutedAmount,
         total_measurements: measurements.length,

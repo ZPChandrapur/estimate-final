@@ -84,6 +84,7 @@ const BOQManagement: React.FC<BOQManagementProps> = ({ onNavigate }) => {
         .schema('estimate')
         .from('mb_projects')
         .select('*')
+        .in('status', ['active', 'in_progress'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;

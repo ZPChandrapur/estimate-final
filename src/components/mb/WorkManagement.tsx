@@ -162,6 +162,7 @@ const WorkManagement: React.FC<WorkManagementProps> = ({ onNavigate }) => {
         .schema('estimate')
         .from('mb_projects')
         .select('id, project_code, project_name, works_id, status')
+        .in('status', ['active', 'in_progress'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
