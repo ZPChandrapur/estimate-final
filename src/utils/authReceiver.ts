@@ -86,11 +86,12 @@ export const handleAutoLogin = async (appName: string = 'estimate'): Promise<boo
           
           if (!error && data.session) {
             // console.log(`✅ ${appName.toUpperCase()}: Auto-login successful via localStorage`);
-            
-            // Clean up the transfer data immediately
-            localStorage.removeItem(storageKey);
-            
+            const check = await supabase.auth.getSession();
+                if (check.data.session) {
+                  // Clean up the transfer data immediately
+                  localStorage.removeItem(storageKey);
             return true;
+                }
           } else {
             console.error(`❌ ${appName.toUpperCase()}: Failed to set session from localStorage:`, error);
           }
