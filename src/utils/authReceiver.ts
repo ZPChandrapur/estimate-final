@@ -22,7 +22,7 @@ export const handleAutoLogin = async (appName: string = 'estimate'): Promise<boo
     const autoLogin = urlParams.get('auto_login');
     const source = urlParams.get('source');
     
-    if (autoLogin === 'true' && source === 'zp_main') {
+    if (autoLogin === 'true' && source === 'zp_chandrapur_main') {
       // console.log(`📧 ${appName.toUpperCase()}: Found URL parameters for auto-login`);
       const accessToken = urlParams.get('access_token');
       const refreshToken = urlParams.get('refresh_token');
