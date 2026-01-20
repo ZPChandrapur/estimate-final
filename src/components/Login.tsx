@@ -90,21 +90,6 @@ const Login: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label htmlFor="department" className="block text-sm font-medium text-gray-700">
-                Department
-              </label>
-              <select
-                id="department"
-                name="department"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              >
-                <option value="A">Public Works Department (PWD)</option>
-                <option value="B">Irrigation</option>
-              </select>
-            </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
