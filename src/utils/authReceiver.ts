@@ -177,6 +177,7 @@ export const isAutoLoginAvailable = (appName: string = 'estimate'): boolean => {
   const getStorageKey = (app: string) => {
     switch (app) {
       case 'fims': return 'fims_auth_transfer';
+      case 'estimate': return 'estimate_auth_transfer';
       case 'pesa': return 'pesa_auth_transfer';
       case 'workflow': return 'workflow_auth_transfer';
       default: return 'estimate_auth_transfer';
