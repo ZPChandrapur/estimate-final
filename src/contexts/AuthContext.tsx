@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { User, AuthContextType } from '../types';
+import { initializeAuthReceiver } from '../utils/authReceiver'; // ✅ ADD
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -58,7 +59,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const setUserWithRole = async (authUser: any) => {
     const role = await fetchUserRole(authUser.id);
-    const hasFullAccess = role?.name === 'developer' || role?.name === 'super_admin';
+    const hasFullAccess =
+      role?.name === 'developer' || role?.name === 'super_admin';
+
     setUser({
       ...authUser,
       role,
@@ -67,20 +70,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
+    let subscription: any;
+
+    const initAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // ✅ 1. VERY IMPORTANT: run auth receiver FIRST
+        await initializeAuthReceiver('estimate');
+
+        // ✅ 2. Then read session AFTER receiver sets tokens
+        const { data: { session }, error } =
+          await supabase.auth.getSession();
+
         if (error) {
           console.error('Error getting session:', error);
-          // Clear invalid session data
           await supabase.auth.signOut();
         } else if (session?.user) {
           await setUserWithRole(session.user);
         }
       } catch (error) {
-        console.error('Error in getInitialSession:', error);
-        // Clear any stale session data on catch
+        console.error('Error initializing auth:', error);
         try {
           await supabase.auth.signOut();
         } catch (signOutError) {
@@ -89,14 +97,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } finally {
         setLoading(false);
       }
-    };
 
-    getInitialSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        (async () => {
+      // ✅ 3. Auth state listener (unchanged behavior)
+      const { data } = supabase.auth.onAuthStateChange(
+        async (_event, session) => {
           try {
             if (session?.user) {
               await setUserWithRole(session.user);
@@ -108,11 +112,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           } finally {
             setLoading(false);
           }
-        })();
-      }
-    );
+        }
+      );
 
-    return () => subscription.unsubscribe();
+      subscription = data.subscription;
+    };
+
+    initAuth();
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -132,10 +142,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setUser(null);
       const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Supabase sign out error:', error);
-        throw error;
-      }
+      if (error) throw error;
     } catch (error) {
       console.error('Error signing out:', error);
       setUser(null);
@@ -143,10 +150,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const hasPermission = (permission: string): boolean => {
-    if (user?.hasFullAccess) {
-      return true;
-    }
+  const hasPermission = (_permission: string): boolean => {
+    if (user?.hasFullAccess) return true;
     return true;
   };
 
@@ -154,7 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return user?.hasFullAccess || false;
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     loading,
     signIn,
@@ -163,5 +168,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     hasFullAccess,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
