@@ -27,9 +27,6 @@ import MeasurementBookApp from './components/mb/MeasurementBookApp';
 import { initializeAuthReceiver } from './utils/authReceiver';
 
 function App() {
-  useEffect(() => {
-    initializeAuthReceiver('estimate');
-  }, []);
 
   return (
     <AuthProvider>
