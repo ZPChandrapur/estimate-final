@@ -199,96 +199,119 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
     setRateGroups(groups);
   };
 
-const handleMeasurementExcelUpload = async (
-  event: React.ChangeEvent<HTMLInputElement>
-) => {
-  const file = event.target.files?.[0];
-  if (!file || !currentItem || !user) return;
-
-  try {
-    setUploadingExcel(true);
-
-    const fileExt = file.name.split('.').pop();
-    const storedFileName = `${currentItem.sr_no}_${Date.now()}.${fileExt}`;
-    const filePath = `measurements/${storedFileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('estimate-designs')
-      .upload(filePath, file);
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      throw new Error(`Failed to upload file: ${uploadError.message}`);
+  // Safely refresh session with timeout to avoid hanging awaits after tab change
+  const refreshSessionSafely = async (timeout = 3000) => {
+    try {
+      const refreshPromise = supabase.auth.refreshSession();
+      const result = await Promise.race([
+        refreshPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('session-refresh-timeout')), timeout))
+      ]);
+      return result;
+    } catch (e) {
+      console.warn('Session refresh failed or timed out:', e);
+      return null;
     }
+  };
 
-    const { data } = supabase.storage
-      .from('estimate-designs')
-      .getPublicUrl(filePath);
+  // Helper to race any promise (eg. Supabase queries) with a timeout to avoid indefinite hangs
+  const withTimeout = async (promise: Promise<any>, ms = 7000) => {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('supabase-timeout')), ms))
+    ]);
+  };
 
-    const publicUrl = data.publicUrl;
+  const handleMeasurementExcelUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentItem || !user) return;
 
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer);
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+    try {
+      setUploadingExcel(true);
 
-    if (!rows.length) {
-      alert('Excel file is empty. Please add data to the Excel file.');
+      const fileExt = file.name.split('.').pop();
+      const storedFileName = `${currentItem.sr_no}_${Date.now()}.${fileExt}`;
+      const filePath = `measurements/${storedFileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('estimate-designs')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw new Error(`Failed to upload file: ${uploadError.message}`);
+      }
+
+      const { data } = supabase.storage
+        .from('estimate-designs')
+        .getPublicUrl(filePath);
+
+      const publicUrl = data.publicUrl;
+
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+
+      if (!rows.length) {
+        alert('Excel file is empty. Please add data to the Excel file.');
+        event.target.value = '';
+        return;
+      }
+
+      const nextSrNo = await getNextMeasurementSrNo();
+
+      const insertRows = rows.map((row, index) => {
+        const quantity = Number(row.Quantity || row.quantity || 0);
+        return {
+          subwork_item_id: currentItem.sr_no,
+          measurement_sr_no: nextSrNo + index,
+          description_of_items: row.Description || row.description || null,
+          unit: currentItem.ssr_unit,
+          factor: 1,
+          no_of_units: 1,
+          length: 1,
+          width_breadth: 1,
+          height_depth: 1,
+          is_manual_quantity: true,
+          manual_quantity: quantity,
+          calculated_quantity: quantity,
+          is_deduction: false,
+          rate: currentItem.ssr_rate || 0,
+          line_amount: quantity * (currentItem.ssr_rate || 0),
+          excel_url: publicUrl,
+          excel_name: file.name,
+          created_by: user.id,
+        };
+      });
+
+      const { error: insertError } = await supabase
+        .schema('estimate')
+        .from('item_measurements')
+        .insert(insertRows);
+
+      if (insertError) {
+        console.error('Database insert error:', insertError);
+        throw new Error(`Failed to save measurements: ${insertError.message}`);
+      }
+
+      await fetchData();
+      await updateItemSSRQuantity();
+
+      alert(`${rows.length} measurement(s) uploaded successfully from Excel!`);
+      setShowAddModal(false);
       event.target.value = '';
-      return;
+
+    } catch (error) {
+      console.error('Error uploading measurement Excel:', error);
+      alert(error.message || 'Error uploading measurement Excel. Please try again.');
+      event.target.value = '';
+    } finally {
+      setUploadingExcel(false);
     }
-
-    const nextSrNo = await getNextMeasurementSrNo();
-
-    const insertRows = rows.map((row, index) => {
-      const quantity = Number(row.Quantity || row.quantity || 0);
-      return {
-        subwork_item_id: currentItem.sr_no,
-        measurement_sr_no: nextSrNo + index,
-        description_of_items: row.Description || row.description || null,
-        unit: currentItem.ssr_unit,
-        factor: 1,
-        no_of_units: 1,
-        length: 1,
-        width_breadth: 1,
-        height_depth: 1,
-        is_manual_quantity: true,
-        manual_quantity: quantity,
-        calculated_quantity: quantity,
-        is_deduction: false,
-        rate: currentItem.ssr_rate || 0,
-        line_amount: quantity * (currentItem.ssr_rate || 0),
-        excel_url: publicUrl,
-        excel_name: file.name,
-        created_by: user.id,
-      };
-    });
-
-    const { error: insertError } = await supabase
-      .schema('estimate')
-      .from('item_measurements')
-      .insert(insertRows);
-
-    if (insertError) {
-      console.error('Database insert error:', insertError);
-      throw new Error(`Failed to save measurements: ${insertError.message}`);
-    }
-
-    await fetchData();
-    await updateItemSSRQuantity();
-
-    alert(`${rows.length} measurement(s) uploaded successfully from Excel!`);
-    setShowAddModal(false);
-    event.target.value = '';
-
-  } catch (error) {
-    console.error('Error uploading measurement Excel:', error);
-    alert(error.message || 'Error uploading measurement Excel. Please try again.');
-    event.target.value = '';
-  } finally {
-    setUploadingExcel(false);
-  }
-};
+  };
 
   const fetchData = async () => {
     try {
@@ -389,26 +412,17 @@ const handleMeasurementExcelUpload = async (
     }
   };
 
-  const getNextMeasurementSrNo = async (): Promise<number> => {
-    try {
-      const { data, error } = await supabase
-        .schema('estimate')
-        .from('item_measurements')
-        .select('measurement_sr_no')
-        .eq('subwork_item_id', currentItem.sr_no)
-        .order('measurement_sr_no', { ascending: false })
-        .limit(1);
+  const getNextMeasurementSrNoFromState = () => {
+    if (!measurements || measurements.length === 0) return 1;
 
-      if (error) throw error;
+    const lastSrNo = Math.max(
+      ...measurements.map(m => m.measurement_sr_no || 0)
+    );
 
-      return data && data.length > 0 ? data[0].measurement_sr_no + 1 : 1;
-    } catch (error) {
-      console.error('Error getting next measurement sr_no:', error);
-      return 1;
-    }
+    return lastSrNo + 1;
   };
 
-  const handleAddMeasurement = async () => {debugger;
+  const handleAddMeasurement = async () => {
     if (!user) return;
 
     // Validate that a rate is selected
@@ -417,8 +431,11 @@ const handleMeasurementExcelUpload = async (
       return;
     }
 
-    try {
-      const nextSrNo = await getNextMeasurementSrNo();
+      try {
+        // 🔄 Refresh session before operations (best-effort, with timeout)
+        await refreshSessionSafely(3000);
+
+      const nextSrNo = getNextMeasurementSrNoFromState();
       const calculatedQuantity = calculateQuantity();
 
       // Validate calculated quantity
@@ -431,28 +448,48 @@ const handleMeasurementExcelUpload = async (
       const rate = selectedRate;
       const lineAmount = calculatedQuantity * rate;
 
-      // 🔹 Fetch subwork_item_id from item_rates using selected_rate_id
-      const { data: rateData, error: rateFetchError } = await supabase
-        .schema('estimate')
-        .from('item_rates')
-        .select('sr_no, subwork_item_sr_no, rate')
-        .eq('description', selectedDescription)   // Now using description instead of sr_no
-        .single();
+      // 🔹 Fetch subwork_item_id from item_rates using selected description
+      let mappedRate = null;
+      try {
+        const rateResp: any = await withTimeout(
+          supabase
+            .schema('estimate')
+            .from('item_rates')
+            .select('sr_no, subwork_item_sr_no, rate')
+            .eq('description', selectedDescription)
+            .eq('subwork_item_sr_no', currentItem.sr_no),
+          7000
+        );
 
-      if (rateFetchError) throw rateFetchError;
-      const subworkItemId = rateData?.subwork_item_sr_no;
-      const rateSrNo = rateData?.sr_no;
+        const { data: rateData, error: rateFetchError } = rateResp || {};
+        if (rateFetchError) {
+          console.error('Rate fetch error:', rateFetchError);
+          throw new Error(`Failed to fetch rate data: ${rateFetchError.message}`);
+        }
+
+        mappedRate = rateData && rateData.length > 0 ? rateData[0] : null;
+      } catch (err) {
+        console.error('Rate fetch timeout or error:', err);
+        throw new Error('Failed to fetch rate data (timeout or network issue)');
+      }
+
+      if (!mappedRate) {
+        throw new Error('No matching rate found for this description and item');
+      }
+
+      const subworkItemId = mappedRate?.subwork_item_sr_no;
+      const rateSrNo = mappedRate?.sr_no;
 
       const { error } = await supabase
         .schema('estimate')
         .from('item_measurements')
         .insert([{
           ...newMeasurement,
-          subwork_item_id: subworkItemId,   // 🔹 Corrected
+          subwork_item_id: subworkItemId,
           measurement_sr_no: nextSrNo,
           factor: newMeasurement.factor || 1,
           calculated_quantity: calculatedQuantity,
-          line_amount: rateData?.rate * calculatedQuantity,
+          line_amount: mappedRate?.rate * calculatedQuantity,
           unit: newMeasurement.unit || null,
           is_deduction: newMeasurement.is_deduction || false,
           is_manual_quantity: newMeasurement.is_manual_quantity || false,
@@ -461,34 +498,62 @@ const handleMeasurementExcelUpload = async (
           rate_sr_no: rateSrNo
         }]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Insert measurement error:', error);
+        throw new Error(`Failed to insert measurement: ${error.message}`);
+      }
 
-      // 🔹 Sum all calculated_quantity for this rate_sr_no from item_measurements table
-      const { data: measurementsForRate, error: measurementsError } = await supabase
-        .schema('estimate')
-        .from('item_measurements')
-        .select('calculated_quantity')
-        .eq('rate_sr_no', rateSrNo);
+      let totalCalculatedQuantity = 0;
+      try {
+        const measResp: any = await withTimeout(
+          supabase
+            .schema('estimate')
+            .from('item_measurements')
+            .select('calculated_quantity')
+            .eq('rate_sr_no', rateSrNo),
+          7000
+        );
 
-      if (measurementsError) throw measurementsError;
+        const { data: measurementsForRate, error: measurementsError } = measResp || {};
+        if (measurementsError) {
+          console.error('Fetch measurements error:', measurementsError);
+          throw new Error(`Failed to fetch measurements: ${measurementsError.message}`);
+        }
 
-      // Calculate total quantity sum
-      const totalCalculatedQuantity = measurementsForRate?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
+        totalCalculatedQuantity =
+          measurementsForRate?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
+      } catch (err) {
+        console.error('Measurements fetch timeout or error:', err);
+        throw new Error('Failed to fetch measurements (timeout or network issue)');
+      }
 
-      const fetchedRate = rateData?.rate;
+      const fetchedRate = mappedRate?.rate;
       const rateTotalAmount = totalCalculatedQuantity * fetchedRate;
 
-      const { error: updateRateError } = await supabase
-        .schema('estimate')
-        .from('item_rates')
-        .update({
-          ssr_quantity: totalCalculatedQuantity,
-          rate_total_amount: rateTotalAmount
-        })
-        .eq('sr_no', rateSrNo);
+      try {
+        const updateResp: any = await withTimeout(
+          supabase
+            .schema('estimate')
+            .from('item_rates')
+            .update({
+              ssr_quantity: totalCalculatedQuantity,
+              rate_total_amount: rateTotalAmount
+            })
+            .eq('sr_no', rateSrNo),
+          7000
+        );
 
-      if (updateRateError) throw updateRateError;
+        const { error: updateRateError } = updateResp || {};
+        if (updateRateError) {
+          console.error('Update rate error:', updateRateError);
+          throw new Error(`Failed to update rate: ${updateRateError.message}`);
+        }
+      } catch (err) {
+        console.error('Update rate timeout or error:', err);
+        throw new Error('Failed to update rate (timeout or network issue)');
+      }
 
+      // Reset form and close modal
       setShowAddModal(false);
       setNewMeasurement({
         factor: 1,
@@ -502,16 +567,20 @@ const handleMeasurementExcelUpload = async (
       setIsReferencing(false);
       setSelectedReferenceItem(null);
 
-      // Refresh data first, then update SSR quantity
-      fetchData();
+      // Fetch fresh data
+      await fetchData();
 
-      // Update SSR quantity after adding measurement
+      // Update item SSR quantity after a brief delay to ensure data is committed
       setTimeout(async () => {
         await updateItemSSRQuantity();
-      }, 100);
+      }, 200);
+
+      alert('Measurement added successfully!');
+
     } catch (error) {
       console.error('Error adding measurement:', error);
-      alert(`Failed to add measurement: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to add measurement: ${errorMessage}`);
     }
   };
 
@@ -653,6 +722,9 @@ const handleMeasurementExcelUpload = async (
     }
 
     try {
+      // 🔄 Refresh session before operations (best-effort, with timeout)
+      await refreshSessionSafely(3000);
+
       const calculatedQuantity = calculateQuantity();
 
       // Validate calculated quantity
@@ -664,15 +736,28 @@ const handleMeasurementExcelUpload = async (
       const rate = selectedRate;
 
       // Fetch rate data (remove .single(), use first entry)
-      const { data: rateDataArray, error: rateFetchError } = await supabase
-        .schema('estimate')
-        .from('item_rates')
-        .select('sr_no, rate, subwork_item_sr_no')
-        .eq('subwork_item_sr_no', selectedMeasurement.subwork_item_id);
+      let rateData: any = null;
+      try {
+        const rateResp: any = await withTimeout(
+          supabase
+            .schema('estimate')
+            .from('item_rates')
+            .select('sr_no, rate, subwork_item_sr_no')
+            .eq('subwork_item_sr_no', selectedMeasurement.subwork_item_id),
+          7000
+        );
 
-      if (rateFetchError) throw rateFetchError;
-      if (!rateDataArray || rateDataArray.length === 0) throw new Error('No rate data found');
-      const rateData = rateDataArray[0];
+        const { data: rateDataArray, error: rateFetchError } = rateResp || {};
+        if (rateFetchError) {
+          console.error('Rate fetch error:', rateFetchError);
+          throw new Error(`Failed to fetch rate data: ${rateFetchError.message}`);
+        }
+        if (!rateDataArray || rateDataArray.length === 0) throw new Error('No rate data found');
+        rateData = rateDataArray[0];
+      } catch (err) {
+        console.error('Rate fetch timeout or error:', err);
+        throw new Error('Failed to fetch rate data (timeout or network issue)');
+      }
 
       const rateSrNo = rateData?.sr_no;
 
@@ -698,32 +783,60 @@ const handleMeasurementExcelUpload = async (
         .eq('subwork_item_id', selectedMeasurement.subwork_item_id)
         .eq('measurement_sr_no', selectedMeasurement.measurement_sr_no);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Update measurement error:', error);
+        throw new Error(`Failed to update measurement: ${error.message}`);
+      }
 
       // Sum all calculated_quantity for this rate_sr_no from item_measurements table
-      const { data: measurementsForRate, error: measurementsError } = await supabase
-        .schema('estimate')
-        .from('item_measurements')
-        .select('calculated_quantity')
-        .eq('rate_sr_no', rateSrNo);
+      let totalCalculatedQuantity2 = 0;
+      try {
+        const measResp: any = await withTimeout(
+          supabase
+            .schema('estimate')
+            .from('item_measurements')
+            .select('calculated_quantity')
+            .eq('rate_sr_no', rateSrNo),
+          7000
+        );
 
-      if (measurementsError) throw measurementsError;
+        const { data: measurementsForRate, error: measurementsError } = measResp || {};
+        if (measurementsError) {
+          console.error('Fetch measurements error:', measurementsError);
+          throw new Error(`Failed to fetch measurements: ${measurementsError.message}`);
+        }
 
-      const totalCalculatedQuantity = measurementsForRate?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
+        totalCalculatedQuantity2 = measurementsForRate?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
+      } catch (err) {
+        console.error('Measurements fetch timeout or error:', err);
+        throw new Error('Failed to fetch measurements (timeout or network issue)');
+      }
 
       const fetchedRate = rateData?.rate;
-      const rateTotalAmount = totalCalculatedQuantity * fetchedRate;
+      const rateTotalAmount = totalCalculatedQuantity2 * fetchedRate;
 
-      const { error: updateRateError } = await supabase
-        .schema('estimate')
-        .from('item_rates')
-        .update({
-          ssr_quantity: totalCalculatedQuantity,
-          rate_total_amount: rateTotalAmount
-        })
-        .eq('sr_no', rateSrNo);
+      try {
+        const updateResp: any = await withTimeout(
+          supabase
+            .schema('estimate')
+            .from('item_rates')
+            .update({
+              ssr_quantity: totalCalculatedQuantity2,
+              rate_total_amount: rateTotalAmount
+            })
+            .eq('sr_no', rateSrNo),
+          7000
+        );
 
-      if (updateRateError) throw updateRateError;
+        const { error: updateRateError } = updateResp || {};
+        if (updateRateError) {
+          console.error('Update rate error:', updateRateError);
+          throw new Error(`Failed to update rate: ${updateRateError.message}`);
+        }
+      } catch (err) {
+        console.error('Update rate timeout or error:', err);
+        throw new Error('Failed to update rate (timeout or network issue)');
+      }
 
       setShowEditModal(false);
       setSelectedMeasurement(null);
@@ -736,14 +849,20 @@ const handleMeasurementExcelUpload = async (
       });
       setSelectedRate(0);
 
-      fetchData();
+      // Fetch fresh data
+      await fetchData();
 
+      // Update item SSR quantity after a brief delay to ensure data is committed
       setTimeout(async () => {
         await updateItemSSRQuantity();
-      }, 100);
+      }, 200);
+
+      alert('Measurement updated successfully!');
+
     } catch (error) {
       console.error('Error updating measurement:', error);
-      alert(`Failed to update measurement: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to update measurement: ${errorMessage}`);
     }
   };
 
@@ -763,19 +882,19 @@ const handleMeasurementExcelUpload = async (
       // If operation is 'none', clear final_quantity and related fields
       const updateData = itemOperation.operation_type === 'none'
         ? {
-            operation_type: null,
-            operation_value: null,
-            unit_conversion_factor: 1,
-            final_unit: null,
-            final_quantity: null
-          }
+          operation_type: null,
+          operation_value: null,
+          unit_conversion_factor: 1,
+          final_unit: null,
+          final_quantity: null
+        }
         : {
-            operation_type: itemOperation.operation_type,
-            operation_value: itemOperation.operation_value,
-            unit_conversion_factor: itemOperation.unit_conversion_factor || 1,
-            final_unit: itemOperation.final_unit || null,
-            final_quantity: finalQty
-          };
+          operation_type: itemOperation.operation_type,
+          operation_value: itemOperation.operation_value,
+          unit_conversion_factor: itemOperation.unit_conversion_factor || 1,
+          final_unit: itemOperation.final_unit || null,
+          final_quantity: finalQty
+        };
 
       // Update subwork_items
       const { error } = await supabase
@@ -847,6 +966,7 @@ const handleMeasurementExcelUpload = async (
       }
 
       alert('Final quantity calculation saved successfully!');
+      onClose();
     } catch (error) {
       console.error('Error saving item operations:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1324,8 +1444,8 @@ const handleMeasurementExcelUpload = async (
                                   <div className="flex justify-between items-center text-sm text-gray-600 border-t pt-2">
                                     <span>
                                       After {itemOperation.operation_type === 'multiply' ? 'multiply by' :
-                                            itemOperation.operation_type === 'divide' ? 'divide by' :
-                                            itemOperation.operation_type === 'add' ? 'add' : 'subtract'} {itemOperation.operation_value}:
+                                        itemOperation.operation_type === 'divide' ? 'divide by' :
+                                          itemOperation.operation_type === 'add' ? 'add' : 'subtract'} {itemOperation.operation_value}:
                                     </span>
                                     <span className="font-medium text-gray-900">
                                       {intermediateQty.toFixed(3)}
