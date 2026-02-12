@@ -8,6 +8,7 @@ import { Work, RecapCalculations, TaxEntry } from '../types';
 import WorksRecapSheet from './WorksRecapSheet';
 import EstimateApprovalActions from './EstimateApprovalActions';
 import WorkAssignments from './WorkAssignments';
+import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility'; // ✅ ADD
 import { Plus, Search, Filter, CreditCard as Edit2, Trash2, Eye, FileText, IndianRupee, Calendar, Building } from 'lucide-react';
 
 const Works: React.FC = () => {
@@ -36,15 +37,22 @@ const Works: React.FC = () => {
     fetchWorks();
   }, []);
 
+  // ✅ NEW: Refetch works when page becomes visible (background refresh - no loading spinner)
+  useRefreshOnVisibility(
+    () => fetchWorks(typeFilter, true),
+    [typeFilter]
+  );
+
   const handleUnitChange = (subworkId: string, value: string) => {
     const num = parseFloat(value) || 0;
     setUnitInputs(prev => ({ ...prev, [subworkId]: num }));
     setSaved(false);
   };
 
-  const fetchWorks = async (filterType = 'all') => {
+  // ✅ background flag: if true, don't show loading spinner (for visibility-triggered refreshes)
+  const fetchWorks = async (filterType = 'all', background = false) => {
   try {
-    setLoading(true);
+    if (!background) setLoading(true);
 
     // Base query
     let query = supabase
@@ -65,58 +73,62 @@ const Works: React.FC = () => {
   } catch (error) {
     console.error('Error fetching works:', error);
   } finally {
-    setLoading(false);
+    if (!background) setLoading(false);
   }
 };
 
-  const handleAddWork = async () => {
-    if (!newWork.work_name || !user) return;
+const handleAddWork = async () => {
+  if (!newWork.work_name || !user) return;
 
-    try {
-      const { data: insertedWork, error: workError } = await supabase
-        .schema('estimate')
-        .from('works')
-        .insert([{
-          ...newWork,
-          created_by: user.id
-        }])
-        .select()
-        .single();
+  try {
+    const { data: insertedWork, error: workError } = await supabase
+      .schema('estimate')
+      .from('works')
+      .insert([{
+        ...newWork,
+        created_by: user.id
+      }])
+      .select()
+      .single();
 
-      if (workError) throw workError;
+    if (workError) throw workError;
 
-      if (insertedWork?.works_id) {
-        const { data: userRole } = await supabase
-          .schema('public')
-          .from('user_roles')
-          .select('role_id, roles!inner(application)')
-          .eq('user_id', user.id)
-          .in('roles.application', ['estimate', 'mb', 'estimate,mb'])
-          .maybeSingle();
+    if (insertedWork?.works_id) {
+      const { data: userRole } = await supabase
+        .schema('public')
+        .from('user_roles')
+        .select('role_id, roles!inner(application)')
+        .eq('user_id', user.id)
+        .in('roles.application', ['estimate', 'mb', 'estimate,mb'])
+        .maybeSingle();
 
-        if (userRole?.role_id) {
-          await supabase
-            .schema('estimate')
-            .from('work_assignments')
-            .insert([{
-              work_id: insertedWork.works_id,
-              user_id: user.id,
-              role_id: userRole.role_id,
-              assigned_by: user.id
-            }]);
-        }
+      if (userRole?.role_id) {
+        await supabase
+          .schema('estimate')
+          .from('work_assignments')
+          .insert([{
+            work_id: insertedWork.works_id,
+            user_id: user.id,
+            role_id: userRole.role_id,
+            assigned_by: user.id
+          }]);
       }
-
-      setShowAddModal(false);
-      setNewWork({
-        type: 'Technical Sanction',
-        division: 'Z.P.(Works) Division, Chandrapur'
-      });
-      fetchWorks();
-    } catch (error) {
-      console.error('Error adding work:', error);
     }
-  };
+
+    setShowAddModal(false);
+
+    // ✅ keep selected type instead of forcing TS
+    setNewWork({
+      type: newWork.type || 'Technical Sanction',
+      division: 'Z.P.(Works) Division, Chandrapur'
+    });
+
+    fetchWorks();
+  } catch (error) {
+    console.error('Error adding work:', error);
+  }
+};
+
 
   const handleViewWork = (work: Work) => {
     setSelectedWork(work);
@@ -771,32 +783,32 @@ const Works: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('addWork.village')}
+                    Taluka
                   </label>
                   <input
                     type="text"
                     value={newWork.village || ''}
                     onChange={(e) => setNewWork({ ...newWork, village: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={t('addWork.entervillage')}
+                    placeholder="Enter Village"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('addWork.grampanchayat')}
+                    Grampanchayat
                   </label>
                   <input
                     type="text"
                     value={newWork.grampanchayat || ''}
                     onChange={(e) => setNewWork({ ...newWork, grampanchayat: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={t('addWork.entergrampanchayat')}
+                    placeholder="Enter Grampanchayat"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('addWork.taluka')}
+                    Taluka
                   </label>
                   <select
                     value={newWork.taluka || ''}
@@ -1158,7 +1170,7 @@ const Works: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('addWork.village')}
+                   Village
                   </label>
                   <input
                     type="text"
@@ -1170,7 +1182,7 @@ const Works: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('addWork.grampanchayat')}
+                    Grampanchayat
                   </label>
                   <input
                     type="text"
@@ -1183,7 +1195,7 @@ const Works: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('addWork.taluka')}
+                    Taluka
                   </label>
                   <select
                     value={newWork.taluka || ''}
