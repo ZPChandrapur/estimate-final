@@ -27,7 +27,7 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
 }) => {
   const { user } = useAuth();
 
-  useSessionRefresh(() => {
+  const { handleRefreshSession } = useSessionRefresh(() => {
     console.warn('Session expired, please refresh the page');
   }, isOpen);
   const [activeTab, setActiveTab] = useState<'measurements' | 'leads' | 'materials'>('measurements');
@@ -437,6 +437,9 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
   }
 
   try {
+    // Refresh session before making database calls
+    await refreshSessionSafely(3000);
+
     const nextSrNo = getNextMeasurementSrNoFromState();
     const calculatedQuantity = calculateQuantity();
 
@@ -451,12 +454,17 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
     const lineAmount = calculatedQuantity * rate;
 
     // 🔹 Fetch subwork_item_id from item_rates using selected description
-    const { data: rateData, error: rateFetchError } = await supabase
-      .schema('estimate')
-      .from('item_rates')
-      .select('sr_no, subwork_item_sr_no, rate')
-      .eq('description', selectedDescription)
-      .eq('subwork_item_sr_no', currentItem.sr_no);     
+    const rateResp: any = await withTimeout(
+      supabase
+        .schema('estimate')
+        .from('item_rates')
+        .select('sr_no, subwork_item_sr_no, rate')
+        .eq('description', selectedDescription)
+        .eq('subwork_item_sr_no', currentItem.sr_no),
+      7000
+    );
+
+    const { data: rateData, error: rateFetchError } = rateResp || {};     
     
     if (rateFetchError) throw rateFetchError;
 
@@ -466,32 +474,40 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
     const subworkItemId = mappedRate?.subwork_item_sr_no;
     const rateSrNo = mappedRate?.sr_no;
 
-    const { error } = await supabase
-      .schema('estimate')
-      .from('item_measurements')
-      .insert([{
-        ...newMeasurement,
-        subwork_item_id: subworkItemId,
-        measurement_sr_no: nextSrNo,
-        factor: newMeasurement.factor || 1,
-        calculated_quantity: calculatedQuantity,
-        line_amount: mappedRate?.rate * calculatedQuantity,
-        unit: newMeasurement.unit || null,
-        is_deduction: newMeasurement.is_deduction || false,
-        is_manual_quantity: newMeasurement.is_manual_quantity || false,
-        manual_quantity: newMeasurement.is_manual_quantity ? (newMeasurement.manual_quantity || 0) : null,
-        selected_rate_id: newMeasurement.selected_rate_id || null,
-        rate_sr_no: rateSrNo
-      }]);
+    const insertResp: any = await withTimeout(
+      supabase
+        .schema('estimate')
+        .from('item_measurements')
+        .insert([{
+          ...newMeasurement,
+          subwork_item_id: subworkItemId,
+          measurement_sr_no: nextSrNo,
+          factor: newMeasurement.factor || 1,
+          calculated_quantity: calculatedQuantity,
+          line_amount: mappedRate?.rate * calculatedQuantity,
+          unit: newMeasurement.unit || null,
+          is_deduction: newMeasurement.is_deduction || false,
+          is_manual_quantity: newMeasurement.is_manual_quantity || false,
+          manual_quantity: newMeasurement.is_manual_quantity ? (newMeasurement.manual_quantity || 0) : null,
+          selected_rate_id: newMeasurement.selected_rate_id || null,
+          rate_sr_no: rateSrNo
+        }]),
+      7000
+    );
 
+    const { error } = insertResp || {};
     if (error) throw error;
 
-    const { data: measurementsForRate, error: measurementsError } = await supabase
-      .schema('estimate')
-      .from('item_measurements')
-      .select('calculated_quantity')
-      .eq('rate_sr_no', rateSrNo);
+    const measResp: any = await withTimeout(
+      supabase
+        .schema('estimate')
+        .from('item_measurements')
+        .select('calculated_quantity')
+        .eq('rate_sr_no', rateSrNo),
+      7000
+    );
 
+    const { data: measurementsForRate, error: measurementsError } = measResp || {};
     if (measurementsError) throw measurementsError;
 
     const totalCalculatedQuantity =
@@ -500,14 +516,19 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
     const fetchedRate = mappedRate?.rate;
     const rateTotalAmount = totalCalculatedQuantity * fetchedRate;
 
-    const { error: updateRateError } = await supabase
-      .schema('estimate')
-      .from('item_rates')
-      .update({
-        ssr_quantity: totalCalculatedQuantity,
-        rate_total_amount: rateTotalAmount
-      })
-      .eq('sr_no', rateSrNo);
+    const updateResp: any = await withTimeout(
+      supabase
+        .schema('estimate')
+        .from('item_rates')
+        .update({
+          ssr_quantity: totalCalculatedQuantity,
+          rate_total_amount: rateTotalAmount
+        })
+        .eq('sr_no', rateSrNo),
+      7000
+    );
+
+    const { error: updateRateError } = updateResp || {};
 
     if (updateRateError) throw updateRateError;
 

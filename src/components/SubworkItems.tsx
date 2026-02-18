@@ -33,9 +33,32 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
 }) => {
   const { user } = useAuth();
 
-  useSessionRefresh(() => {
+  const { handleRefreshSession } = useSessionRefresh(() => {
     console.warn('Session expired, please refresh the page');
   }, isOpen);
+
+  // Safely refresh session with timeout to avoid hanging awaits after tab change
+  const refreshSessionSafely = async (timeout = 3000) => {
+    try {
+      const refreshPromise = supabase.auth.refreshSession();
+      const result = await Promise.race([
+        refreshPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('session-refresh-timeout')), timeout))
+      ]);
+      return result;
+    } catch (e) {
+      console.warn('Session refresh failed or timed out:', e);
+      return null;
+    }
+  };
+
+  // Helper to race any promise (eg. Supabase queries) with a timeout to avoid indefinite hangs
+  const withTimeout = async (promise: Promise<any>, ms = 7000) => {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('supabase-timeout')), ms))
+    ]);
+  };
   const [subworkItems, setSubworkItems] = useState<SubworkItem[]>([]);
   const [itemRatesMap, setItemRatesMap] = useState<{ [key: string]: ItemRate[] }>({});
   const [royaltyMeasurementsMap, setRoyaltyMeasurementsMap] = useState<{ [key: string]: { hb_metal: number; murum: number; sand: number } }>({});
@@ -678,6 +701,9 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     }
 
     try {
+      // Refresh session before making database calls
+      await refreshSessionSafely(3000);
+
       const itemNumber = await generateItemNumber();
 
       // Calculate total amount from all rates (for now, just sum all rates)
@@ -687,7 +713,8 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       const mainUnit = validRates[0]?.unit || '';
 
       // Insert the subwork item first
-      const { data: insertedItem, error: itemError } = await supabase
+      const insertResp: any = await withTimeout(
+        supabase
         .schema('estimate')
         .from('subwork_items')
         .insert({
@@ -704,18 +731,25 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
           created_by: user.id
         })
         .select()
-        .single();
+        .single(),
+        7000
+      );
 
+      const { data: insertedItem, error: itemError } = insertResp || {};
       if (itemError) throw itemError;
 
       // 🔹 Fetch calculated_quantity from item_measurements for this subwork_item
-      const { data: measurementData, error: measurementError } = await supabase
-        .schema('estimate')
-        .from('item_measurements')
-        .select('calculated_quantity')
-        .eq('subwork_item_id', insertedItem.sr_no)
-        .maybeSingle();
+      const measResp: any = await withTimeout(
+        supabase
+          .schema('estimate')
+          .from('item_measurements')
+          .select('calculated_quantity')
+          .eq('subwork_item_id', insertedItem.sr_no)
+          .maybeSingle(),
+        7000
+      );
 
+      const { data: measurementData, error: measurementError } = measResp || {};
       if (measurementError) throw measurementError;
 
       const ssrQuantity = measurementData?.calculated_quantity || 1;
@@ -731,10 +765,15 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         created_by: user.id
       }));
 
-      const { error: ratesError } = await supabase
-        .schema('estimate')
-        .from('item_rates')
-        .insert(ratesToInsert);
+      const ratesResp: any = await withTimeout(
+        supabase
+          .schema('estimate')
+          .from('item_rates')
+          .insert(ratesToInsert),
+        7000
+      );
+
+      const { error: ratesError } = ratesResp || {};
 
       if (ratesError) throw ratesError;
 

@@ -21,9 +21,33 @@ const RoyaltyTestingItems: React.FC<RoyaltyTestingItemsProps> = ({
 }) => {
   const { user } = useAuth();
 
-  useSessionRefresh(() => {
+  const { handleRefreshSession } = useSessionRefresh(() => {
     console.warn('Session expired, please refresh the page');
   }, isOpen);
+
+  // Safely refresh session with timeout to avoid hanging awaits after tab change
+  const refreshSessionSafely = async (timeout = 3000) => {
+    try {
+      const refreshPromise = supabase.auth.refreshSession();
+      const result = await Promise.race([
+        refreshPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('session-refresh-timeout')), timeout))
+      ]);
+      return result;
+    } catch (e) {
+      console.warn('Session refresh failed or timed out:', e);
+      return null;
+    }
+  };
+
+  // Helper to race any promise (eg. Supabase queries) with a timeout to avoid indefinite hangs
+  const withTimeout = async (promise: Promise<any>, ms = 7000) => {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('supabase-timeout')), ms))
+    ]);
+  };
+
   const [description, setDescription] = useState('');
   const [rates, setRates] = useState<Array<{
     description: string;
@@ -78,32 +102,43 @@ const RoyaltyTestingItems: React.FC<RoyaltyTestingItemsProps> = ({
     }
 
     try {
+      // Refresh session before making database calls
+      await refreshSessionSafely(3000);
+
       const itemNumber = await generateItemNumber();
 
-      const { data: insertedItem, error: itemError } = await supabase
-        .schema('estimate')
-        .from('subwork_items')
-        .insert({
-          description_of_item: description,
-          category: category,
-          subwork_id: subworkId,
-          item_number: itemNumber,
-          ssr_rate: validRates[0]?.rate || 0,
-          ssr_unit: validRates[0]?.unit || '',
-          created_by: user.id
-        })
-        .select()
-        .single();
+      const insertResp: any = await withTimeout(
+        supabase
+          .schema('estimate')
+          .from('subwork_items')
+          .insert({
+            description_of_item: description,
+            category: category,
+            subwork_id: subworkId,
+            item_number: itemNumber,
+            ssr_rate: validRates[0]?.rate || 0,
+            ssr_unit: validRates[0]?.unit || '',
+            created_by: user.id
+          })
+          .select()
+          .single(),
+        7000
+      );
 
+      const { data: insertedItem, error: itemError } = insertResp || {};
       if (itemError) throw itemError;
 
-      const { data: measurementData } = await supabase
-        .schema('estimate')
-        .from('item_measurements')
-        .select('calculated_quantity')
-        .eq('subwork_item_id', insertedItem.sr_no)
-        .maybeSingle();
+      const measResp: any = await withTimeout(
+        supabase
+          .schema('estimate')
+          .from('item_measurements')
+          .select('calculated_quantity')
+          .eq('subwork_item_id', insertedItem.sr_no)
+          .maybeSingle(),
+        7000
+      );
 
+      const { data: measurementData } = measResp || {};
       const ssrQuantity = measurementData?.calculated_quantity || 1;
 
       const ratesToInsert = validRates.map(rate => ({
@@ -116,10 +151,15 @@ const RoyaltyTestingItems: React.FC<RoyaltyTestingItemsProps> = ({
         created_by: user.id
       }));
 
-      const { error: ratesError } = await supabase
-        .schema('estimate')
-        .from('item_rates')
-        .insert(ratesToInsert);
+      const ratesResp: any = await withTimeout(
+        supabase
+          .schema('estimate')
+          .from('item_rates')
+          .insert(ratesToInsert),
+        7000
+      );
+
+      const { error: ratesError } = ratesResp || {};
 
       if (ratesError) throw ratesError;
 
