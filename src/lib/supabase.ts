@@ -11,6 +11,21 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false
+    detectSessionInUrl: false,
+    storageKey: 'estimate-auth',
+    storage: window.localStorage,
+  },
+  db: {
+    schema: 'public'
+  },
+  global: {
+    headers: {
+      'x-application': 'estimate-system'
+    }
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
   }
 });

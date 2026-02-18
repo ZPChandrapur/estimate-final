@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { SubworkItem, ItemMeasurement, ItemLead, ItemMaterial } from '../types';
 import { Plus, CreditCard as Edit2, Trash2, Calculator, Truck, Upload, X, Image as ImageIcon, Package2, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useSessionRefresh } from '../hooks/useSessionRefresh';
 
 interface ItemMeasurementsProps {
   item: SubworkItem;
@@ -25,6 +26,10 @@ const ItemMeasurements: React.FC<ItemMeasurementsProps> = ({
   selectedSrNo,
 }) => {
   const { user } = useAuth();
+
+  useSessionRefresh(() => {
+    console.warn('Session expired, please refresh the page');
+  }, isOpen);
   const [activeTab, setActiveTab] = useState<'measurements' | 'leads' | 'materials'>('measurements');
   const [measurements, setMeasurements] = useState<ItemMeasurement[]>([]);
   const [itemRates, setItemRates] = useState<ItemRate[]>([]);

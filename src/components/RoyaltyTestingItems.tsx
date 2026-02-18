@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { X, Plus, Trash2 } from 'lucide-react';
+import { useSessionRefresh } from '../hooks/useSessionRefresh';
 
 interface RoyaltyTestingItemsProps {
   subworkId: string;
@@ -19,6 +20,10 @@ const RoyaltyTestingItems: React.FC<RoyaltyTestingItemsProps> = ({
   onItemAdded
 }) => {
   const { user } = useAuth();
+
+  useSessionRefresh(() => {
+    console.warn('Session expired, please refresh the page');
+  }, isOpen);
   const [description, setDescription] = useState('');
   const [rates, setRates] = useState<Array<{
     description: string;

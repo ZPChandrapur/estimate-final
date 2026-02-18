@@ -16,6 +16,7 @@ import {
 import RoyaltyTestingItems from './RoyaltyTestingItems';
 import RoyaltyMeasurements from './RoyaltyMeasurements';
 import TestingMeasurements from './TestingMeasurements';
+import { useSessionRefresh } from '../hooks/useSessionRefresh';
 
 interface SubworkItemsProps {
   subworkId: string;
@@ -31,6 +32,10 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
   onClose
 }) => {
   const { user } = useAuth();
+
+  useSessionRefresh(() => {
+    console.warn('Session expired, please refresh the page');
+  }, isOpen);
   const [subworkItems, setSubworkItems] = useState<SubworkItem[]>([]);
   const [itemRatesMap, setItemRatesMap] = useState<{ [key: string]: ItemRate[] }>({});
   const [royaltyMeasurementsMap, setRoyaltyMeasurementsMap] = useState<{ [key: string]: { hb_metal: number; murum: number; sand: number } }>({});

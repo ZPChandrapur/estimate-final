@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { X, Save } from 'lucide-react';
+import { useSessionRefresh } from '../hooks/useSessionRefresh';
 
 interface TestingMeasurementsProps {
   subworkId: string;
@@ -25,6 +26,10 @@ const TestingMeasurements: React.FC<TestingMeasurementsProps> = ({
   onClose
 }) => {
   const { user } = useAuth();
+
+  useSessionRefresh(() => {
+    console.warn('Session expired, please refresh the page');
+  }, isOpen);
   const [testingItems, setTestingItems] = useState<TestingItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [worksId, setWorksId] = useState<string>('');
