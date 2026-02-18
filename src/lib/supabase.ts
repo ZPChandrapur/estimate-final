@@ -29,3 +29,37 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     }
   }
 });
+
+/**
+ * Creates a fresh Supabase client with the current session token read directly
+ * from localStorage. This bypasses any internal async token-refresh locks that
+ * can hang after a browser tab switch, allowing write operations to succeed
+ * immediately when the user returns to the tab.
+ */
+export const createFreshClient = () => {
+  let accessToken: string | undefined;
+  try {
+    const raw = localStorage.getItem('estimate-auth');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      accessToken = parsed?.access_token;
+    }
+  } catch {
+    // ignore parse errors
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+    db: { schema: 'public' },
+    global: {
+      headers: {
+        'x-application': 'estimate-system',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      }
+    },
+  });
+};
