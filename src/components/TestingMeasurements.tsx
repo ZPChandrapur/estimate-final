@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { createFreshClient } from '../lib/supabase';
 import { X, Save } from 'lucide-react';
 import { useSessionRefresh } from '../hooks/useSessionRefresh';
 
@@ -44,7 +44,7 @@ const TestingMeasurements: React.FC<TestingMeasurementsProps> = ({
     try {
       setLoading(true);
 
-      const { data: subworkData } = await supabase
+      const { data: subworkData } = await createFreshClient()
         .schema('estimate')
         .from('subworks')
         .select('works_id, sr_no')
@@ -58,7 +58,7 @@ const TestingMeasurements: React.FC<TestingMeasurementsProps> = ({
 
       setWorksId(subworkData.works_id);
 
-      const { data: items, error: itemsError } = await supabase
+      const { data: items, error: itemsError } = await createFreshClient()
         .schema('estimate')
         .from('subwork_items')
         .select('*')
@@ -78,7 +78,7 @@ const TestingMeasurements: React.FC<TestingMeasurementsProps> = ({
       const itemsWithTestingData = [];
 
       for (const item of items) {
-        const { data: measurements, error: measurementError } = await supabase
+        const { data: measurements, error: measurementError } = await createFreshClient()
           .schema('estimate')
           .from('item_measurements')
           .select('calculated_quantity')
@@ -91,7 +91,7 @@ const TestingMeasurements: React.FC<TestingMeasurementsProps> = ({
 
         const totalMeasurement = measurements?.reduce((sum, m) => sum + (m.calculated_quantity || 0), 0) || 0;
 
-        const { data: existingTesting } = await supabase
+        const { data: existingTesting } = await createFreshClient()
           .schema('estimate')
           .from('testing_measurements')
           .select('*')
@@ -135,8 +135,9 @@ const TestingMeasurements: React.FC<TestingMeasurementsProps> = ({
   const handleSave = async () => {
     try {
       setLoading(true);
+      const db = createFreshClient();
 
-      const { data: subworkData } = await supabase
+      const { data: subworkData } = await db
         .schema('estimate')
         .from('subworks')
         .select('sr_no')
@@ -149,7 +150,7 @@ const TestingMeasurements: React.FC<TestingMeasurementsProps> = ({
       }
 
       for (const item of testingItems) {
-        const { data: existing } = await supabase
+        const { data: existing } = await db
           .schema('estimate')
           .from('testing_measurements')
           .select('sr_no')
@@ -157,7 +158,7 @@ const TestingMeasurements: React.FC<TestingMeasurementsProps> = ({
           .maybeSingle();
 
         if (existing) {
-          await supabase
+          await db
             .schema('estimate')
             .from('testing_measurements')
             .update({
@@ -168,7 +169,7 @@ const TestingMeasurements: React.FC<TestingMeasurementsProps> = ({
             })
             .eq('sr_no', existing.sr_no);
         } else {
-          await supabase
+          await db
             .schema('estimate')
             .from('testing_measurements')
             .insert({

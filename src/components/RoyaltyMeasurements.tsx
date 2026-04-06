@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { createFreshClient } from '../lib/supabase';
 import { X } from 'lucide-react';
 import { useSessionRefresh } from '../hooks/useSessionRefresh';
 
@@ -51,7 +51,7 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
       setLoading(true);
 
       // Get subwork sr_no from subwork_id
-      const { data: subworkData, error: subworkError } = await supabase
+      const { data: subworkData, error: subworkError } = await createFreshClient()
         .schema('estimate')
         .from('subworks')
         .select('sr_no')
@@ -67,7 +67,7 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
       const subworkSrNo = subworkData.sr_no;
 
       // Fetch all items from this subwork
-      const { data: items, error: itemsError } = await supabase
+      const { data: items, error: itemsError } = await createFreshClient()
         .schema('estimate')
         .from('subwork_items')
         .select('sr_no, item_number, description_of_item')
@@ -84,7 +84,7 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
 
       for (const item of items) {
         // Check if item has rate analysis - get all records and use the most recent
-        const { data: analysisRecords, error: analysisError } = await supabase
+        const { data: analysisRecords, error: analysisError } = await createFreshClient()
           .schema('estimate')
           .from('item_rate_analysis')
           .select('entries, created_at')
@@ -136,7 +136,7 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
 
           if (hasRoyaltyMaterial) {
             // Get measurement from item_measurements
-            const { data: measurements, error: measurementError } = await supabase
+            const { data: measurements, error: measurementError } = await createFreshClient()
               .schema('estimate')
               .from('item_measurements')
               .select('calculated_quantity')
@@ -188,7 +188,7 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
             }
 
             // Check if royalty measurement already exists
-            const { data: existingRoyalty } = await supabase
+            const { data: existingRoyalty } = await createFreshClient()
               .schema('estimate')
               .from('royalty_measurements')
               .select('*')
@@ -252,9 +252,10 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
   const handleSave = async () => {
     try {
       setSaving(true);
+      const db = createFreshClient();
 
       // Get subwork sr_no
-      const { data: subworkData, error: subworkError } = await supabase
+      const { data: subworkData, error: subworkError } = await db
         .schema('estimate')
         .from('subworks')
         .select('sr_no')
@@ -269,10 +270,8 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
 
       // Save all royalty items
       for (const item of royaltyItems) {
-        console.log('Saving royalty item:', item);
-
         // Check if record exists
-        const { data: existing } = await supabase
+        const { data: existing } = await db
           .schema('estimate')
           .from('royalty_measurements')
           .select('sr_no')
@@ -293,12 +292,8 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
           created_by: user?.id
         };
 
-        console.log('Payload to save:', payload);
-
         if (existing) {
-          // Update
-          console.log('Updating existing record:', existing.sr_no);
-          const { error: updateError } = await supabase
+          const { error: updateError } = await db
             .schema('estimate')
             .from('royalty_measurements')
             .update(payload)
@@ -309,9 +304,7 @@ const RoyaltyMeasurements: React.FC<RoyaltyMeasurementsProps> = ({
             throw updateError;
           }
         } else {
-          // Insert
-          console.log('Inserting new record');
-          const { error: insertError } = await supabase
+          const { error: insertError } = await db
             .schema('estimate')
             .from('royalty_measurements')
             .insert(payload);

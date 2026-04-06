@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { createFreshClient } from '../lib/supabase';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { useSessionRefresh } from '../hooks/useSessionRefresh';
 
@@ -55,8 +55,8 @@ const RoyaltyTestingItems: React.FC<RoyaltyTestingItemsProps> = ({
     unit: string;
   }>>([{ description: '', rate: 0, unit: '' }]);
 
-  const generateItemNumber = async (): Promise<string> => {
-    const { data, error } = await supabase
+  const generateItemNumber = async (db: ReturnType<typeof createFreshClient>): Promise<string> => {
+    const { data, error } = await db
       .schema('estimate')
       .from('subwork_items')
       .select('item_number')
@@ -102,43 +102,34 @@ const RoyaltyTestingItems: React.FC<RoyaltyTestingItemsProps> = ({
     }
 
     try {
-      // Refresh session before making database calls
-      await refreshSessionSafely(3000);
+      const db = createFreshClient();
 
-      const itemNumber = await generateItemNumber();
+      const itemNumber = await generateItemNumber(db);
 
-      const insertResp: any = await withTimeout(
-        supabase
-          .schema('estimate')
-          .from('subwork_items')
-          .insert({
-            description_of_item: description,
-            category: category,
-            subwork_id: subworkId,
-            item_number: itemNumber,
-            ssr_rate: validRates[0]?.rate || 0,
-            ssr_unit: validRates[0]?.unit || '',
-            created_by: user.id
-          })
-          .select()
-          .single(),
-        7000
-      );
+      const { data: insertedItem, error: itemError } = await db
+        .schema('estimate')
+        .from('subwork_items')
+        .insert({
+          description_of_item: description,
+          category: category,
+          subwork_id: subworkId,
+          item_number: itemNumber,
+          ssr_rate: validRates[0]?.rate || 0,
+          ssr_unit: validRates[0]?.unit || '',
+          created_by: user.id
+        })
+        .select()
+        .single();
 
-      const { data: insertedItem, error: itemError } = insertResp || {};
       if (itemError) throw itemError;
 
-      const measResp: any = await withTimeout(
-        supabase
-          .schema('estimate')
-          .from('item_measurements')
-          .select('calculated_quantity')
-          .eq('subwork_item_id', insertedItem.sr_no)
-          .maybeSingle(),
-        7000
-      );
+      const { data: measurementData } = await db
+        .schema('estimate')
+        .from('item_measurements')
+        .select('calculated_quantity')
+        .eq('subwork_item_id', insertedItem.sr_no)
+        .maybeSingle();
 
-      const { data: measurementData } = measResp || {};
       const ssrQuantity = measurementData?.calculated_quantity || 1;
 
       const ratesToInsert = validRates.map(rate => ({
@@ -151,15 +142,10 @@ const RoyaltyTestingItems: React.FC<RoyaltyTestingItemsProps> = ({
         created_by: user.id
       }));
 
-      const ratesResp: any = await withTimeout(
-        supabase
-          .schema('estimate')
-          .from('item_rates')
-          .insert(ratesToInsert),
-        7000
-      );
-
-      const { error: ratesError } = ratesResp || {};
+      const { error: ratesError } = await db
+        .schema('estimate')
+        .from('item_rates')
+        .insert(ratesToInsert);
 
       if (ratesError) throw ratesError;
 
