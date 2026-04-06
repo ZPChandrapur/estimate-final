@@ -520,7 +520,7 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
 
         const pageElement = pages[i] as HTMLElement;
         const canvas = await html2canvas(pageElement, {
-          scale: 1.8,
+          scale: 1.5,
           useCORS: true,
           allowTaint: true,
           width: pageElement.scrollWidth,
@@ -529,7 +529,7 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
           removeContainer: true
         });
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.92);
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
         const imgWidth = contentWidth;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
