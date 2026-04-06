@@ -503,7 +503,7 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
     try {
       setLoading(true);
 
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdf = new jsPDF('p', 'mm', 'a4', true);
       const pageWidth = 210;
       const pageHeight = 297;
       const margin = 10;
@@ -520,19 +520,21 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
 
         const pageElement = pages[i] as HTMLElement;
         const canvas = await html2canvas(pageElement, {
-          scale: 2,
+          scale: 1.5,
           useCORS: true,
           allowTaint: true,
           width: pageElement.scrollWidth,
-          height: pageElement.scrollHeight
+          height: pageElement.scrollHeight,
+          imageTimeout: 0,
+          removeContainer: true
         });
 
-        const imgData = canvas.toDataURL('image/png');
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
         const imgWidth = contentWidth;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
         // Add image to PDF
-        pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, Math.min(imgHeight, contentHeight));
+        pdf.addImage(imgData, 'JPEG', margin, margin, imgWidth, Math.min(imgHeight, contentHeight), '', 'FAST');
 
         // Add page number if enabled
         if (documentSettings.pageSettings.showPageNumbers) {
