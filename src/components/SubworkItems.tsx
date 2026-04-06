@@ -1,18 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabase, createFreshClient } from '../lib/supabase';
 import { SubworkItem, ItemMeasurement, ItemRate } from '../types';
-import {
-  Plus,
-  Edit2,
-  Trash2,
-  Eye,
-  Package,
-  Calculator,
-  X,
-  Search,
-  CheckCircle
-} from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, Eye, Package, Calculator, X, Search, CheckCircle } from 'lucide-react';
 import RoyaltyTestingItems from './RoyaltyTestingItems';
 import RoyaltyMeasurements from './RoyaltyMeasurements';
 import TestingMeasurements from './TestingMeasurements';
@@ -645,9 +635,10 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     }
   };
 
-  const generateItemNumber = async (): Promise<string> => {
+  const generateItemNumber = async (db?: ReturnType<typeof createFreshClient>): Promise<string> => {
     try {
-      const { data, error } = await supabase
+      const client = db || supabase;
+      const { data, error } = await client
         .schema('estimate')
         .from('subwork_items')
         .select('item_number')
@@ -701,10 +692,9 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
     }
 
     try {
-      // Refresh session before making database calls
-      await refreshSessionSafely(3000);
+      const db = createFreshClient();
 
-      const itemNumber = await generateItemNumber();
+      const itemNumber = await generateItemNumber(db);
 
       // Calculate total amount from all rates (for now, just sum all rates)
       const totalAmount = validRates.reduce((sum, rate) => sum + rate.rate, 0);
@@ -713,8 +703,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
       const mainUnit = validRates[0]?.unit || '';
 
       // Insert the subwork item first
-      const insertResp: any = await withTimeout(
-        supabase
+      const { data: insertedItem, error: itemError } = await db
         .schema('estimate')
         .from('subwork_items')
         .insert({
@@ -731,25 +720,18 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
           created_by: user.id
         })
         .select()
-        .single(),
-        7000
-      );
+        .single();
 
-      const { data: insertedItem, error: itemError } = insertResp || {};
       if (itemError) throw itemError;
 
       // 🔹 Fetch calculated_quantity from item_measurements for this subwork_item
-      const measResp: any = await withTimeout(
-        supabase
-          .schema('estimate')
-          .from('item_measurements')
-          .select('calculated_quantity')
-          .eq('subwork_item_id', insertedItem.sr_no)
-          .maybeSingle(),
-        7000
-      );
+      const { data: measurementData, error: measurementError } = await db
+        .schema('estimate')
+        .from('item_measurements')
+        .select('calculated_quantity')
+        .eq('subwork_item_id', insertedItem.sr_no)
+        .maybeSingle();
 
-      const { data: measurementData, error: measurementError } = measResp || {};
       if (measurementError) throw measurementError;
 
       const ssrQuantity = measurementData?.calculated_quantity || 1;
@@ -765,15 +747,10 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
         created_by: user.id
       }));
 
-      const ratesResp: any = await withTimeout(
-        supabase
-          .schema('estimate')
-          .from('item_rates')
-          .insert(ratesToInsert),
-        7000
-      );
-
-      const { error: ratesError } = ratesResp || {};
+      const { error: ratesError } = await db
+        .schema('estimate')
+        .from('item_rates')
+        .insert(ratesToInsert);
 
       if (ratesError) throw ratesError;
 
@@ -792,7 +769,7 @@ const SubworkItems: React.FC<SubworkItemsProps> = ({
               created_by: user.id,
               updated_at: new Date().toISOString()
             };
-            const { error: analysisErr } = await supabase
+            const { error: analysisErr } = await db
               .schema('estimate')
               .from('item_rate_analysis')
               .insert(analysisToInsert);
