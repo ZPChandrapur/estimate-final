@@ -147,12 +147,15 @@ export const EstimateRateAnalysis: React.FC<EstimateRateAnalysisProps> = ({
                       const quantity = Number(rate.ssr_quantity) || 0;
                       const rateValue = Number(rate.rate) || 0;
                       const amount = Number(rate.rate_total_amount) || 0;
+                      const rateDescNorm = (rate.description || '').trim().toLowerCase();
+                      const itemDescNorm = (item.description_of_item || '').trim().toLowerCase();
+                      const isDuplicate = rateDescNorm === itemDescNorm;
 
                       return (
                         <tr key={rateIndex}>
                           <td className="border border-black p-2"></td>
                           <td className="border border-black p-2">
-                            <div className="pl-4">{rate.description || 'Default Rate'}</div>
+                            <div className="pl-4">{isDuplicate ? '' : (rate.description || '')}</div>
                           </td>
                           <td className="border border-black p-2 text-center">
                             {quantity > 0 ? quantity.toFixed(2) : ''}

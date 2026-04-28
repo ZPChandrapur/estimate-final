@@ -605,18 +605,17 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
   );
 
   const PageFooter: React.FC<{ pageNumber?: number }> = ({ pageNumber }) => (
-    <div className="mt-8 pt-4 border-t-2 border-gray-300">
-      <div className="flex justify-between items-end">
+    <div className="mt-4 pt-2 border-t border-gray-300">
+      <div className="flex justify-between items-center">
         <div className="text-left">
-          <p className="text-sm font-medium">Prepared By:</p>
-          <p className="text-xs mt-2">{documentSettings.footer.preparedBy}</p>
+          <p className="text-xs text-gray-600">Prepared By: <span className="font-medium text-gray-800">{documentSettings.footer.preparedBy}</span></p>
         </div>
         <div className="text-right">
-          <p className="text-sm font-medium">{documentSettings.footer.designation}</p>
+          <p className="text-xs font-medium text-gray-800">{documentSettings.footer.designation}</p>
         </div>
       </div>
       {pageNumber && documentSettings.pageSettings.showPageNumbers && documentSettings.pageSettings.pageNumberPosition === 'bottom' && (
-        <div className="text-center text-xs text-gray-500 mt-2">Page {pageNumber}</div>
+        <div className="text-center text-xs text-gray-400 mt-1">Page {pageNumber}</div>
       )}
     </div>
   );
@@ -928,34 +927,16 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
                   />
 
                   {/* Signature & Stamp Box */}
-                  <div className="mt-8 border border-black">
-                    <div className="grid grid-cols-3 divide-x divide-black">
-                      <div className="p-4 min-h-[120px]">
-                        <p className="text-xs font-semibold mb-1">Prepared By</p>
-                        <p className="text-xs text-gray-500">(Signature &amp; Stamp)</p>
-                        <div className="mt-2 space-y-1">
-                          <p className="text-xs">Name: ___________________________</p>
-                          <p className="text-xs">Designation: ____________________</p>
-                          <p className="text-xs">Date: ___________________________</p>
-                        </div>
+                  <div className="mt-6 border border-gray-300">
+                    <div className="grid grid-cols-3 divide-x divide-gray-300">
+                      <div className="p-3 min-h-[100px]">
+                        <p className="text-xs font-semibold text-gray-600 mb-1">Prepared By</p>
                       </div>
-                      <div className="p-4 min-h-[120px]">
-                        <p className="text-xs font-semibold mb-1">Checked By</p>
-                        <p className="text-xs text-gray-500">(Signature &amp; Stamp)</p>
-                        <div className="mt-2 space-y-1">
-                          <p className="text-xs">Name: ___________________________</p>
-                          <p className="text-xs">Designation: ____________________</p>
-                          <p className="text-xs">Date: ___________________________</p>
-                        </div>
+                      <div className="p-3 min-h-[100px]">
+                        <p className="text-xs font-semibold text-gray-600 mb-1">Checked By</p>
                       </div>
-                      <div className="p-4 min-h-[120px]">
-                        <p className="text-xs font-semibold mb-1">Approved By</p>
-                        <p className="text-xs text-gray-500">(Signature &amp; Stamp)</p>
-                        <div className="mt-2 space-y-1">
-                          <p className="text-xs">Name: ___________________________</p>
-                          <p className="text-xs">Designation: ____________________</p>
-                          <p className="text-xs">Date: ___________________________</p>
-                        </div>
+                      <div className="p-3 min-h-[100px]">
+                        <p className="text-xs font-semibold text-gray-600 mb-1">Approved By</p>
                       </div>
                     </div>
                   </div>
@@ -1056,15 +1037,20 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
                                             const baseRate = Number(rate.rate || 0);
                                             const adjustedRate =
                                               Math.round(baseRate / 0.05) * 0.05;
+                                            const rateDescNorm = (rate.description || '').trim().toLowerCase();
+                                            const itemDescNorm = (item.description_of_item || '').trim().toLowerCase();
+                                            const isDuplicate = rateDescNorm === itemDescNorm;
 
                                             return (
                                               <div
                                                 key={i}
                                                 className="text-xs bg-gray-50 p-2 rounded border-l-2 border-blue-200 mt-1"
                                               >
-                                                <div className="font-medium text-gray-700">
-                                                  {rate.description}
-                                                </div>
+                                                {!isDuplicate && (
+                                                  <div className="font-medium text-gray-700">
+                                                    {rate.description}
+                                                  </div>
+                                                )}
 
                                                 <div className="flex items-center justify-between mt-1">
                                                   <span className="text-gray-600">
