@@ -43,9 +43,7 @@ const Header: React.FC = () => {
             className="flex items-center space-x-4 hover:opacity-80 transition-opacity cursor-pointer"
           >
             <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-xl shadow-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">E</span>
-              </div>
+              <img src="/headerlogo.png" alt="ZP Chandrapur" className="w-10 h-10 object-contain rounded-lg" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900 tracking-wide">
