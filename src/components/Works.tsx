@@ -10,7 +10,7 @@ import EstimateApprovalActions from './EstimateApprovalActions';
 import WorkAssignments from './WorkAssignments';
 import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility';
 import { useYear } from '../contexts/YearContext';
-import { Plus, Search, Filter, CreditCard as Edit2, Trash2, Eye, FileText, IndianRupee, Calendar, Building } from 'lucide-react';
+import { Plus, Search, Filter, CreditCard as Edit2, Trash2, Eye, FileText, IndianRupee, Calendar, Building, ArrowRight } from 'lucide-react';
 
 const Works: React.FC = () => {
   const { t } = useLanguage();
@@ -119,9 +119,8 @@ const handleAddWork = async () => {
 
     setShowAddModal(false);
 
-    // ✅ keep selected type instead of forcing TS
     setNewWork({
-      type: newWork.type || 'Technical Sanction',
+      type: 'Technical Approval',
       division: 'Z.P.(Works) Division, Chandrapur'
     });
 
@@ -235,6 +234,25 @@ const handleAddWork = async () => {
     } catch (error: any) {
       console.error('Error deleting work:', error);
       alert(`An error occurred while deleting the work: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handlePromoteToTS = async (work: Work) => {
+    if (!confirm(`Promote "${work.work_name}" from Technical Approval to Technical Sanction? This will update the work type and reset the approval process for TS.`)) return;
+    try {
+      // Update work type to Technical Sanction and reset estimate_status
+      const { error: updateError } = await supabase
+        .schema('estimate')
+        .from('works')
+        .update({ type: 'Technical Sanction', estimate_status: 'draft' })
+        .eq('works_id', work.works_id);
+      if (updateError) throw updateError;
+
+      alert(`Work promoted to Technical Sanction successfully. Works ID remains: ${work.works_id}`);
+      fetchWorks();
+    } catch (error: any) {
+      console.error('Error promoting to TS:', error);
+      alert('Failed to promote: ' + error.message);
     }
   };
 
@@ -368,7 +386,7 @@ const handleAddWork = async () => {
           {activeTab === 'ta' && (
             <div className="flex justify-end">
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => { setNewWork({ type: 'Technical Approval', division: 'Z.P.(Works) Division, Chandrapur' }); setShowAddModal(true); }}
                 className="inline-flex items-center px-6 py-3 border border-transparent rounded-2xl shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -540,6 +558,16 @@ const handleAddWork = async () => {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                        {activeTab === 'ta' && work.estimate_status === 'approved' && (
+                          <button
+                            onClick={() => handlePromoteToTS(work)}
+                            className="inline-flex items-center px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-teal-500 to-green-600 rounded-lg hover:from-teal-600 hover:to-green-700 transition-all duration-200 shadow-sm"
+                            title="Promote to Technical Sanction"
+                          >
+                            <ArrowRight className="w-3 h-3 mr-1" />
+                            Promote to TS
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -592,14 +620,12 @@ const handleAddWork = async () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t('addWork.type')} *
                   </label>
-                  <select
-                    value={newWork.type}
-                    onChange={(e) => setNewWork({ ...newWork, type: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="Technical Approval">Technical Approval (TA)</option>
-                    <option value="Technical Sanction">Technical Sanction (TS)</option>
-                  </select>
+                  <input
+                    type="text"
+                    value="Technical Approval (TA)"
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
+                  />
                 </div>
 
                 <div>

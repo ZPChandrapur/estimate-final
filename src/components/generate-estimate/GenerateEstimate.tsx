@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useYear } from '../../contexts/YearContext';
 import { supabase } from '../../lib/supabase';
 import { Work, EstimateTemplate, SubWork, SubworkItem, ItemMeasurement, ItemLead, ItemMaterial, RecapCalculations, TaxEntry } from '../../types';
 import LoadingSpinner from '../common/LoadingSpinner';
@@ -23,6 +24,7 @@ import {
 
 const GenerateEstimate: React.FC = () => {
   const { user } = useAuth();
+  const { selectedYear } = useYear();
   const [works, setWorks] = useState<Work[]>([]);
   const [templates, setTemplates] = useState<EstimateTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,7 @@ const fetchWorks = async () => {
     const { data, error } = await supabase
       .schema('estimate')
       .from('works')
-      .select('sr_no, works_id, work_name, division, type, status, created_at, total_estimated_cost, village, grampanchayat, taluka')
+      .select('sr_no, works_id, work_name, division, type, status, created_at, total_estimated_cost, village, grampanchayat, taluka, year')
       .order('sr_no', { ascending: false });
 
     if (error) throw error;
@@ -450,7 +452,8 @@ const fetchCompleteEstimateData = async (worksId: string) => {
                          (work.division && work.division.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesType = typeFilter === 'all' || work.type === typeFilter;
     const matchesStatus = statusFilter === 'all' || work.status === statusFilter;
-    return matchesSearch && matchesType && matchesStatus;
+    const matchesYear = selectedYear === 'all' || (work as any).year === selectedYear;
+    return matchesSearch && matchesType && matchesStatus && matchesYear;
   });
 
   if (loading) {

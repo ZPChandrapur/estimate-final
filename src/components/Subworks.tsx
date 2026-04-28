@@ -3,31 +3,20 @@ import { useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility'; // ✅ ADD
+import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility';
+import { useYear } from '../contexts/YearContext';
 import { Work, SubWork } from '../types';
 import LoadingSpinner from './common/LoadingSpinner';
 import SubworkItems from './SubworkItems';
 import LeadStatement from './LeadStatement';
 import QuarryChart from './QuarryChart';
-import {
-  Plus,
-  Search,
-  Edit2,
-  Trash2,
-  Eye,
-  FileText,
-  IndianRupee,
-  Calculator,
-  Camera,
-  Upload,
-  Image as ImageIcon,
-  X
-} from 'lucide-react';
+import { Plus, Search, CreditCard as Edit2, Trash2, Eye, FileText, IndianRupee, Calculator, Camera, Upload, Image as ImageIcon, X } from 'lucide-react';
 
 const Subworks: React.FC = () => {
   const { t } = useLanguage();
   const { user } = useAuth();
   const location = useLocation();
+  const { selectedYear } = useYear();
   const [works, setWorks] = useState<Work[]>([]);
   const [subworks, setSubworks] = useState<SubWork[]>([]);
   const [selectedWorkId, setSelectedWorkId] = useState<string>('');
@@ -899,7 +888,7 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
                 className="block w-full pl-2 pr-6 py-1.5 text-xs border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md"
               >
                 <option value="">Select Work ID...</option>
-                {works.map(work => (
+                {works.filter(w => selectedYear === 'all' || w.year === selectedYear).map(work => (
                   <option key={work.works_id} value={work.works_id}>
                     {work.works_id}
                   </option>

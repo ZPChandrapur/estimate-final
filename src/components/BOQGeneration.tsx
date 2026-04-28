@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility'; // ✅ ADD
+import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility';
+import { useYear } from '../contexts/YearContext';
 import { FileText, Plus, Trash2, Save, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -35,10 +36,12 @@ interface Work {
   work_name: string;
   division: string;
   estimate_status: string;
+  year?: string;
 }
 
 const BOQGeneration: React.FC = () => {
   const { user } = useAuth();
+  const { selectedYear } = useYear();
   const [works, setWorks] = useState<Work[]>([]);
   const [selectedWork, setSelectedWork] = useState<string | null>(null);
   const [boqData, setBOQData] = useState<BOQData | null>(null);
@@ -71,7 +74,7 @@ const BOQGeneration: React.FC = () => {
       const { data, error } = await supabase
         .schema('estimate')
         .from('works')
-        .select('works_id, work_name, division, estimate_status')
+        .select('works_id, work_name, division, estimate_status, year')
         .eq('estimate_status', 'approved')
         .order('work_name');
 
@@ -496,7 +499,7 @@ const BOQGeneration: React.FC = () => {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">-- Select Work --</option>
-            {works.map((work) => (
+            {works.filter(w => selectedYear === 'all' || w.year === selectedYear).map((work) => (
               <option key={work.works_id} value={work.works_id}>
                 {work.work_name} ({work.division})
               </option>

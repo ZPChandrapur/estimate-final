@@ -142,78 +142,51 @@ const ApprovalDashboard: React.FC = () => {
     try {
       if (!background) setLoading(true);
 
-      // Check if user has admin access
-      const { data: userRole } = await supabase
-        .schema('public')
-        .from('user_roles')
-        .select('role_id, roles(name)')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      const isAdmin = userRole && userRole.roles &&
-        (Array.isArray(userRole.roles)
-          ? userRole.roles[0]?.name === 'super_admin' || userRole.roles[0]?.name === 'developer'
-          : userRole.roles.name === 'super_admin' || userRole.roles.name === 'developer');
-
-      // Fetch pending approvals - if admin, get all; otherwise only current user's
-      let pendingQuery = supabase
-        .schema('estimate')
-        .from('approval_workflows')
-        .select('*')
-        .eq('status', 'pending_approval');
-
-      if (!isAdmin) {
-        pendingQuery = pendingQuery.eq('current_approver_id', user.id);
-      }
-
-      const [pendingRes, submissionsRes] = await Promise.all([
-        pendingQuery,
-        supabase
-          .schema('estimate')
-          .from('approval_workflows')
-          .select('*')
-          .eq('initiated_by', user.id),
+      // Fetch all workflows and all works in parallel
+      const [workflowsRes, worksRes] = await Promise.all([
+        supabase.schema('estimate').from('approval_workflows').select('*'),
+        supabase.schema('estimate').from('works').select('works_id, work_name, division, year, estimate_status, type').order('sr_no', { ascending: false }),
       ]);
 
-      if (pendingRes.error) throw pendingRes.error;
-      if (submissionsRes.error) throw submissionsRes.error;
+      const allWorkflows = workflowsRes.data || [];
+      const allWorks = worksRes.data || [];
 
-      const workIds = [
-        ...(pendingRes.data || []).map(w => w.work_id),
-        ...(submissionsRes.data || []).map(w => w.work_id),
-      ];
+      // Build a map of workId -> latest workflow
+      const workflowByWorkId: Record<string, typeof allWorkflows[0]> = {};
+      allWorkflows.forEach(wf => {
+        if (!workflowByWorkId[wf.work_id] || new Date(wf.initiated_at) > new Date(workflowByWorkId[wf.work_id].initiated_at)) {
+          workflowByWorkId[wf.work_id] = wf;
+        }
+      });
 
-      if (workIds.length > 0) {
-        const { data: worksData } = await supabase
-          .schema('estimate')
-          .from('works')
-          .select('works_id, work_name, division, year, estimate_status')
-          .in('works_id', workIds);
+      // Pending: workflows where current user is approver OR admin
+      const { data: userRoleData } = await supabase
+        .schema('public').from('user_roles').select('role_id, roles(name)').eq('user_id', user.id).maybeSingle();
+      const isAdmin = userRoleData?.roles &&
+        (Array.isArray(userRoleData.roles)
+          ? ['super_admin', 'developer'].includes(userRoleData.roles[0]?.name)
+          : ['super_admin', 'developer'].includes((userRoleData.roles as any).name));
 
-        const findWork = (workId: string) => worksData?.find(w => w.works_id === workId);
+      const pendingWorkflows = allWorkflows.filter(wf =>
+        wf.status === 'pending_approval' && (isAdmin || wf.current_approver_id === user.id)
+      );
 
-        const enrichPending = (pendingRes.data || []).map(wf => ({
-          ...wf,
-          work_name: findWork(wf.work_id)?.work_name || 'Unknown',
-          work_division: findWork(wf.work_id)?.division || 'N/A',
-          work_year: findWork(wf.work_id)?.year || null,
-          estimate_status: findWork(wf.work_id)?.estimate_status || 'draft',
-        }));
+      const enrichPending = pendingWorkflows.map(wf => {
+        const work = allWorks.find(w => w.works_id === wf.work_id);
+        return { ...wf, work_name: work?.work_name || 'Unknown', work_division: work?.division || 'N/A', work_year: work?.year || null, estimate_status: work?.estimate_status || 'draft' };
+      });
 
-        const enrichSubmissions = (submissionsRes.data || []).map(wf => ({
-          ...wf,
-          work_name: findWork(wf.work_id)?.work_name || 'Unknown',
-          work_division: findWork(wf.work_id)?.division || 'N/A',
-          work_year: findWork(wf.work_id)?.year || null,
-          estimate_status: findWork(wf.work_id)?.estimate_status || 'draft',
-        }));
+      // My submissions: all works the user submitted (workflows initiated by this user)
+      const myWorkflows = allWorkflows.filter(wf => wf.initiated_by === user.id);
+      const enrichSubmissions = myWorkflows.map(wf => {
+        const work = allWorks.find(w => w.works_id === wf.work_id);
+        return { ...wf, work_name: work?.work_name || 'Unknown', work_division: work?.division || 'N/A', work_year: work?.year || null, estimate_status: work?.estimate_status || 'draft' };
+      });
 
-        setPendingApprovals(enrichPending);
-        setMySubmissions(enrichSubmissions);
-      }
+      setPendingApprovals(enrichPending);
+      setMySubmissions(enrichSubmissions);
     } catch (error) {
       console.error('Error fetching approvals:', error);
-      alert('Failed to load approvals');
     } finally {
       if (!background) setLoading(false);
     }
