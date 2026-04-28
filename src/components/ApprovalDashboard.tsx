@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility';
 import { useYear } from '../contexts/YearContext';
 import LoadingSpinner from './common/LoadingSpinner';
+import EstimateApprovalActions from './EstimateApprovalActions';
 import { CheckCircle, XCircle, RotateCcw, Send, Clock, FileCheck, MessageSquare, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
 
 interface Workflow {
@@ -17,6 +18,7 @@ interface Workflow {
   work_name?: string;
   work_division?: string;
   work_year?: string | null;
+  estimate_status?: string;
   initiator_name?: string;
 }
 
@@ -185,21 +187,25 @@ const ApprovalDashboard: React.FC = () => {
         const { data: worksData } = await supabase
           .schema('estimate')
           .from('works')
-          .select('works_id, work_name, division, year')
+          .select('works_id, work_name, division, year, estimate_status')
           .in('works_id', workIds);
+
+        const findWork = (workId: string) => worksData?.find(w => w.works_id === workId);
 
         const enrichPending = (pendingRes.data || []).map(wf => ({
           ...wf,
-          work_name: worksData?.find(w => w.works_id === wf.work_id)?.work_name || 'Unknown',
-          work_division: worksData?.find(w => w.works_id === wf.work_id)?.division || 'N/A',
-          work_year: worksData?.find(w => w.works_id === wf.work_id)?.year || null,
+          work_name: findWork(wf.work_id)?.work_name || 'Unknown',
+          work_division: findWork(wf.work_id)?.division || 'N/A',
+          work_year: findWork(wf.work_id)?.year || null,
+          estimate_status: findWork(wf.work_id)?.estimate_status || 'draft',
         }));
 
         const enrichSubmissions = (submissionsRes.data || []).map(wf => ({
           ...wf,
-          work_name: worksData?.find(w => w.works_id === wf.work_id)?.work_name || 'Unknown',
-          work_division: worksData?.find(w => w.works_id === wf.work_id)?.division || 'N/A',
-          work_year: worksData?.find(w => w.works_id === wf.work_id)?.year || null,
+          work_name: findWork(wf.work_id)?.work_name || 'Unknown',
+          work_division: findWork(wf.work_id)?.division || 'N/A',
+          work_year: findWork(wf.work_id)?.year || null,
+          estimate_status: findWork(wf.work_id)?.estimate_status || 'draft',
         }));
 
         setPendingApprovals(enrichPending);
@@ -390,6 +396,11 @@ const ApprovalDashboard: React.FC = () => {
                         </div>
                         <div className="flex flex-col items-end space-y-2">
                           {getStatusBadge(workflow.status)}
+                          <EstimateApprovalActions
+                            workId={workflow.work_id}
+                            currentStatus={workflow.estimate_status || 'draft'}
+                            onStatusUpdate={() => fetchApprovals(true)}
+                          />
                           {canTakeAction(workflow) ? (
                             <button
                               onClick={() => {
@@ -484,8 +495,13 @@ const ApprovalDashboard: React.FC = () => {
                           Submitted: {new Date(workflow.initiated_at).toLocaleString()}
                         </p>
                       </div>
-                      <div>
+                      <div className="flex flex-col items-end space-y-2">
                         {getStatusBadge(workflow.status)}
+                        <EstimateApprovalActions
+                          workId={workflow.work_id}
+                          currentStatus={workflow.estimate_status || 'draft'}
+                          onStatusUpdate={() => fetchApprovals(true)}
+                        />
                       </div>
                     </div>
                     <button

@@ -17,7 +17,7 @@ const Works: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { selectedYear } = useYear();
-  const [activeTab, setActiveTab] = useState<'ta' | 'ts'>('ta');
+  const [activeTab, setActiveTab] = useState<'ta' | 'ts' | 'assignments'>('ta');
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -343,8 +343,23 @@ const handleAddWork = async () => {
           >
             TS (Technical Sanction)
           </button>
+          <button
+            onClick={() => setActiveTab('assignments')}
+            className={`
+              whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
+              ${activeTab === 'assignments'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }
+            `}
+          >
+            Work Assignments
+          </button>
         </nav>
       </div>
+
+      {/* Work Assignments Tab */}
+      {activeTab === 'assignments' && <WorkAssignments />}
 
       {/* Tab Content */}
       {(activeTab === 'ta' || activeTab === 'ts') && (
@@ -433,9 +448,6 @@ const handleAddWork = async () => {
                     Total Estimated Cost
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
-                    Approval
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                     {t('works.actions')}
                   </th>
                 </tr>
@@ -497,13 +509,6 @@ const handleAddWork = async () => {
                         <IndianRupee className="w-4 h-4 mr-1" />
                          {work.recap_json ? formatCurrency(JSON.parse(work.recap_json).calculations?.grandTotal || 0) : '-'}
                       </div>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <EstimateApprovalActions
-                        workId={work.works_id}
-                        currentStatus={work.estimate_status || 'draft'}
-                        onStatusUpdate={fetchWorks}
-                      />
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center space-x-2">
