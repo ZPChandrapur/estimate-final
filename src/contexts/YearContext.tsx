@@ -10,8 +10,18 @@ const YearContext = createContext<YearContextType>({
   setSelectedYear: () => {},
 });
 
+const STORAGE_KEY = 'zp_selected_year';
+
 export const YearProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedYear, setSelectedYearState] = useState<string>(
+    () => localStorage.getItem(STORAGE_KEY) || 'all'
+  );
+
+  const setSelectedYear = (year: string) => {
+    localStorage.setItem(STORAGE_KEY, year);
+    setSelectedYearState(year);
+  };
+
   return (
     <YearContext.Provider value={{ selectedYear, setSelectedYear }}>
       {children}

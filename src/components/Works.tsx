@@ -238,17 +238,27 @@ const handleAddWork = async () => {
   };
 
   const handlePromoteToTS = async (work: Work) => {
-    if (!confirm(`Promote "${work.work_name}" from Technical Approval to Technical Sanction? This will update the work type and reset the approval process for TS.`)) return;
+    if (!confirm(`Promote "${work.work_name}" from Technical Approval to Technical Sanction?\n\nThe Works ID (${work.works_id}) will remain the same. The TA approval record will be cleared so a fresh TS approval process can begin.`)) return;
     try {
-      // Update work type to Technical Sanction and reset estimate_status
+      // Delete existing approval workflow + history so TS gets a clean slate
+      const { data: existingWf } = await supabase
+        .schema('estimate').from('approval_workflows')
+        .select('id').eq('work_id', work.works_id);
+
+      if (existingWf && existingWf.length > 0) {
+        const wfIds = existingWf.map(w => w.id);
+        await supabase.schema('estimate').from('approval_history').delete().in('workflow_id', wfIds);
+        await supabase.schema('estimate').from('approval_workflows').delete().eq('work_id', work.works_id);
+      }
+
+      // Update type to TS and reset status to draft
       const { error: updateError } = await supabase
-        .schema('estimate')
-        .from('works')
+        .schema('estimate').from('works')
         .update({ type: 'Technical Sanction', estimate_status: 'draft' })
         .eq('works_id', work.works_id);
       if (updateError) throw updateError;
 
-      alert(`Work promoted to Technical Sanction successfully. Works ID remains: ${work.works_id}`);
+      alert(`"${work.work_name}" has been promoted to Technical Sanction.\nWorks ID: ${work.works_id}\nYou can now submit it through the new TS approval process.`);
       fetchWorks();
     } catch (error: any) {
       console.error('Error promoting to TS:', error);

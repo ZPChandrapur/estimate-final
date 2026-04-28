@@ -1,16 +1,37 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useYear, YEAR_OPTIONS } from '../../contexts/YearContext';
-import { User, LogOut, Home, FileCheck, FileSpreadsheet, Calendar } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { User, LogOut, Home, FileCheck, FileSpreadsheet, Calendar, Bell } from 'lucide-react';
 
 const Header: React.FC = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { t } = useLanguage();
   const { selectedYear, setSelectedYear } = useYear();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (user) fetchPendingCount();
+    const interval = setInterval(() => { if (user) fetchPendingCount(); }, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const fetchPendingCount = async () => {
+    try {
+      const { data: roleData } = await supabase
+        .schema('public').from('user_roles').select('roles(name)').eq('user_id', user!.id).maybeSingle();
+      const roleName = roleData?.roles && (Array.isArray(roleData.roles) ? (roleData.roles[0] as any)?.name : (roleData.roles as any).name);
+      const isAdmin = roleName === 'super_admin' || roleName === 'developer';
+
+      let q = supabase.schema('estimate').from('approval_workflows').select('id', { count: 'exact', head: true }).eq('status', 'pending_approval');
+      if (!isAdmin) q = q.eq('current_approver_id', user!.id);
+      const { count } = await q;
+      setPendingCount(count || 0);
+    } catch (_) {}
+  };
 
   const navigationItems = [
     { key: 'home', path: '/', label: 'Home', gradient: 'from-slate-500 to-gray-600', showIcon: true, icon: Home },
@@ -48,14 +69,12 @@ const Header: React.FC = () => {
               <img src="/headerlogo.png" alt="ZP Chandrapur" className="w-10 h-10 object-contain rounded-lg" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-wide">
-                E-Estimate
-              </h1>
+              <h1 className="text-xl font-bold text-gray-900 tracking-wide">E-Estimate</h1>
               <p className="text-xs text-gray-500">ZP Chandrapur</p>
             </div>
           </button>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             {/* Year Filter */}
             <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm">
               <Calendar className="w-4 h-4 text-blue-500 flex-shrink-0" />
@@ -71,22 +90,34 @@ const Header: React.FC = () => {
               </select>
             </div>
 
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2">
-                <User className="w-5 h-5 text-gray-400" />
-                <span className="text-sm text-gray-700">
-                  {user?.user_metadata?.full_name || user?.email}
+            {/* Bell icon */}
+            <button
+              onClick={() => handleNavigation('/approvals')}
+              className="relative p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors"
+              title={`${pendingCount} approvals pending`}
+            >
+              <Bell className="w-5 h-5 text-gray-600" />
+              {pendingCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow">
+                  {pendingCount > 99 ? '99+' : pendingCount}
                 </span>
-              </div>
+              )}
+            </button>
 
-              <button
-                onClick={handleSignOut}
-                className="flex items-center space-x-1 px-3 py-2 rounded-xl text-sm font-medium text-gray-600 hover:text-red-600"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('nav.signOut')}</span>
-              </button>
+            <div className="flex items-center space-x-2">
+              <User className="w-5 h-5 text-gray-400" />
+              <span className="text-sm text-gray-700">
+                {user?.user_metadata?.full_name || user?.email}
+              </span>
             </div>
+
+            <button
+              onClick={handleSignOut}
+              className="flex items-center space-x-1 px-3 py-2 rounded-xl text-sm font-medium text-gray-600 hover:text-red-600"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('nav.signOut')}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -97,11 +128,12 @@ const Header: React.FC = () => {
           <nav className="flex space-x-2 py-2">
             {navigationItems.map((item) => {
               const Icon = item.icon;
+              const isApprovals = item.key === 'approvals';
               return (
                 <button
                   key={item.key}
                   onClick={() => handleNavigation(item.path)}
-                  className={`px-6 py-3 rounded-xl text-base font-bold transition-all duration-300 flex items-center space-x-2 ${
+                  className={`relative px-6 py-3 rounded-xl text-base font-bold transition-all duration-300 flex items-center space-x-2 ${
                     location.pathname === item.path
                       ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg scale-105`
                       : 'text-gray-700 hover:text-gray-900 hover:bg-white/60 hover:scale-105 hover:shadow-md'
@@ -109,6 +141,11 @@ const Header: React.FC = () => {
                 >
                   {item.showIcon && Icon && <Icon className="w-4 h-4" />}
                   <span>{item.label}</span>
+                  {isApprovals && pendingCount > 0 && (
+                    <span className="ml-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                      {pendingCount > 99 ? '99+' : pendingCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
