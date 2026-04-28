@@ -5,9 +5,19 @@ import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility';
 import { useYear } from '../contexts/YearContext';
 import LoadingSpinner from './common/LoadingSpinner';
 import EstimateApprovalActions from './EstimateApprovalActions';
-import { CheckCircle, XCircle, RotateCcw, Send, Clock, FileCheck, MessageSquare, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, Send, Clock, FileCheck, MessageSquare, ChevronDown, ChevronUp, ArrowRight, Search } from 'lucide-react';
 
-interface Workflow {
+interface WorkRow {
+  works_id: string;
+  work_name: string;
+  division: string;
+  year: string | null;
+  type: string;
+  estimate_status: string;
+  workflow?: WorkflowData;
+}
+
+interface WorkflowData {
   id: string;
   work_id: string;
   current_level: number;
@@ -15,11 +25,6 @@ interface Workflow {
   status: string;
   initiated_by: string;
   initiated_at: string;
-  work_name?: string;
-  work_division?: string;
-  work_year?: string | null;
-  estimate_status?: string;
-  initiator_name?: string;
 }
 
 interface HistoryEntry {
@@ -43,16 +48,17 @@ const APPROVAL_LEVELS = [
 
 const ApprovalFlowPipeline: React.FC<{ currentLevel: number; status: string }> = ({ currentLevel, status }) => {
   return (
-    <div className="flex items-center space-x-1 mt-3 flex-wrap gap-y-2">
+    <div className="flex items-center space-x-1 flex-wrap gap-y-1">
       {APPROVAL_LEVELS.map((lvl, idx) => {
-        const isPast = lvl.level < currentLevel;
+        const isPast = status === 'approved' ? true : lvl.level < currentLevel;
         const isCurrent = lvl.level === currentLevel;
-        const isFuture = lvl.level > currentLevel;
         const isRejected = isCurrent && (status === 'rejected' || status === 'sent_back');
-        const isFinalApproved = status === 'approved' && isPast;
+        const isFinalApproved = status === 'approved';
 
-        let nodeClass = 'px-3 py-1.5 rounded-full text-xs font-semibold border ';
-        if (isFinalApproved || isPast) {
+        let nodeClass = 'px-2 py-1 rounded-full text-xs font-semibold border ';
+        if (isFinalApproved) {
+          nodeClass += 'bg-green-100 text-green-700 border-green-300';
+        } else if (isPast) {
           nodeClass += 'bg-green-100 text-green-700 border-green-300';
         } else if (isRejected) {
           nodeClass += 'bg-red-100 text-red-700 border-red-300';
@@ -64,19 +70,11 @@ const ApprovalFlowPipeline: React.FC<{ currentLevel: number; status: string }> =
 
         return (
           <React.Fragment key={lvl.level}>
-            <div className="flex flex-col items-center">
-              <span className={nodeClass} title={lvl.label}>
-                {lvl.short}
-              </span>
-              {isCurrent && status === 'pending_approval' && (
-                <span className="text-xs text-amber-600 mt-0.5 font-medium">Pending</span>
-              )}
-              {(isPast || isFinalApproved) && (
-                <span className="text-xs text-green-600 mt-0.5">Done</span>
-              )}
-            </div>
+            <span className={nodeClass} title={lvl.label}>
+              {lvl.short}
+            </span>
             {idx < APPROVAL_LEVELS.length - 1 && (
-              <ArrowRight className={`w-4 h-4 flex-shrink-0 ${isPast ? 'text-green-400' : 'text-gray-300'}`} />
+              <ArrowRight className={`w-3 h-3 flex-shrink-0 ${(isFinalApproved || isPast) ? 'text-green-400' : 'text-gray-300'}`} />
             )}
           </React.Fragment>
         );
@@ -88,105 +86,69 @@ const ApprovalFlowPipeline: React.FC<{ currentLevel: number; status: string }> =
 const ApprovalDashboard: React.FC = () => {
   const { user } = useAuth();
   const { selectedYear } = useYear();
-  const [pendingApprovals, setPendingApprovals] = useState<Workflow[]>([]);
-  const [mySubmissions, setMySubmissions] = useState<Workflow[]>([]);
+  const [works, setWorks] = useState<WorkRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowData | null>(null);
+  const [selectedWorkName, setSelectedWorkName] = useState('');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [showActionModal, setShowActionModal] = useState(false);
-  const [actionForm, setActionForm] = useState({
-    action: '',
-    comments: '',
-  });
+  const [actionForm, setActionForm] = useState({ action: '', comments: '' });
   const [expandedHistory, setExpandedHistory] = useState<{ [key: string]: boolean }>({});
   const [hasFullAccess, setHasFullAccess] = useState(false);
 
   useEffect(() => {
-    fetchApprovals();
-    checkPermissions();
+    if (user) {
+      fetchData();
+    }
   }, [user]);
 
-  // ✅ NEW: Refetch approvals when page becomes visible (background)
   useRefreshOnVisibility(
     async () => {
-      try {
-        await supabase.auth.refreshSession();
-      } catch (e) {
-        console.warn('Session refresh failed on visibility (approvals):', e);
-      }
-      await fetchApprovals(true);
-      await checkPermissions();
+      try { await supabase.auth.refreshSession(); } catch (_) {}
+      await fetchData(true);
     },
     [user]
   );
 
-  const checkPermissions = async () => {
+  const fetchData = async (background = false) => {
     if (!user) return;
-
-    const { data: userRole } = await supabase
-      .schema('public')
-      .from('user_roles')
-      .select('role_id, roles(name)')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (userRole && userRole.roles) {
-      const roleName = Array.isArray(userRole.roles) ? userRole.roles[0]?.name : userRole.roles.name;
-      setHasFullAccess(roleName === 'super_admin' || roleName === 'developer');
-    }
-  };
-
-  const fetchApprovals = async (background = false) => {
-    if (!user) return;
-
     try {
       if (!background) setLoading(true);
 
-      // Fetch all workflows and all works in parallel
-      const [workflowsRes, worksRes] = await Promise.all([
+      const [worksRes, workflowsRes, roleRes] = await Promise.all([
+        supabase.schema('estimate').from('works')
+          .select('works_id, work_name, division, year, type, estimate_status')
+          .order('sr_no', { ascending: false }),
         supabase.schema('estimate').from('approval_workflows').select('*'),
-        supabase.schema('estimate').from('works').select('works_id, work_name, division, year, estimate_status, type').order('sr_no', { ascending: false }),
+        supabase.schema('public').from('user_roles').select('role_id, roles(name)').eq('user_id', user.id).maybeSingle(),
       ]);
 
-      const allWorkflows = workflowsRes.data || [];
       const allWorks = worksRes.data || [];
+      const allWorkflows = workflowsRes.data || [];
 
-      // Build a map of workId -> latest workflow
-      const workflowByWorkId: Record<string, typeof allWorkflows[0]> = {};
+      // latest workflow per work
+      const latestByWork: Record<string, WorkflowData> = {};
       allWorkflows.forEach(wf => {
-        if (!workflowByWorkId[wf.work_id] || new Date(wf.initiated_at) > new Date(workflowByWorkId[wf.work_id].initiated_at)) {
-          workflowByWorkId[wf.work_id] = wf;
+        const existing = latestByWork[wf.work_id];
+        if (!existing || new Date(wf.initiated_at) > new Date(existing.initiated_at)) {
+          latestByWork[wf.work_id] = wf;
         }
       });
 
-      // Pending: workflows where current user is approver OR admin
-      const { data: userRoleData } = await supabase
-        .schema('public').from('user_roles').select('role_id, roles(name)').eq('user_id', user.id).maybeSingle();
-      const isAdmin = userRoleData?.roles &&
-        (Array.isArray(userRoleData.roles)
-          ? ['super_admin', 'developer'].includes(userRoleData.roles[0]?.name)
-          : ['super_admin', 'developer'].includes((userRoleData.roles as any).name));
+      const enriched: WorkRow[] = allWorks.map(w => ({
+        ...w,
+        workflow: latestByWork[w.works_id],
+      }));
 
-      const pendingWorkflows = allWorkflows.filter(wf =>
-        wf.status === 'pending_approval' && (isAdmin || wf.current_approver_id === user.id)
-      );
+      setWorks(enriched);
 
-      const enrichPending = pendingWorkflows.map(wf => {
-        const work = allWorks.find(w => w.works_id === wf.work_id);
-        return { ...wf, work_name: work?.work_name || 'Unknown', work_division: work?.division || 'N/A', work_year: work?.year || null, estimate_status: work?.estimate_status || 'draft' };
-      });
-
-      // My submissions: all works the user submitted (workflows initiated by this user)
-      const myWorkflows = allWorkflows.filter(wf => wf.initiated_by === user.id);
-      const enrichSubmissions = myWorkflows.map(wf => {
-        const work = allWorks.find(w => w.works_id === wf.work_id);
-        return { ...wf, work_name: work?.work_name || 'Unknown', work_division: work?.division || 'N/A', work_year: work?.year || null, estimate_status: work?.estimate_status || 'draft' };
-      });
-
-      setPendingApprovals(enrichPending);
-      setMySubmissions(enrichSubmissions);
+      if (roleRes.data?.roles) {
+        const name = Array.isArray(roleRes.data.roles) ? roleRes.data.roles[0]?.name : (roleRes.data.roles as any).name;
+        setHasFullAccess(name === 'super_admin' || name === 'developer');
+      }
     } catch (error) {
-      console.error('Error fetching approvals:', error);
+      console.error('Error fetching approvals data:', error);
     } finally {
       if (!background) setLoading(false);
     }
@@ -195,37 +157,21 @@ const ApprovalDashboard: React.FC = () => {
   const fetchHistory = async (workflowId: string) => {
     try {
       const { data, error } = await supabase
-        .schema('estimate')
-        .from('approval_history')
-        .select('*')
-        .eq('workflow_id', workflowId)
-        .order('created_at', { ascending: true });
-
+        .schema('estimate').from('approval_history').select('*')
+        .eq('workflow_id', workflowId).order('created_at', { ascending: true });
       if (error) throw error;
 
-      const userIds = [...new Set(data?.map(h => h.approver_id) || [])];
-      const { data: userRoles } = await supabase
-        .schema('public')
-        .from('user_roles')
-        .select('user_id, name, role_id')
-        .in('user_id', userIds);
+      const userIds = [...new Set((data || []).map(h => h.approver_id))];
+      const [userRolesRes, rolesRes] = await Promise.all([
+        supabase.schema('public').from('user_roles').select('user_id, name, role_id').in('user_id', userIds),
+        supabase.schema('public').from('roles').select('id, name').eq('application', 'estimate'),
+      ]);
 
-      const { data: roles } = await supabase
-        .schema('public')
-        .from('roles')
-        .select('id, name')
-        .eq('application', 'estimate');
-
-      const enriched = (data || []).map(h => {
-        const userRole = userRoles?.find(ur => ur.user_id === h.approver_id);
-        const role = roles?.find(r => r.id === h.approver_role_id);
-        return {
-          ...h,
-          approver_name: userRole?.name || 'Unknown',
-          role_name: role?.name || 'Unknown',
-        };
-      });
-
+      const enriched = (data || []).map(h => ({
+        ...h,
+        approver_name: userRolesRes.data?.find(ur => ur.user_id === h.approver_id)?.name || 'Unknown',
+        role_name: rolesRes.data?.find(r => r.id === h.approver_role_id)?.name || 'Unknown',
+      }));
       setHistory(enriched);
     } catch (error) {
       console.error('Error fetching history:', error);
@@ -237,303 +183,241 @@ const ApprovalDashboard: React.FC = () => {
       alert('Please select an action');
       return;
     }
-
     try {
       const { error } = await supabase.rpc('process_approval_action', {
         p_workflow_id: selectedWorkflow.id,
         p_action: actionForm.action,
         p_comments: actionForm.comments || null,
       });
-
       if (error) throw error;
-
       alert('Action completed successfully');
       setShowActionModal(false);
       setActionForm({ action: '', comments: '' });
       setSelectedWorkflow(null);
-      fetchApprovals();
+      fetchData();
     } catch (error: any) {
-      console.error('Error processing action:', error);
       alert('Failed to process action: ' + error.message);
     }
   };
 
-  const canTakeAction = (workflow: Workflow) => {
-    return hasFullAccess || workflow.current_approver_id === user?.id;
+  const toggleHistory = (workflowId: string) => {
+    const next = !expandedHistory[workflowId];
+    setExpandedHistory(prev => ({ ...prev, [workflowId]: next }));
+    if (next) fetchHistory(workflowId);
   };
 
-  const getLevelName = (level: number) => {
-    switch (level) {
-      case 1: return 'Junior Engineer';
-      case 2: return 'Sub Division Engineer';
-      case 3: return 'Divisional Engineer';
-      case 4: return 'Executive Engineer';
-      default: return `Level ${level}`;
+  const getWorkflowStatusBadge = (work: WorkRow) => {
+    if (!work.workflow) {
+      const s = work.estimate_status;
+      if (s === 'draft') return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Draft</span>;
+      if (s === 'ready_for_approval') return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Ready</span>;
+      return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{s}</span>;
     }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const configs = {
-      pending_approval: { color: 'bg-yellow-100 text-yellow-700', icon: Clock, label: 'Pending' },
+    const configs: Record<string, { color: string; icon: React.ElementType; label: string }> = {
+      pending_approval: { color: 'bg-amber-100 text-amber-700', icon: Clock, label: 'In Progress' },
       approved: { color: 'bg-green-100 text-green-700', icon: CheckCircle, label: 'Approved' },
       rejected: { color: 'bg-red-100 text-red-700', icon: XCircle, label: 'Rejected' },
       sent_back: { color: 'bg-orange-100 text-orange-700', icon: RotateCcw, label: 'Sent Back' },
     };
-    const config = configs[status as keyof typeof configs] || configs.pending_approval;
-    const Icon = config.icon;
+    const cfg = configs[work.workflow.status] || configs.pending_approval;
+    const Icon = cfg.icon;
     return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${config.color}`}>
-        <Icon className="w-3 h-3 mr-1" />
-        {config.label}
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cfg.color}`}>
+        <Icon className="w-3 h-3 mr-1" />{cfg.label}
       </span>
     );
   };
 
   const getActionBadge = (action: string) => {
-    const configs = {
-      submitted: { color: 'bg-blue-100 text-blue-700', label: 'Submitted' },
-      approved: { color: 'bg-green-100 text-green-700', label: 'Approved' },
-      rejected: { color: 'bg-red-100 text-red-700', label: 'Rejected' },
-      sent_back: { color: 'bg-orange-100 text-orange-700', label: 'Sent Back' },
-      forwarded: { color: 'bg-purple-100 text-purple-700', label: 'Forwarded' },
+    const configs: Record<string, string> = {
+      submitted: 'bg-blue-100 text-blue-700',
+      approved: 'bg-green-100 text-green-700',
+      rejected: 'bg-red-100 text-red-700',
+      sent_back: 'bg-orange-100 text-orange-700',
+      forwarded: 'bg-teal-100 text-teal-700',
     };
-    const config = configs[action as keyof typeof configs] || { color: 'bg-gray-100 text-gray-700', label: action };
     return (
-      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${config.color}`}>
-        {config.label}
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${configs[action] || 'bg-gray-100 text-gray-700'}`}>
+        {action}
       </span>
     );
   };
 
-  const toggleHistory = (workflowId: string) => {
-    if (expandedHistory[workflowId]) {
-      setExpandedHistory({ ...expandedHistory, [workflowId]: false });
-    } else {
-      setExpandedHistory({ ...expandedHistory, [workflowId]: true });
-      fetchHistory(workflowId);
-    }
-  };
+  const filtered = works.filter(w => {
+    const matchesYear = selectedYear === 'all' || w.year === selectedYear;
+    const matchesSearch = !searchTerm ||
+      w.work_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      w.works_id.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesYear && matchesSearch;
+  });
 
-  const filteredPending = selectedYear === 'all'
-    ? pendingApprovals
-    : pendingApprovals.filter(w => w.work_year === selectedYear);
-  const filteredSubmissions = selectedYear === 'all'
-    ? mySubmissions
-    : mySubmissions.filter(w => w.work_year === selectedYear);
-
-  if (loading) {
-    return <LoadingSpinner text="Loading approvals..." />;
-  }
+  if (loading) return <LoadingSpinner text="Loading approvals..." />;
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <div className="bg-gradient-to-r from-green-600 via-teal-600 to-blue-600 shadow-xl">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg">
-              <FileCheck className="h-8 w-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white drop-shadow-lg">Approval Dashboard</h1>
-              <p className="text-blue-100 text-base mt-1 drop-shadow">
-                Manage estimate approvals and track submissions
-              </p>
-            </div>
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center space-x-4">
+          <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg">
+            <FileCheck className="h-8 w-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white drop-shadow-lg">Approval Dashboard</h1>
+            <p className="text-blue-100 text-sm mt-0.5">Track and manage estimate approvals across all works</p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-orange-50">
-            <h2 className="font-semibold text-gray-900 flex items-center">
-              <Clock className="w-5 h-5 mr-2 text-yellow-600" />
-              Pending Approvals ({filteredPending.length})
-            </h2>
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-5">
+        {/* Search */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by work name or ID..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="pl-9 pr-4 py-2 w-full border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
           </div>
-          <div className="p-6">
-            {filteredPending.length > 0 ? (
-              <div className="space-y-4">
-                {filteredPending.map(workflow => (
-                  <div key={workflow.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <div className="bg-gray-50 p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900">{workflow.work_name}</h3>
-                          <p className="text-sm text-gray-600 mt-1">Work ID: {workflow.work_id}</p>
-                          <p className="text-sm text-gray-600">Division: {workflow.work_division}</p>
-                          <ApprovalFlowPipeline currentLevel={workflow.current_level} status={workflow.status} />
-                          <p className="text-xs text-gray-500 mt-2">
-                            Submitted: {new Date(workflow.initiated_at).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end space-y-2">
-                          {getStatusBadge(workflow.status)}
-                          <EstimateApprovalActions
-                            workId={workflow.work_id}
-                            currentStatus={workflow.estimate_status || 'draft'}
-                            onStatusUpdate={() => fetchApprovals(true)}
-                          />
-                          {canTakeAction(workflow) ? (
+          <span className="text-sm text-gray-500">{filtered.length} works</span>
+        </div>
+
+        {/* Table */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-teal-600 to-blue-600">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Works ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Work Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Year</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Approval Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Pipeline</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Approval Action</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">History</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-16 text-center">
+                      <FileCheck className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                      <p className="text-gray-500 text-sm">No works found</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map(work => (
+                    <React.Fragment key={work.works_id}>
+                      <tr className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm font-semibold text-teal-700">{work.works_id}</span>
+                        </td>
+                        <td className="px-4 py-3 max-w-xs">
+                          <span className="text-sm font-medium text-gray-900 line-clamp-2">{work.work_name}</span>
+                          <span className="text-xs text-gray-500 block">{work.division}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${work.type === 'Technical Approval' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                            {work.type === 'Technical Approval' ? 'TA' : 'TS'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                          {work.year || '-'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {getWorkflowStatusBadge(work)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {work.workflow ? (
+                            <ApprovalFlowPipeline
+                              currentLevel={work.workflow.current_level}
+                              status={work.workflow.status}
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">Not submitted</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <EstimateApprovalActions
+                              workId={work.works_id}
+                              currentStatus={work.estimate_status}
+                              onStatusUpdate={() => fetchData(true)}
+                            />
+                            {work.workflow && work.workflow.status === 'pending_approval' && (hasFullAccess || work.workflow.current_approver_id === user?.id) && (
+                              <button
+                                onClick={() => {
+                                  setSelectedWorkflow(work.workflow!);
+                                  setSelectedWorkName(work.work_name);
+                                  setShowActionModal(true);
+                                }}
+                                className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-green-600 to-teal-600 rounded-lg hover:from-green-700 hover:to-teal-700 transition-all shadow-sm"
+                              >
+                                Take Action
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {work.workflow ? (
                             <button
-                              onClick={() => {
-                                setSelectedWorkflow(workflow);
-                                setShowActionModal(true);
-                              }}
-                              className="px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 transition-all duration-200 shadow-md text-sm"
+                              onClick={() => toggleHistory(work.workflow!.id)}
+                              className="inline-flex items-center text-xs text-gray-600 hover:text-teal-600 transition-colors"
                             >
-                              Take Action
+                              <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                              {expandedHistory[work.workflow.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                             </button>
                           ) : (
-                            <span className="px-4 py-2 bg-gray-200 text-gray-500 rounded-lg text-sm cursor-not-allowed">
-                              No Permission
-                            </span>
+                            <span className="text-xs text-gray-300">—</span>
                           )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="border-t border-gray-200">
-                      <button
-                        onClick={() => toggleHistory(workflow.id)}
-                        className="w-full px-4 py-2 bg-white hover:bg-gray-50 flex items-center justify-between text-sm text-gray-700"
-                      >
-                        <span className="flex items-center">
-                          <MessageSquare className="w-4 h-4 mr-2" />
-                          View History
-                        </span>
-                        {expandedHistory[workflow.id] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
-                      {expandedHistory[workflow.id] && (
-                        <div className="p-4 bg-gray-50 border-t border-gray-200">
-                          {history.length > 0 ? (
-                            <div className="space-y-3">
-                              {history.map(entry => (
-                                <div key={entry.id} className="bg-white p-3 rounded border border-gray-200">
-                                  <div className="flex items-start justify-between">
-                                    <div>
-                                      <div className="flex items-center space-x-2">
-                                        {getActionBadge(entry.action)}
-                                        <span className="text-sm font-medium text-gray-900">{entry.approver_name}</span>
-                                        <span className="text-xs text-gray-500">({entry.role_name})</span>
-                                      </div>
-                                      {entry.comments && (
-                                        <p className="text-sm text-gray-600 mt-2">{entry.comments}</p>
-                                      )}
-                                    </div>
-                                    <span className="text-xs text-gray-500">
-                                      {new Date(entry.created_at).toLocaleString()}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-500 text-center py-2">No history available</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-gray-500">
-                <Clock className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No pending approvals</h3>
-                <p className="text-gray-500">You don't have any estimates waiting for your approval.</p>
-              </div>
-            )}
-          </div>
-        </div>
+                        </td>
+                      </tr>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <h2 className="font-semibold text-gray-900 flex items-center">
-              <Send className="w-5 h-5 mr-2 text-blue-600" />
-              My Submissions ({filteredSubmissions.length})
-            </h2>
-          </div>
-          <div className="p-6">
-            {filteredSubmissions.length > 0 ? (
-              <div className="space-y-4">
-                {filteredSubmissions.map(workflow => (
-                  <div key={workflow.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{workflow.work_name}</h3>
-                        <p className="text-sm text-gray-600 mt-1">Work ID: {workflow.work_id}</p>
-                        <p className="text-sm text-gray-600">Division: {workflow.work_division}</p>
-                        <ApprovalFlowPipeline currentLevel={workflow.current_level} status={workflow.status} />
-                        <p className="text-xs text-gray-500 mt-2">
-                          Submitted: {new Date(workflow.initiated_at).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end space-y-2">
-                        {getStatusBadge(workflow.status)}
-                        <EstimateApprovalActions
-                          workId={workflow.work_id}
-                          currentStatus={workflow.estimate_status || 'draft'}
-                          onStatusUpdate={() => fetchApprovals(true)}
-                        />
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => toggleHistory(workflow.id)}
-                      className="mt-3 w-full px-4 py-2 bg-white hover:bg-gray-100 border border-gray-300 rounded-lg flex items-center justify-between text-sm text-gray-700"
-                    >
-                      <span className="flex items-center">
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        View History
-                      </span>
-                      {expandedHistory[workflow.id] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                    {expandedHistory[workflow.id] && (
-                      <div className="mt-3 p-4 bg-white rounded border border-gray-200">
-                        {history.length > 0 ? (
-                          <div className="space-y-3">
-                            {history.map(entry => (
-                              <div key={entry.id} className="bg-gray-50 p-3 rounded border border-gray-200">
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <div className="flex items-center space-x-2">
+                      {/* Expanded history row */}
+                      {work.workflow && expandedHistory[work.workflow.id] && (
+                        <tr key={`hist-${work.works_id}`}>
+                          <td colSpan={8} className="px-6 py-3 bg-gray-50 border-t border-gray-200">
+                            <p className="text-xs font-semibold text-gray-700 mb-2">Approval History — {work.work_name}</p>
+                            {history.length > 0 ? (
+                              <div className="space-y-2">
+                                {history.map(entry => (
+                                  <div key={entry.id} className="flex items-start justify-between bg-white rounded-lg p-3 border border-gray-200 text-xs">
+                                    <div className="flex items-start gap-2">
                                       {getActionBadge(entry.action)}
-                                      <span className="text-sm font-medium text-gray-900">{entry.approver_name}</span>
-                                      <span className="text-xs text-gray-500">({entry.role_name})</span>
+                                      <div>
+                                        <span className="font-medium text-gray-800">{entry.approver_name}</span>
+                                        <span className="text-gray-500 ml-1">({entry.role_name})</span>
+                                        {entry.comments && <p className="text-gray-600 mt-0.5">{entry.comments}</p>}
+                                      </div>
                                     </div>
-                                    {entry.comments && (
-                                      <p className="text-sm text-gray-600 mt-2">{entry.comments}</p>
-                                    )}
+                                    <span className="text-gray-400 whitespace-nowrap ml-4">{new Date(entry.created_at).toLocaleString()}</span>
                                   </div>
-                                  <span className="text-xs text-gray-500">
-                                    {new Date(entry.created_at).toLocaleString()}
-                                  </span>
-                                </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500 text-center py-2">No history available</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-gray-500">
-                <Send className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No submissions yet</h3>
-                <p className="text-gray-500">You haven't submitted any estimates for approval.</p>
-              </div>
-            )}
+                            ) : (
+                              <p className="text-xs text-gray-500">No history available</p>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      {showActionModal && (
+      {/* Action Modal */}
+      {showActionModal && selectedWorkflow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">Take Approval Action</h2>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Take Approval Action</h2>
+            <p className="text-sm text-gray-500 mb-4">{selectedWorkName}</p>
 
             <div className="space-y-4">
               <div>
@@ -541,51 +425,41 @@ const ApprovalDashboard: React.FC = () => {
                 <select
                   value={actionForm.action}
                   onChange={e => setActionForm({ ...actionForm, action: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >
                   <option value="">Select Action...</option>
                   <option value="approved">Approve & Forward</option>
-                  {(hasFullAccess || selectedWorkflow?.current_level === 4) &&
+                  {(hasFullAccess || selectedWorkflow.current_level === 4) && (
                     <option value="approved_final">Final Approve</option>
-                  }
+                  )}
                   <option value="rejected">Reject</option>
                   <option value="sent_back">Send Back for Changes</option>
                 </select>
-                {(hasFullAccess || selectedWorkflow?.current_level === 4) && (
-                  <p className="mt-2 text-xs text-gray-500">
-                    <strong>Approve & Forward:</strong> Send to next level.
-                    <strong className="ml-2">Final Approve:</strong> Complete approval workflow.
-                  </p>
-                )}
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Comments</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Comments (optional)</label>
                 <textarea
                   value={actionForm.comments}
                   onChange={e => setActionForm({ ...actionForm, comments: e.target.value })}
-                  rows={4}
-                  placeholder="Add any comments or reasons for this action..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  rows={3}
+                  placeholder="Add any comments or reasons..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end space-x-3">
+            <div className="mt-6 flex justify-end gap-3">
               <button
-                onClick={handleAction}
-                className="px-6 py-3 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-xl font-semibold shadow-md hover:scale-[1.03] transition-transform duration-200"
-              >
-                Submit
-              </button>
-              <button
-                onClick={() => {
-                  setShowActionModal(false);
-                  setActionForm({ action: '', comments: '' });
-                }}
-                className="px-6 py-3 bg-gray-300 text-gray-800 rounded-xl font-semibold shadow-sm hover:bg-gray-400 transition-colors duration-200"
+                onClick={() => { setShowActionModal(false); setActionForm({ action: '', comments: '' }); }}
+                className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
               >
                 Cancel
+              </button>
+              <button
+                onClick={handleAction}
+                className="px-5 py-2.5 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-xl text-sm font-semibold hover:from-green-700 hover:to-teal-700 transition-all shadow-md"
+              >
+                Submit
               </button>
             </div>
           </div>
