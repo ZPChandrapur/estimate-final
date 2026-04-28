@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
-import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility'; // ✅ ADD
+import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility';
+import { useYear } from '../contexts/YearContext';
 import { EstimateWork } from '../types';
 import LoadingSpinner from './common/LoadingSpinner';
 import {
@@ -11,7 +13,8 @@ import {
   Clock,
   IndianRupee,
   TrendingUp,
-  Activity
+  Activity,
+  Bell
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -26,12 +29,14 @@ interface DashboardStats {
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { selectedYear } = useYear();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [selectedYear]);
 
   // ✅ NEW: Refetch dashboard data when page becomes visible
   useRefreshOnVisibility(
@@ -74,10 +79,13 @@ const Dashboard: React.FC = () => {
         .eq('initiated_by', user?.id);
 
       if (works) {
+        // Apply year filter
+        const filteredWorks = selectedYear === 'all' ? works : works.filter(w => w.year === selectedYear);
+
         // Get works that have actual estimate/measurement activity
         const recentWorksWithActivity = [];
 
-        for (const work of works.slice(0, 10)) {
+        for (const work of filteredWorks.slice(0, 10)) {
           const { data: subworks } = await supabase
             .schema('estimate')
             .from('subworks')
@@ -112,12 +120,12 @@ const Dashboard: React.FC = () => {
           if (recentWorksWithActivity.length >= 5) break;
         }
 
-        const totalWorks = works.length;
+        const totalWorks = filteredWorks.length;
         const pendingApprovals = pendingApprovalsData?.length || 0;
         const mySubmissions = mySubmissionsData?.length || 0;
-        const totalAmount = works.reduce((sum, work) => sum + work.total_estimated_cost, 0);
+        const totalAmount = filteredWorks.reduce((sum, work) => sum + work.total_estimated_cost, 0);
 
-        const grandTotalAmount = works.reduce((sum, work) => {
+        const grandTotalAmount = filteredWorks.reduce((sum, work) => {
           try {
             if (work.recap_json) {
               const recap = JSON.parse(work.recap_json);
@@ -178,13 +186,26 @@ const Dashboard: React.FC = () => {
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-indigo-700 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]">
         <div className="px-6 py-4">
-          <div className="flex items-center">
+          <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-white drop-shadow-lg">
                 {t('dashboard.welcome')}, {user?.user_metadata?.full_name || user?.email}
               </h1>
               <p className="text-indigo-100 text-sm mt-1">E-Estimate Management System</p>
             </div>
+            {/* Bell icon — pending approvals notification */}
+            {(stats?.pendingApprovals ?? 0) > 0 && (
+              <button
+                onClick={() => navigate('/approvals')}
+                className="relative p-3 bg-white/20 hover:bg-white/30 rounded-2xl transition-all duration-200 group"
+                title="You have pending approvals"
+              >
+                <Bell className="w-6 h-6 text-white animate-pulse" />
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
+                  {stats!.pendingApprovals > 9 ? '9+' : stats!.pendingApprovals}
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </div>

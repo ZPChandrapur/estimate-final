@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { YearProvider } from './contexts/YearContext';
 import './lib/i18n';
 
 // Components
@@ -31,6 +32,7 @@ function App() {
   return (
     <AuthProvider>
       <LanguageProvider>
+        <YearProvider>
         <Router>
           <div className="min-h-screen bg-gray-50">
             <Routes>
@@ -174,6 +176,7 @@ function App() {
             </Routes>
           </div>
         </Router>
+        </YearProvider>
       </LanguageProvider>
     </AuthProvider>
   );

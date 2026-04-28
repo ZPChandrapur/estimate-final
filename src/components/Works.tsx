@@ -8,14 +8,16 @@ import { Work, RecapCalculations, TaxEntry } from '../types';
 import WorksRecapSheet from './WorksRecapSheet';
 import EstimateApprovalActions from './EstimateApprovalActions';
 import WorkAssignments from './WorkAssignments';
-import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility'; // ✅ ADD
+import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility';
+import { useYear } from '../contexts/YearContext';
 import { Plus, Search, Filter, CreditCard as Edit2, Trash2, Eye, FileText, IndianRupee, Calendar, Building } from 'lucide-react';
 
 const Works: React.FC = () => {
   const { t } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'management' | 'assignments'>('management');
+  const { selectedYear } = useYear();
+  const [activeTab, setActiveTab] = useState<'ta' | 'ts'>('ta');
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,7 +31,7 @@ const Works: React.FC = () => {
   const [selectedWorkForPdf, setSelectedWorkForPdf] = useState<Work | null>(null);
   const [savedCalculations, setSavedCalculations] = useState<{ [workId: string]: { calculations: RecapCalculations; taxes: TaxEntry[] } }>({});
   const [newWork, setNewWork] = useState<Partial<Work>>({
-    type: 'Technical Sanction',
+    type: 'Technical Approval',
     division: 'Z.P.(Works) Division, Chandrapur'
   });
 
@@ -287,12 +289,15 @@ const handleAddWork = async () => {
     setShowPdfModal(true);
   };
 
+  const tabTypeMap: Record<string, string> = { ta: 'Technical Approval', ts: 'Technical Sanction' };
   const filteredWorks = works.filter(work => {
     const matchesSearch = work.work_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (work.works_id && work.works_id.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (work.division && work.division.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesType = typeFilter === 'all' || work.type === typeFilter;
-    return matchesSearch && matchesType;
+    const matchesTab = work.type === tabTypeMap[activeTab];
+    const matchesYear = selectedYear === 'all' || work.year === selectedYear;
+    return matchesSearch && matchesType && matchesTab && matchesYear;
   });
 
   if (loading) {
@@ -315,45 +320,47 @@ const handleAddWork = async () => {
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
           <button
-            onClick={() => setActiveTab('management')}
+            onClick={() => setActiveTab('ta')}
             className={`
               whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
-              ${activeTab === 'management'
+              ${activeTab === 'ta'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }
             `}
           >
-            Work Management
+            TA (Technical Approval)
           </button>
           <button
-            onClick={() => setActiveTab('assignments')}
+            onClick={() => setActiveTab('ts')}
             className={`
               whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
-              ${activeTab === 'assignments'
+              ${activeTab === 'ts'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }
             `}
           >
-            Work Assignments
+            TS (Technical Sanction)
           </button>
         </nav>
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'management' ? (
+      {(activeTab === 'ta' || activeTab === 'ts') && (
         <div className="space-y-6">
-          {/* Add Work Button */}
-          <div className="flex justify-end">
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center px-6 py-3 border border-transparent rounded-2xl shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              {t('works.addNew')}
-            </button>
-          </div>
+          {/* Add Work Button — only on TA tab */}
+          {activeTab === 'ta' && (
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center px-6 py-3 border border-transparent rounded-2xl shadow-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {t('works.addNew')}
+              </button>
+            </div>
+          )}
 
           {/* Filters and Search */}
           <div className="bg-gradient-to-r from-slate-50 to-gray-100 rounded-2xl shadow-lg border border-slate-200 p-4">
@@ -542,17 +549,19 @@ const handleAddWork = async () => {
             </div>
             <h3 className="mt-2 text-sm font-medium text-gray-900">No works found</h3>
             <p className="mt-1 text-sm text-gray-500">
-              Get started by creating a new work estimate.
+              {activeTab === 'ta' ? 'Get started by creating a new Technical Approval work.' : 'No Technical Sanction works found. Works must be TA-approved first.'}
             </p>
-            <div className="mt-6">
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center px-6 py-3 border border-transparent shadow-lg text-sm font-semibold rounded-2xl text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                {t('works.addNew')}
-              </button>
-            </div>
+            {activeTab === 'ta' && (
+              <div className="mt-6">
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="inline-flex items-center px-6 py-3 border border-transparent shadow-lg text-sm font-semibold rounded-2xl text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all duration-300"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t('works.addNew')}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1264,8 +1273,6 @@ const handleAddWork = async () => {
   </div>
 )}
         </div>
-      ) : (
-        <WorkAssignments />
       )}
     </div>
   );

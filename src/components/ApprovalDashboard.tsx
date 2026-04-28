@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility'; // ✅ ADD
+import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility';
+import { useYear } from '../contexts/YearContext';
 import LoadingSpinner from './common/LoadingSpinner';
-import { CheckCircle, XCircle, RotateCcw, Send, Clock, FileCheck, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, Send, Clock, FileCheck, MessageSquare, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
 
 interface Workflow {
   id: string;
@@ -15,6 +16,7 @@ interface Workflow {
   initiated_at: string;
   work_name?: string;
   work_division?: string;
+  work_year?: string | null;
   initiator_name?: string;
 }
 
@@ -30,8 +32,60 @@ interface HistoryEntry {
   role_name?: string;
 }
 
+const APPROVAL_LEVELS = [
+  { level: 1, short: 'JE', label: 'Junior Engineer' },
+  { level: 2, short: 'SDE', label: 'Sub Division Engineer' },
+  { level: 3, short: 'DE', label: 'Divisional Engineer' },
+  { level: 4, short: 'EE', label: 'Executive Engineer' },
+];
+
+const ApprovalFlowPipeline: React.FC<{ currentLevel: number; status: string }> = ({ currentLevel, status }) => {
+  return (
+    <div className="flex items-center space-x-1 mt-3 flex-wrap gap-y-2">
+      {APPROVAL_LEVELS.map((lvl, idx) => {
+        const isPast = lvl.level < currentLevel;
+        const isCurrent = lvl.level === currentLevel;
+        const isFuture = lvl.level > currentLevel;
+        const isRejected = isCurrent && (status === 'rejected' || status === 'sent_back');
+        const isFinalApproved = status === 'approved' && isPast;
+
+        let nodeClass = 'px-3 py-1.5 rounded-full text-xs font-semibold border ';
+        if (isFinalApproved || isPast) {
+          nodeClass += 'bg-green-100 text-green-700 border-green-300';
+        } else if (isRejected) {
+          nodeClass += 'bg-red-100 text-red-700 border-red-300';
+        } else if (isCurrent) {
+          nodeClass += 'bg-amber-100 text-amber-700 border-amber-400 ring-2 ring-amber-300';
+        } else {
+          nodeClass += 'bg-gray-100 text-gray-400 border-gray-200';
+        }
+
+        return (
+          <React.Fragment key={lvl.level}>
+            <div className="flex flex-col items-center">
+              <span className={nodeClass} title={lvl.label}>
+                {lvl.short}
+              </span>
+              {isCurrent && status === 'pending_approval' && (
+                <span className="text-xs text-amber-600 mt-0.5 font-medium">Pending</span>
+              )}
+              {(isPast || isFinalApproved) && (
+                <span className="text-xs text-green-600 mt-0.5">Done</span>
+              )}
+            </div>
+            {idx < APPROVAL_LEVELS.length - 1 && (
+              <ArrowRight className={`w-4 h-4 flex-shrink-0 ${isPast ? 'text-green-400' : 'text-gray-300'}`} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+};
+
 const ApprovalDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { selectedYear } = useYear();
   const [pendingApprovals, setPendingApprovals] = useState<Workflow[]>([]);
   const [mySubmissions, setMySubmissions] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,19 +185,21 @@ const ApprovalDashboard: React.FC = () => {
         const { data: worksData } = await supabase
           .schema('estimate')
           .from('works')
-          .select('works_id, work_name, division')
+          .select('works_id, work_name, division, year')
           .in('works_id', workIds);
 
         const enrichPending = (pendingRes.data || []).map(wf => ({
           ...wf,
           work_name: worksData?.find(w => w.works_id === wf.work_id)?.work_name || 'Unknown',
           work_division: worksData?.find(w => w.works_id === wf.work_id)?.division || 'N/A',
+          work_year: worksData?.find(w => w.works_id === wf.work_id)?.year || null,
         }));
 
         const enrichSubmissions = (submissionsRes.data || []).map(wf => ({
           ...wf,
           work_name: worksData?.find(w => w.works_id === wf.work_id)?.work_name || 'Unknown',
           work_division: worksData?.find(w => w.works_id === wf.work_id)?.division || 'N/A',
+          work_year: worksData?.find(w => w.works_id === wf.work_id)?.year || null,
         }));
 
         setPendingApprovals(enrichPending);
@@ -279,6 +335,13 @@ const ApprovalDashboard: React.FC = () => {
     }
   };
 
+  const filteredPending = selectedYear === 'all'
+    ? pendingApprovals
+    : pendingApprovals.filter(w => w.work_year === selectedYear);
+  const filteredSubmissions = selectedYear === 'all'
+    ? mySubmissions
+    : mySubmissions.filter(w => w.work_year === selectedYear);
+
   if (loading) {
     return <LoadingSpinner text="Loading approvals..." />;
   }
@@ -306,13 +369,13 @@ const ApprovalDashboard: React.FC = () => {
           <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-orange-50">
             <h2 className="font-semibold text-gray-900 flex items-center">
               <Clock className="w-5 h-5 mr-2 text-yellow-600" />
-              Pending Approvals ({pendingApprovals.length})
+              Pending Approvals ({filteredPending.length})
             </h2>
           </div>
           <div className="p-6">
-            {pendingApprovals.length > 0 ? (
+            {filteredPending.length > 0 ? (
               <div className="space-y-4">
-                {pendingApprovals.map(workflow => (
+                {filteredPending.map(workflow => (
                   <div key={workflow.id} className="border border-gray-200 rounded-lg overflow-hidden">
                     <div className="bg-gray-50 p-4">
                       <div className="flex items-start justify-between">
@@ -320,9 +383,7 @@ const ApprovalDashboard: React.FC = () => {
                           <h3 className="font-semibold text-gray-900">{workflow.work_name}</h3>
                           <p className="text-sm text-gray-600 mt-1">Work ID: {workflow.work_id}</p>
                           <p className="text-sm text-gray-600">Division: {workflow.work_division}</p>
-                          <p className="text-sm text-gray-600 mt-2">
-                            Current Level: <span className="font-medium">{getLevelName(workflow.current_level)}</span>
-                          </p>
+                          <ApprovalFlowPipeline currentLevel={workflow.current_level} status={workflow.status} />
                           <p className="text-xs text-gray-500 mt-2">
                             Submitted: {new Date(workflow.initiated_at).toLocaleString()}
                           </p>
@@ -405,22 +466,20 @@ const ApprovalDashboard: React.FC = () => {
           <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
             <h2 className="font-semibold text-gray-900 flex items-center">
               <Send className="w-5 h-5 mr-2 text-blue-600" />
-              My Submissions ({mySubmissions.length})
+              My Submissions ({filteredSubmissions.length})
             </h2>
           </div>
           <div className="p-6">
-            {mySubmissions.length > 0 ? (
+            {filteredSubmissions.length > 0 ? (
               <div className="space-y-4">
-                {mySubmissions.map(workflow => (
+                {filteredSubmissions.map(workflow => (
                   <div key={workflow.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900">{workflow.work_name}</h3>
                         <p className="text-sm text-gray-600 mt-1">Work ID: {workflow.work_id}</p>
                         <p className="text-sm text-gray-600">Division: {workflow.work_division}</p>
-                        <p className="text-sm text-gray-600 mt-2">
-                          Current Level: <span className="font-medium">{getLevelName(workflow.current_level)}</span>
-                        </p>
+                        <ApprovalFlowPipeline currentLevel={workflow.current_level} status={workflow.status} />
                         <p className="text-xs text-gray-500 mt-2">
                           Submitted: {new Date(workflow.initiated_at).toLocaleString()}
                         </p>

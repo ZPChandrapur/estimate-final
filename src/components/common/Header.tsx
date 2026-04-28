@@ -2,13 +2,15 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { User, LogOut, Home, FileCheck, FileSpreadsheet } from 'lucide-react';
+import { useYear, YEAR_OPTIONS } from '../../contexts/YearContext';
+import { User, LogOut, Home, FileCheck, FileSpreadsheet, Calendar } from 'lucide-react';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { t } = useLanguage();
+  const { selectedYear, setSelectedYear } = useYear();
 
   const navigationItems = [
     { key: 'home', path: '/', label: 'Home', gradient: 'from-slate-500 to-gray-600', showIcon: true, icon: Home },
@@ -54,6 +56,21 @@ const Header: React.FC = () => {
           </button>
 
           <div className="flex items-center space-x-4">
+            {/* Year Filter */}
+            <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm">
+              <Calendar className="w-4 h-4 text-blue-500 flex-shrink-0" />
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="text-sm font-medium text-gray-700 bg-transparent border-none outline-none cursor-pointer"
+              >
+                <option value="all">All Years</option>
+                {YEAR_OPTIONS.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
                 <User className="w-5 h-5 text-gray-400" />
