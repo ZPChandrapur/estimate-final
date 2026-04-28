@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Work, SubWork, SubworkItem, TaxEntry, RecapCalculations } from '../types';
 import { Plus, Trash2, Save, Check } from 'lucide-react';
@@ -55,6 +55,37 @@ const WorksRecapSheet: React.FC<WorksRecapSheetProps> = ({
   useEffect(() => {
     if (work && subworks.length > 0) calculateRecap();
   }, [work, subworks, subworkItems, subworkTotals, taxes, unitInputs, roundingAmount]);
+
+  const roundingInitialized = useRef(false);
+  useEffect(() => {
+    if (!roundingInitialized.current) {
+      roundingInitialized.current = true;
+      return;
+    }
+    if (!workId) return;
+    const timer = setTimeout(async () => {
+      try {
+        const { data: workData } = await supabase
+          .schema('estimate')
+          .from('works')
+          .select('recap_json')
+          .eq('works_id', workId)
+          .maybeSingle();
+        const existing = workData?.recap_json ? JSON.parse(workData.recap_json) : {};
+        await supabase
+          .schema('estimate')
+          .from('works')
+          .update({
+            recap_json: JSON.stringify({ ...existing, roundingAmount }),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('works_id', workId);
+      } catch (e) {
+        console.error('Error auto-saving rounding amount:', e);
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [roundingAmount]);
 
 const fetchSubworkTotals = async (subworksData: SubWork[], itemsMap: { [subworkId: string]: SubworkItem[] }) => {
   try {
