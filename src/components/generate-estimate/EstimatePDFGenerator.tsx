@@ -927,18 +927,7 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
                   />
 
                   {/* Signature & Stamp Box */}
-                  <div className="mt-6 border border-gray-300">
-                    <div className="grid grid-cols-3 divide-x divide-gray-300">
-                      <div className="p-3 min-h-[100px]">
-                        <p className="text-xs font-semibold text-gray-600 mb-1">Prepared By</p>
-                      </div>
-                      <div className="p-3 min-h-[100px]">
-                        <p className="text-xs font-semibold text-gray-600 mb-1">Checked By</p>
-                      </div>
-                      <div className="p-3 min-h-[100px]">
-                        <p className="text-xs font-semibold text-gray-600 mb-1">Approved By</p>
-                      </div>
-                    </div>
+                  <div className="mt-6 border border-gray-200 min-h-[160px]">
                   </div>
 
                 </div>
@@ -978,7 +967,7 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
                       <div className="flex-1">
                         <div className="text-center mb-6">
                           <p className="text-sm">Fund Head :- {estimateData.work.fund_head || '-'}</p>
-                          <p className="text-sm">Village :- {estimateData.work.village || 'N/A'}, GP :- {estimateData.work.grampanchayat || 'N/A'}, Tah :- {estimateData.work.taluka || 'N/A'}</p>
+                          <p className="text-sm">Village: {estimateData.work.village || 'N/A'} &nbsp;|&nbsp; GP: {estimateData.work.grampanchayat || 'N/A'} &nbsp;|&nbsp; Tah: {estimateData.work.taluka || 'N/A'} &nbsp;|&nbsp; District: Chandrapur</p>
                           <h3 className="text-lg font-bold mt-4">Sub-work: {subwork.subworks_name}</h3>
                           <h4 className="text-lg font-bold underline">ABSTRACT</h4>
                         </div>

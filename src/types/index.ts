@@ -252,5 +252,6 @@ export interface RecapCalculations {
     inspectionCharges: number;
     dprCharges: number;
   };
+  roundingAmount?: number;
   grandTotal: number;
 }

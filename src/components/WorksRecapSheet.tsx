@@ -33,6 +33,7 @@ const WorksRecapSheet: React.FC<WorksRecapSheetProps> = ({
   const [calculations, setCalculations] = useState<RecapCalculations | null>(null);
   const [saved, setSaved] = useState(false);
   const [department, setDepartment] = useState<'water_sanitation' | 'pwd' | 'irrigation'>('water_sanitation');
+  const [roundingAmount, setRoundingAmount] = useState<number>(0);
 
   const [localUnitInputs, setLocalUnitInputs] = useState<{ [subworkId: string]: number }>({});
   const unitInputs = externalUnitInputs ?? localUnitInputs;
@@ -53,7 +54,7 @@ const WorksRecapSheet: React.FC<WorksRecapSheetProps> = ({
 
   useEffect(() => {
     if (work && subworks.length > 0) calculateRecap();
-  }, [work, subworks, subworkItems, subworkTotals, taxes, unitInputs]);
+  }, [work, subworks, subworkItems, subworkTotals, taxes, unitInputs, roundingAmount]);
 
 const fetchSubworkTotals = async (subworksData: SubWork[], itemsMap: { [subworkId: string]: SubworkItem[] }) => {
   try {
@@ -230,6 +231,10 @@ const fetchWorkData = async () => {
         setLocalUnitInputs({});
       }
 
+      if (recapJsonData.roundingAmount !== undefined) {
+        setRoundingAmount(recapJsonData.roundingAmount);
+      }
+
       if (recapJsonData.department) {
         setDepartment(recapJsonData.department);
       } else {
@@ -342,7 +347,8 @@ const fetchWorkData = async () => {
     const inspectionCharges = partATotal * 0.005;
     const dprCharges = department === 'pwd' ? 0 : Math.min(partATotal * 0.05, 100000);
 
-    const grandTotal = partABCombinedSubtotal + partABCombinedTaxTotal + (department === 'pwd' ? 0 : partCTotal) + dprCharges;
+    const baseTotal = partABCombinedSubtotal + partABCombinedTaxTotal + (department === 'pwd' ? 0 : partCTotal) + dprCharges;
+    const grandTotal = baseTotal + roundingAmount;
 
     const calculationsResult: RecapCalculations = {
       partA: { subtotal: partASubtotal, taxes: partATaxes, total: partATotal },
@@ -350,6 +356,7 @@ const fetchWorkData = async () => {
       partC: { subtotal: partCSubtotal, taxes: partCTaxes, total: partCTotal },
       partABCombined: { subtotal: partABCombinedSubtotal, taxes: partABCombinedTaxAmounts, total: partABCombinedSubtotal + partABCombinedTaxTotal },
       additionalCharges: { contingencies, inspectionCharges, dprCharges },
+      roundingAmount,
       grandTotal,
     };
 
@@ -422,6 +429,7 @@ const handleSave = async () => {
       calculations,
       unitInputs,
       department,
+      roundingAmount,
       savedAt: new Date().toISOString(),
     };
 
@@ -1054,6 +1062,31 @@ const handleSave = async () => {
                     )}
                   </tr>
                 )}
+                <tr className="font-semibold">
+                  <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
+                    Add/Less Rounding Amount
+                  </td>
+                  <td className="border border-gray-300 p-2 text-right">
+                    {readonly ? (
+                      <span>{roundingAmount !== 0 ? roundingAmount.toFixed(0) : '0'}</span>
+                    ) : (
+                      <input
+                        type="number"
+                        className="w-28 px-2 py-1 border border-gray-300 rounded text-right text-sm"
+                        value={roundingAmount}
+                        step="1"
+                        onChange={(e) => { setRoundingAmount(Number(e.target.value) || 0); setSaved(false); }}
+                        placeholder="0"
+                      />
+                    )}
+                  </td>
+                  {showFundingCols && (
+                    <>
+                      <td className="border border-gray-300 p-3"></td>
+                      <td className="border border-gray-300 p-3"></td>
+                    </>
+                  )}
+                </tr>
                 <tr className="font-bold bg-yellow-100 text-lg">
                   <td colSpan={showTypeColumn ? 5 : 4} className="border border-gray-300 p-3 text-right">
                     Gross Total Estimated Amount
