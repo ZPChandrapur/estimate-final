@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useYear, YEAR_OPTIONS } from '../../contexts/YearContext';
 import { supabase } from '../../lib/supabase';
-import { User, LogOut, Home, FileCheck, FileSpreadsheet, Calendar, Bell, GitBranch } from 'lucide-react';
+import { User, LogOut, Home, FileSpreadsheet, Calendar, Bell, GitBranch } from 'lucide-react';
 
 const Header: React.FC = () => {
   const location = useLocation();
@@ -39,8 +39,7 @@ const Header: React.FC = () => {
     { key: 'works', path: '/works', label: t('nav.works'), gradient: 'from-emerald-500 to-teal-600' },
     { key: 'subworks', path: '/subworks', label: t('nav.subworks'), gradient: 'from-purple-500 to-pink-600' },
     { key: 'generate-estimate', path: '/generate-estimate', label: 'Generate E-Estimate', gradient: 'from-violet-500 to-purple-600' },
-    { key: 'approvals', path: '/approvals', label: 'Approvals', gradient: 'from-green-500 to-teal-600', showIcon: true, icon: FileCheck },
-    { key: 'workflow-dashboard', path: '/workflow-dashboard', label: 'Workflow', gradient: 'from-blue-600 to-blue-800', showIcon: true, icon: GitBranch },
+    { key: 'workflow-dashboard', path: '/workflow-dashboard', label: 'Approval Workflow', gradient: 'from-green-500 to-teal-600', showIcon: true, icon: GitBranch },
     { key: 'boq-generation', path: '/boq-generation', label: 'BOQ Generation', gradient: 'from-orange-500 to-amber-600', showIcon: true, icon: FileSpreadsheet },
   ];
 
@@ -93,7 +92,7 @@ const Header: React.FC = () => {
 
             {/* Bell icon */}
             <button
-              onClick={() => handleNavigation('/approvals')}
+              onClick={() => handleNavigation('/workflow-dashboard')}
               className="relative p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors"
               title={`${pendingCount} approvals pending`}
             >
@@ -129,7 +128,7 @@ const Header: React.FC = () => {
           <nav className="flex space-x-2 py-2">
             {navigationItems.map((item) => {
               const Icon = item.icon;
-              const isApprovals = item.key === 'approvals';
+              const isApprovals = item.key === 'workflow-dashboard';
               return (
                 <button
                   key={item.key}

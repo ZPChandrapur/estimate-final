@@ -526,9 +526,9 @@ const handleAddWork = async () => {
                       </div>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
-                      {work.estimate_status === 'approved' ? (
+                      {/* Lock only when TS is fully approved. TA-approved stays editable (user can promote). */}
+                      {work.estimate_status === 'approved' && work.type === 'Technical Sanction' ? (
                         <div className="flex items-center space-x-2">
-                          {/* View and PDF always allowed */}
                           <button
                             onClick={() => handlePdfView(work)}
                             className="text-purple-600 hover:text-purple-900 p-2 rounded-lg hover:bg-purple-100 transition"
@@ -543,22 +543,10 @@ const handleAddWork = async () => {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {/* Frozen badge */}
                           <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg" title="Work is approved and locked">
                             <CheckCircle className="w-3 h-3" />
-                            Approved & Locked
+                            TS Approved & Locked
                           </span>
-                          {/* Promote to TS only for TA tab */}
-                          {activeTab === 'ta' && (
-                            <button
-                              onClick={() => handlePromoteToTS(work)}
-                              className="inline-flex items-center px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-teal-500 to-green-600 rounded-lg hover:from-teal-600 hover:to-green-700 transition-all duration-200 shadow-sm"
-                              title="Promote to Technical Sanction"
-                            >
-                              <ArrowRight className="w-3 h-3 mr-1" />
-                              Promote to TS
-                            </button>
-                          )}
                         </div>
                       ) : (
                         <div className="flex items-center space-x-2">
@@ -590,6 +578,17 @@ const handleAddWork = async () => {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
+                          {/* Promote to TS: only on TA tab when TA is fully approved */}
+                          {activeTab === 'ta' && work.estimate_status === 'approved' && work.type === 'Technical Approval' && (
+                            <button
+                              onClick={() => handlePromoteToTS(work)}
+                              className="inline-flex items-center px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-teal-500 to-green-600 rounded-lg hover:from-teal-600 hover:to-green-700 transition-all duration-200 shadow-sm"
+                              title="Promote to Technical Sanction"
+                            >
+                              <ArrowRight className="w-3 h-3 mr-1" />
+                              Promote to TS
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>

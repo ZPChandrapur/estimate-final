@@ -1028,10 +1028,10 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
                   </h3>
                 </div>
                 <div className="flex items-center gap-2">
-                  {selectedWork?.estimate_status === 'approved' ? (
+                  {selectedWork?.estimate_status === 'approved' && selectedWork?.type === 'Technical Sanction' ? (
                     <span className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">
                       <CheckCircle className="w-3 h-3" />
-                      Approved & Locked
+                      TS Approved & Locked
                     </span>
                   ) : (
                     <button
@@ -1171,7 +1171,7 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        {selectedWork?.estimate_status !== 'approved' && (
+                        {!(selectedWork?.estimate_status === 'approved' && selectedWork?.type === 'Technical Sanction') && (
                           <>
                             <button
                               onClick={e => {
@@ -1211,7 +1211,7 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
                 <p className="mt-1 text-sm text-gray-500">
                   Add sub work items to break down the estimate.
                 </p>
-                {selectedWork?.estimate_status !== 'approved' && (
+                {!(selectedWork?.estimate_status === 'approved' && selectedWork?.type === 'Technical Sanction') && (
                   <div className="mt-6">
                     <button
                       onClick={() => setShowAddModal(true)}
