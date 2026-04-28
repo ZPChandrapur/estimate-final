@@ -183,19 +183,44 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
       const { data: work, error: workError } = await supabase
         .schema("estimate")
         .from("works")
-        .select("works_id, work_name, division, sub_division, fund_head, major_head, minor_head, service_head, departmental_head, sanctioning_authority, total_estimated_cost, village, grampanchayat, taluka")
+        .select("works_id, work_name, division, sub_division, fund_head, major_head, minor_head, service_head, departmental_head, sanctioning_authority, total_estimated_cost, village, grampanchayat, taluka, created_by")
         .eq("works_id", workId)
         .single();
 
       if (workError) throw workError;
 
       if (work) {
+        // Fetch creator's name and designation from user_roles + roles
+        let preparedByName = "";
+        let preparedByDesignation = "";
+        if (work.created_by) {
+          const { data: userRoleData } = await supabase
+            .from("user_roles")
+            .select("name, role_id")
+            .eq("user_id", work.created_by)
+            .maybeSingle();
+          if (userRoleData) {
+            preparedByName = userRoleData.name || "";
+            const { data: roleData } = await supabase
+              .from("roles")
+              .select("name")
+              .eq("id", userRoleData.role_id)
+              .maybeSingle();
+            preparedByDesignation = roleData?.name || "";
+          }
+        }
+
         setDocumentSettings((prev) => ({
           ...prev,
           header: {
             ...prev.header,
             division: work.division || "",
             subDivision: work.sub_division || "",
+          },
+          footer: {
+            ...prev.footer,
+            preparedBy: preparedByName,
+            designation: preparedByDesignation,
           },
         }));
       }
@@ -564,11 +589,17 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
   };
 
   const PageHeader: React.FC<{ pageNumber?: number }> = ({ pageNumber }) => (
-    <div className="text-center mb-6 pb-4 border-b-2 border-gray-300">
-      <h2 className="text-base font-semibold text-blue-600 mb-1">{documentSettings.header.division}</h2>
-      <h3 className="text-sm font-medium text-blue-600 mb-3">{documentSettings.header.subDivision}</h3>
+    <div className="mb-6 pb-4 border-b-2 border-gray-300">
+      <div className="flex items-center justify-between">
+        <img src="/emblem.png" alt="Emblem" className="h-16 w-auto object-contain" />
+        <div className="text-center flex-1 px-4">
+          <h2 className="text-base font-semibold text-blue-600 mb-1">{documentSettings.header.division}</h2>
+          <h3 className="text-sm font-medium text-blue-600">{documentSettings.header.subDivision}</h3>
+        </div>
+        <img src="/headerlogo.png" alt="ZP Logo" className="h-16 w-auto object-contain" />
+      </div>
       {pageNumber && documentSettings.pageSettings.showPageNumbers && documentSettings.pageSettings.pageNumberPosition === 'top' && (
-        <div className="text-xs text-gray-500">Page {pageNumber}</div>
+        <div className="text-xs text-gray-500 text-center mt-2">Page {pageNumber}</div>
       )}
     </div>
   );
@@ -753,6 +784,9 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
                     <div className="mb-8">
                       <p className="text-lg mb-2">( 2024-25)</p>
                       <p className="text-xl font-bold">ESTIMATED COST. Rs. {(estimateData.work.total_estimated_cost || calculateTotalEstimate()).toLocaleString('hi-IN')}</p>
+                      {estimateData.work.fund_head && (
+                        <p className="text-sm mt-3">Fund Head: {estimateData.work.fund_head}</p>
+                      )}
                     </div>
 
                     <div className="mt-12">
