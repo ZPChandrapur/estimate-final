@@ -10,7 +10,7 @@ import LoadingSpinner from './common/LoadingSpinner';
 import SubworkItems from './SubworkItems';
 import LeadStatement from './LeadStatement';
 import QuarryChart from './QuarryChart';
-import { Plus, Search, CreditCard as Edit2, Trash2, Eye, FileText, IndianRupee, Calculator, Camera, Upload, Image as ImageIcon, X } from 'lucide-react';
+import { Plus, Search, CreditCard as Edit2, Trash2, Eye, FileText, IndianRupee, Calculator, Camera, Upload, Image as ImageIcon, X, CheckCircle } from 'lucide-react';
 
 const Subworks: React.FC = () => {
   const { t } = useLanguage();
@@ -1028,14 +1028,21 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
                   </h3>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    disabled={!selectedWorkId}
-                    className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-100 shadow-sm disabled:opacity-50"
-                  >
-                    <Plus className="w-3 h-3 mr-1" />
-                    Add Sub Work
-                  </button>
+                  {selectedWork?.estimate_status === 'approved' ? (
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">
+                      <CheckCircle className="w-3 h-3" />
+                      Approved & Locked
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      disabled={!selectedWorkId}
+                      className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-100 shadow-sm disabled:opacity-50"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add Sub Work
+                    </button>
+                  )}
                   <button
                     onClick={handleViewItems}
                     disabled={selectedSubworkIds.length === 0}
@@ -1164,26 +1171,30 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleEditSubwork(subwork);
-                          }}
-                          className="text-emerald-600 hover:text-emerald-900 p-2 rounded-lg hover:bg-emerald-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                          title="Edit Subwork"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleDeleteSubwork(subwork);
-                          }}
-                          className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-300"
-                          title="Delete Subwork"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {selectedWork?.estimate_status !== 'approved' && (
+                          <>
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleEditSubwork(subwork);
+                              }}
+                              className="text-emerald-600 hover:text-emerald-900 p-2 rounded-lg hover:bg-emerald-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                              title="Edit Subwork"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleDeleteSubwork(subwork);
+                              }}
+                              className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-300"
+                              title="Delete Subwork"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1200,16 +1211,18 @@ const [showQuarryChartModal, setShowQuarryChartModal] = useState(false);
                 <p className="mt-1 text-sm text-gray-500">
                   Add sub work items to break down the estimate.
                 </p>
-                <div className="mt-6">
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    disabled={!selectedWorkId}
-                    className="inline-flex items-center px-6 py-3 border border-transparent shadow-lg text-sm font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300 transition-all duration-300"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Sub Work
-                  </button>
-                </div>
+                {selectedWork?.estimate_status !== 'approved' && (
+                  <div className="mt-6">
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      disabled={!selectedWorkId}
+                      className="inline-flex items-center px-6 py-3 border border-transparent shadow-lg text-sm font-semibold rounded-2xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300 transition-all duration-300"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Sub Work
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

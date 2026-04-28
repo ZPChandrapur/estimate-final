@@ -10,7 +10,7 @@ import EstimateApprovalActions from './EstimateApprovalActions';
 import WorkAssignments from './WorkAssignments';
 import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility';
 import { useYear } from '../contexts/YearContext';
-import { Plus, Search, Filter, CreditCard as Edit2, Trash2, Eye, FileText, IndianRupee, Calendar, Building, ArrowRight } from 'lucide-react';
+import { Plus, Search, Filter, CreditCard as Edit2, Trash2, Eye, FileText, IndianRupee, Calendar, Building, ArrowRight, CheckCircle } from 'lucide-react';
 
 const Works: React.FC = () => {
   const { t } = useLanguage();
@@ -526,46 +526,72 @@ const handleAddWork = async () => {
                       </div>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handlePdfView(work)}
-                          className="text-purple-600 hover:text-purple-900 p-2 rounded-lg hover:bg-purple-100 transition"
-                          title="View Recap Sheet"
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleViewWork(work)}
-                          className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                          title="View Work"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEditWork(work)}
-                          className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-300"
-                          title="Edit Work"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteWork(work)}
-                          className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-300"
-                          title="Delete Work"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                        {activeTab === 'ta' && work.estimate_status === 'approved' && (
+                      {work.estimate_status === 'approved' ? (
+                        <div className="flex items-center space-x-2">
+                          {/* View and PDF always allowed */}
                           <button
-                            onClick={() => handlePromoteToTS(work)}
-                            className="inline-flex items-center px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-teal-500 to-green-600 rounded-lg hover:from-teal-600 hover:to-green-700 transition-all duration-200 shadow-sm"
-                            title="Promote to Technical Sanction"
+                            onClick={() => handlePdfView(work)}
+                            className="text-purple-600 hover:text-purple-900 p-2 rounded-lg hover:bg-purple-100 transition"
+                            title="View Recap Sheet"
                           >
-                            <ArrowRight className="w-3 h-3 mr-1" />
-                            Promote to TS
+                            <FileText className="w-4 h-4" />
                           </button>
-                        )}
-                      </div>
+                          <button
+                            onClick={() => handleViewWork(work)}
+                            className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-100 transition-all duration-200"
+                            title="View Work"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {/* Frozen badge */}
+                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg" title="Work is approved and locked">
+                            <CheckCircle className="w-3 h-3" />
+                            Approved & Locked
+                          </span>
+                          {/* Promote to TS only for TA tab */}
+                          {activeTab === 'ta' && (
+                            <button
+                              onClick={() => handlePromoteToTS(work)}
+                              className="inline-flex items-center px-2 py-1 text-xs font-semibold text-white bg-gradient-to-r from-teal-500 to-green-600 rounded-lg hover:from-teal-600 hover:to-green-700 transition-all duration-200 shadow-sm"
+                              title="Promote to Technical Sanction"
+                            >
+                              <ArrowRight className="w-3 h-3 mr-1" />
+                              Promote to TS
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handlePdfView(work)}
+                            className="text-purple-600 hover:text-purple-900 p-2 rounded-lg hover:bg-purple-100 transition"
+                            title="View Recap Sheet"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleViewWork(work)}
+                            className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            title="View Work"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEditWork(work)}
+                            className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-300"
+                            title="Edit Work"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteWork(work)}
+                            className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-300"
+                            title="Delete Work"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
