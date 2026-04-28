@@ -785,7 +785,7 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
                       <p className="text-lg mb-2">( 2024-25)</p>
                       <p className="text-xl font-bold">ESTIMATED COST. Rs. {(estimateData.work.total_estimated_cost || calculateTotalEstimate()).toLocaleString('hi-IN')}</p>
                       {estimateData.work.fund_head && (
-                        <p className="text-sm mt-3">Fund Head: {estimateData.work.fund_head}</p>
+                        <p className="text-sm font-bold mt-3">Fund Head: {estimateData.work.fund_head}</p>
                       )}
                     </div>
 
@@ -912,12 +912,11 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
 
                 <div className="flex-1">
                   <div className="text-center mb-6">
-                    <p className="text-sm">Fund Head :- {estimateData.work.fund_head || '-'}</p>
-                    <p className="text-sm font-semibold">NAME OF WORK: {estimateData.work.work_name}</p>
-                    <p className="text-sm font-semibold">Village: {estimateData.work.village}</p>
-                    <p className="text-sm font-semibold">GP : {estimateData.work.grampanchayat}</p>
-                    <p className="text-sm font-semibold">Tah : {estimateData.work.taluka}</p>
-                    <p className="text-sm">District :- Chandrapur</p>
+                    <p className="text-sm font-bold">Fund Head :- {estimateData.work.fund_head || '-'}</p>
+                    <p className="text-sm font-semibold mt-1">NAME OF WORK: {estimateData.work.work_name}</p>
+                    <p className="text-sm font-semibold mt-1">
+                      Village: {estimateData.work.village || '-'} &nbsp;|&nbsp; GP: {estimateData.work.grampanchayat || '-'} &nbsp;|&nbsp; Tah: {estimateData.work.taluka || '-'} &nbsp;|&nbsp; District: {estimateData.work.district || 'Chandrapur'}
+                    </p>
                     <h3 className="text-lg font-bold mt-4">GENERAL ABSTRACT</h3>
                   </div>
 
@@ -927,6 +926,39 @@ export const EstimatePDFGenerator: React.FC<EstimatePDFGeneratorProps> = ({
                     savedTaxes={savedTaxes ?? null}
                     readonly={true}
                   />
+
+                  {/* Signature & Stamp Box */}
+                  <div className="mt-8 border border-black">
+                    <div className="grid grid-cols-3 divide-x divide-black">
+                      <div className="p-4 min-h-[120px]">
+                        <p className="text-xs font-semibold mb-1">Prepared By</p>
+                        <p className="text-xs text-gray-500">(Signature &amp; Stamp)</p>
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs">Name: ___________________________</p>
+                          <p className="text-xs">Designation: ____________________</p>
+                          <p className="text-xs">Date: ___________________________</p>
+                        </div>
+                      </div>
+                      <div className="p-4 min-h-[120px]">
+                        <p className="text-xs font-semibold mb-1">Checked By</p>
+                        <p className="text-xs text-gray-500">(Signature &amp; Stamp)</p>
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs">Name: ___________________________</p>
+                          <p className="text-xs">Designation: ____________________</p>
+                          <p className="text-xs">Date: ___________________________</p>
+                        </div>
+                      </div>
+                      <div className="p-4 min-h-[120px]">
+                        <p className="text-xs font-semibold mb-1">Approved By</p>
+                        <p className="text-xs text-gray-500">(Signature &amp; Stamp)</p>
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs">Name: ___________________________</p>
+                          <p className="text-xs">Designation: ____________________</p>
+                          <p className="text-xs">Date: ___________________________</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                 </div>
 
