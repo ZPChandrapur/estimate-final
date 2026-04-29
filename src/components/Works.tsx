@@ -240,25 +240,59 @@ const handleAddWork = async () => {
   const handlePromoteToTS = async (work: Work) => {
     if (!confirm(`Promote "${work.work_name}" from Technical Approval to Technical Sanction?\n\nThe Works ID (${work.works_id}) will remain the same. The TA approval record will be cleared so a fresh TS approval process can begin.`)) return;
     try {
-      // Delete existing approval workflow + history so TS gets a clean slate
-      const { data: existingWf } = await supabase
-        .schema('estimate').from('approval_workflows')
-        .select('id').eq('work_id', work.works_id);
+      // VALIDATION: Check if current user and higher-level approvers are assigned to this work
+      const { data: assignments, error: assignError } = await supabase
+        .schema('estimate').from('work_assignments')
+        .select('user_id, role_id')
+        .eq('work_id', work.works_id);
 
-      if (existingWf && existingWf.length > 0) {
-        const wfIds = existingWf.map(w => w.id);
-        await supabase.schema('estimate').from('approval_history').delete().in('workflow_id', wfIds);
-        await supabase.schema('estimate').from('approval_workflows').delete().eq('work_id', work.works_id);
+      if (assignError) throw assignError;
+
+      if (!assignments || assignments.length === 0) {
+        alert(`Cannot promote to TS: This work has no role assignments.\n\nYou must assign engineers (JE, Sub Div, Div, Exec) to this work before promoting to Technical Sanction.\n\nPlease go to Work Assignments to set up the required roles.`);
+        return;
       }
 
-      // Update type to TS and reset status to draft
+      // Check if current user is assigned to this work
+      const currentUserAssigned = assignments.some(a => a.user_id === user?.id);
+      if (!currentUserAssigned) {
+        alert(`Cannot promote to TS: You are not assigned to this work.\n\nPlease ensure you are assigned with an appropriate role (Junior Engineer or higher) before promoting to Technical Sanction.`);
+        return;
+      }
+
+      // Get all assigned role IDs
+      const assignedRoles = assignments.map(a => a.role_id).filter(Boolean);
+      const requiredRoles = [10, 15, 16, 17]; // JE, SubDiv, Div, Exec
+      const hasAllRequiredLevels = [10, 15, 16].some(role => assignedRoles.includes(role)) && 
+                                     assignedRoles.some(role => requiredRoles.includes(role));
+      
+      if (!hasAllRequiredLevels && assignedRoles.length < 2) {
+        const warning = confirm(
+          `⚠️ Warning: This work has limited role assignments.\n\nAssigned roles: ${assignedRoles.map(r => {
+            const roleNames: Record<number, string> = { 10: 'JE', 15: 'Sub Div', 16: 'Div', 17: 'Exec' };
+            return roleNames[r] || 'Unknown';
+          }).join(', ')}\n\nFor a complete TS approval workflow, you should have multiple approval levels assigned.\n\nContinue anyway?`
+        );
+        if (!warning) return;
+      }
+
+      // NO NEED TO DELETE workflow anymore - we now support separate TA and TS workflows
+      // The old TA workflow will be preserved, new TS workflow will be created when submitted
+      
+      console.log(`Promoting ${work.works_id} from TA to TS - old TA approval records will be preserved`);
+
+      // Update type to TS and reset BOTH status fields to draft
       const { error: updateError } = await supabase
         .schema('estimate').from('works')
-        .update({ type: 'Technical Sanction', estimate_status: 'draft' })
+        .update({ 
+          type: 'Technical Sanction', 
+          estimate_status: 'draft',
+          status: 'draft'  // Reset the status field as well
+        })
         .eq('works_id', work.works_id);
       if (updateError) throw updateError;
 
-      alert(`"${work.work_name}" has been promoted to Technical Sanction.\nWorks ID: ${work.works_id}\nYou can now submit it through the new TS approval process.`);
+      alert(`"${work.work_name}" has been promoted to Technical Sanction.\n\nWorks ID: ${work.works_id}\n\n✓ Old TA approval records preserved and accessible in history\n✓ Fresh TS approval workflow ready to start\n✓ Submit the work to initiate new TS approval process`);
       fetchWorks();
     } catch (error: any) {
       console.error('Error promoting to TS:', error);
@@ -306,10 +340,12 @@ const handleAddWork = async () => {
   };
 
   const formatCurrency = (amount: number) => {
+    // Round to nearest whole number
+    const roundedAmount = Math.round(amount);
     return new Intl.NumberFormat('hi-IN', {
       style: 'currency',
       currency: 'INR',
-    }).format(amount);
+    }).format(roundedAmount);
   };
 
   const handlePdfView = (work: Work) => {
@@ -1307,7 +1343,7 @@ const handleAddWork = async () => {
 
       {showPdfModal && selectedWorkForPdf && (
   <div className="fixed inset-0 z-50 bg-gray-600 bg-opacity-50 flex justify-center items-center p-4">
-    <div className="bg-white rounded-lg shadow-lg max-w-6xl w-full max-h-[90vh] overflow-auto relative p-4">
+    <div className="bg-white rounded-lg shadow-lg max-w-6xl w-full max-h-[90vh] overflow-auto relative p-4" id="estimate-recap-sheet">
       <button
         onClick={() => setShowPdfModal(false)}
         className="absolute top-2 right-2 text-gray-600 hover:text-gray-900 z-10"
