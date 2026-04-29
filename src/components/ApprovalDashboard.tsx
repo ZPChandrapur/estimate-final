@@ -5,7 +5,6 @@ import { useRefreshOnVisibility } from '../hooks/useRefreshOnVisibility';
 import { useYear } from '../contexts/YearContext';
 import LoadingSpinner from './common/LoadingSpinner';
 import EstimateApprovalActions from './EstimateApprovalActions';
-import ApprovalActionWithSignature from './approval/ApprovalActionWithSignature';
 import {
   CheckCircle, XCircle, RotateCcw, Clock, FileCheck,
   MessageSquare, ChevronDown, ChevronUp, Search, Filter,
@@ -120,10 +119,7 @@ const ApprovalDashboard: React.FC = () => {
   // Action modal
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowData | null>(null);
   const [selectedWorkName, setSelectedWorkName] = useState('');
-  const [selectedWorkId, setSelectedWorkId] = useState('');
-  const [approverName, setApproverName] = useState('');
   const [actionForm, setActionForm] = useState({ action: '', comments: '' });
-  const [useSignatureFlow, setUseSignatureFlow] = useState(true);
 
   // History panel (side drawer)
   const [historyWorkflow, setHistoryWorkflow] = useState<WorkflowData | null>(null);
@@ -217,35 +213,6 @@ const ApprovalDashboard: React.FC = () => {
       fetchData();
     } catch (error: any) {
       alert('Failed to process action: ' + error.message);
-    }
-  };
-
-  // Fetch approver name and open workflow with signature flow
-  const openWorkflowWithSignature = async (workflow: WorkflowData, workName: string, workId: string) => {
-    try {
-      setSelectedWorkflow(workflow);
-      setSelectedWorkName(workName);
-      setSelectedWorkId(workId);
-      
-      // Fetch approver name
-      const { data, error } = await supabase
-        .schema('public')
-        .from('user_roles')
-        .select('name')
-        .eq('user_id', workflow.current_approver_id)
-        .single();
-      
-      if (error) {
-        console.warn('Could not fetch approver name:', error);
-        setApproverName('Approver');
-      } else {
-        setApproverName(data?.name || 'Approver');
-      }
-      
-      setUseSignatureFlow(true);
-    } catch (err) {
-      console.error('Error opening workflow:', err);
-      setApproverName('Approver');
     }
   };
 
@@ -414,14 +381,13 @@ const ApprovalDashboard: React.FC = () => {
                         <div className="flex items-center gap-2 flex-wrap">
                           <EstimateApprovalActions
                             workId={work.works_id}
-                            workType={work.type === 'Technical Sanction' ? 'TS' : 'TA'}
                             currentStatus={work.estimate_status}
                             onStatusUpdate={() => fetchData(true)}
                           />
                           {work.workflow?.status === 'pending_approval' &&
                             (hasFullAccess || work.workflow.current_approver_id === user?.id) && (
                             <button
-                              onClick={() => openWorkflowWithSignature(work.workflow!, work.work_name, work.works_id)}
+                              onClick={() => { setSelectedWorkflow(work.workflow!); setSelectedWorkName(work.work_name); setActionForm({ action: '', comments: '' }); }}
                               className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-teal-600 to-blue-600 rounded-lg hover:from-teal-700 hover:to-blue-700 transition-all shadow-sm"
                             >
                               Take Action
@@ -453,103 +419,66 @@ const ApprovalDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Action Modal with Digital Signature ── */}
+      {/* ── Action Modal ── */}
       {selectedWorkflow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white z-10">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div>
                 <h2 className="text-base font-bold text-gray-900">Take Approval Action</h2>
                 <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{selectedWorkName}</p>
               </div>
-              <button 
-                onClick={() => {
-                  setSelectedWorkflow(null);
-                  setActionForm({ action: '', comments: '' });
-                  setApproverName('');
-                }} 
-                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-              >
+              <button onClick={() => setSelectedWorkflow(null)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
-            
-            {/* Use ApprovalActionWithSignature for signature-based approval */}
-            {useSignatureFlow && selectedWorkflow && (
-              <div className="p-6">
-                <ApprovalActionWithSignature
-                  workflowId={selectedWorkflow.id}
-                  approvalLevel={selectedWorkflow.current_level}
-                  currentApproverId={selectedWorkflow.current_approver_id}
-                  approverName={approverName}
-                  workId={selectedWorkId}
-                  onApprovalComplete={() => {
-                    setSelectedWorkflow(null);
-                    setActionForm({ action: '', comments: '' });
-                    setApproverName('');
-                    fetchData(true);
-                  }}
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Current Stage</label>
+                <Pipeline currentLevel={selectedWorkflow.current_level} status={selectedWorkflow.status} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Select Action *</label>
+                <select
+                  value={actionForm.action}
+                  onChange={e => setActionForm({ ...actionForm, action: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                >
+                  <option value="">Choose an action...</option>
+                  <option value="approved">Approve & Forward to Next Level</option>
+                  {(hasFullAccess || selectedWorkflow.current_level === 4) && (
+                    <option value="approved_final">Final Approve (Complete Workflow)</option>
+                  )}
+                  <option value="rejected">Reject</option>
+                  <option value="sent_back">Send Back for Revision</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Comments</label>
+                <textarea
+                  value={actionForm.comments}
+                  onChange={e => setActionForm({ ...actionForm, comments: e.target.value })}
+                  rows={3}
+                  placeholder="Add remarks or reasons (optional)..."
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
                 />
               </div>
-            )}
-            
-            {/* Fallback to basic form if signature flow is disabled */}
-            {!useSignatureFlow && (
-              <div className="px-6 py-5 space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Current Stage</label>
-                  <Pipeline currentLevel={selectedWorkflow.current_level} status={selectedWorkflow.status} />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Select Action *</label>
-                  <select
-                    value={actionForm.action}
-                    onChange={e => setActionForm({ ...actionForm, action: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    <option value="">Choose an action...</option>
-                    <option value="approved">Approve & Forward to Next Level</option>
-                    {(hasFullAccess || selectedWorkflow.current_level === 4) && (
-                      <option value="approved_final">Final Approve (Complete Workflow)</option>
-                    )}
-                    <option value="rejected">Reject</option>
-                    <option value="sent_back">Send Back for Revision</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Comments</label>
-                  <textarea
-                    value={actionForm.comments}
-                    onChange={e => setActionForm({ ...actionForm, comments: e.target.value })}
-                    rows={3}
-                    placeholder="Add remarks or reasons (optional)..."
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
-                  />
-                </div>
-              </div>
-            )}
-            
-            {!useSignatureFlow && (
-              <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-                <button
-                  onClick={() => { 
-                    setSelectedWorkflow(null);
-                    setActionForm({ action: '', comments: '' });
-                    setApproverName('');
-                  }}
-                  className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAction}
-                  disabled={!actionForm.action}
-                  className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-teal-600 to-blue-600 rounded-xl hover:from-teal-700 hover:to-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Submit Action
-                </button>
-              </div>
-            )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => { setSelectedWorkflow(null); setActionForm({ action: '', comments: '' }); }}
+                className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAction}
+                disabled={!actionForm.action}
+                className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-teal-600 to-blue-600 rounded-xl hover:from-teal-700 hover:to-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Submit Action
+              </button>
+            </div>
           </div>
         </div>
       )}

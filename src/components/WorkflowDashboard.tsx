@@ -28,7 +28,6 @@ interface WorkflowData {
   status: string;
   initiated_by: string;
   initiated_at: string;
-  work_type?: string;  // 'TA' or 'TS'
 }
 
 interface HistoryEntry {
@@ -164,26 +163,14 @@ const WorkflowDashboard: React.FC = () => {
       ]);
 
       const allWorkflows = workflowsRes.data || [];
-      // Keep the most recent workflow per (work_id, work_type) pair
-      const latestByWorkAndType: Record<string, WorkflowData> = {};
+      // Keep the most recent workflow per work
+      const latestByWork: Record<string, WorkflowData> = {};
       allWorkflows.forEach(wf => {
-        // Key by both work_id AND work_type to support separate TA and TS workflows
-        const workType = wf.work_type || 'TA'; // Default to TA for backward compatibility
-        const key = `${wf.work_id}:${workType}`;
-        const ex = latestByWorkAndType[key];
-        if (!ex || new Date(wf.initiated_at) > new Date(ex.initiated_at)) {
-          latestByWorkAndType[key] = wf;
-        }
+        const ex = latestByWork[wf.work_id];
+        if (!ex || new Date(wf.initiated_at) > new Date(ex.initiated_at)) latestByWork[wf.work_id] = wf;
       });
 
-      const enriched: WorkRow[] = (worksRes.data || []).map(w => {
-        // Determine target work type based on work.type
-        const targetType = w.type === 'Technical Sanction' ? 'TS' : 'TA';
-        const key = `${w.works_id}:${targetType}`;
-        const workflow = latestByWorkAndType[key] || undefined;
-        
-        return { ...w, workflow };
-      });
+      const enriched: WorkRow[] = (worksRes.data || []).map(w => ({ ...w, workflow: latestByWork[w.works_id] }));
       setWorks(enriched);
 
       if (roleRes.data?.roles) {
@@ -207,7 +194,7 @@ const WorkflowDashboard: React.FC = () => {
     setHistory([]);
     setHistoryLoading(true);
     try {
-      // Get all workflows for this work (including deleted ones that left history records)
+      // Get all workflow ids for this work
       const { data: wfRows } = await supabase
         .schema('estimate').from('approval_workflows')
         .select('id').eq('work_id', work.works_id);
@@ -215,7 +202,6 @@ const WorkflowDashboard: React.FC = () => {
       const wfIds = (wfRows || []).map(w => w.id);
       if (wfIds.length === 0) { setHistoryLoading(false); return; }
 
-      // Get approval history
       const { data: histRows } = await supabase
         .schema('estimate').from('approval_history')
         .select('*')
@@ -469,7 +455,6 @@ const WorkflowDashboard: React.FC = () => {
                           <div className="flex items-center gap-2 flex-wrap">
                             <EstimateApprovalActions
                               workId={work.works_id}
-                              workType={work.type === 'Technical Sanction' ? 'TS' : 'TA'}
                               currentStatus={work.estimate_status}
                               onStatusUpdate={() => fetchData(true)}
                             />

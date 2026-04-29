@@ -2,18 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Send, CheckCircle, XCircle, RotateCcw, Clock, AlertCircle } from 'lucide-react';
-import { generateAndUploadApprovalPDF } from '../utils/pdfSignatureUtils';
 
 interface EstimateApprovalActionsProps {
   workId: string;
-  workType?: string;  // 'TA' or 'TS' - defaults to 'TA'
   currentStatus: string;
   onStatusUpdate: () => void;
 }
 
 type WorkflowStatus = 'pending_approval' | 'approved' | 'rejected' | 'sent_back' | null;
 
-const EstimateApprovalActions: React.FC<EstimateApprovalActionsProps> = ({ workId, workType = 'TA', currentStatus, onStatusUpdate }) => {
+const EstimateApprovalActions: React.FC<EstimateApprovalActionsProps> = ({ workId, currentStatus, onStatusUpdate }) => {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>(null);
@@ -21,18 +19,17 @@ const EstimateApprovalActions: React.FC<EstimateApprovalActionsProps> = ({ workI
 
   useEffect(() => {
     checkWorkflow();
-  }, [workId, workType, currentStatus]);
+  }, [workId, currentStatus]);
 
   const checkWorkflow = async () => {
     try {
       setLoadingWorkflow(true);
-      // Get the most recent workflow for this work and work_type
+      // Get the most recent workflow for this work
       const { data } = await supabase
         .schema('estimate')
         .from('approval_workflows')
         .select('id, status')
         .eq('work_id', workId)
-        .eq('work_type', workType)
         .order('initiated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -67,53 +64,13 @@ const EstimateApprovalActions: React.FC<EstimateApprovalActionsProps> = ({ workI
     if (!confirm('Submit this estimate for approval? Once submitted, the assigned approver will review it.')) return;
     try {
       setSubmitting(true);
-      
-      // First create the workflow
-      const { data: workflowData, error: workflowError } = await supabase
-        .schema('estimate')
-        .rpc('initiate_approval_workflow', { 
-          p_work_id: workId,
-          p_work_type: workType
-        });
-      
-      if (workflowError) throw workflowError;
-
-      // Then generate and upload PDF if estimate content exists, or create placeholder
-      try {
-        const estimateContent = document.getElementById('estimate-recap-sheet') || 
-                               document.getElementById('estimate-content') ||
-                               document.querySelector('[data-estimate-pdf]');
-        
-        if (workflowData?.workflow_id) {
-          await generateAndUploadApprovalPDF(
-            estimateContent as HTMLElement | null,
-            workId,
-            workflowData.workflow_id,
-            user?.id || ''
-          );
-        }
-      } catch (pdfError) {
-        console.warn('PDF generation skipped (not critical):', pdfError);
-        // Don't fail the entire submission if PDF generation fails
-      }
-
+      const { error } = await supabase.schema('estimate').rpc('initiate_approval_workflow', { p_work_id: workId });
+      if (error) throw error;
       onStatusUpdate();
       checkWorkflow();
     } catch (error: any) {
       let msg = error.message || error.hint || JSON.stringify(error);
-      
-      // Provide helpful error messages for common approval workflow issues
-      if (msg.includes('not assigned to this work')) {
-        msg = `${msg}\n\n📋 Please ensure you are assigned to this work with an appropriate role (Junior Engineer, Sub Division Engineer, Divisional Engineer, or Executive Engineer) via the Work Assignments section.`;
-      } else if (msg.includes('No approver found')) {
-        msg = `${msg}\n\n👥 Please ensure that higher-level engineers are assigned to this work for the next approval level via the Work Assignments section.`;
-      } else if (msg.includes('already has an active approval workflow')) {
-        msg = `${msg}\n\nℹ️ The approval workflow for this work is already in progress. You cannot submit it again until the current workflow is completed.`;
-      } else if (msg.includes('already been fully approved')) {
-        msg = `${msg}\n\nℹ️ This work has already been fully approved. No further approval is needed.`;
-      }
-      
-      alert('Failed to submit for approval:\n\n' + msg);
+      alert('Failed to submit for approval: ' + msg);
     } finally {
       setSubmitting(false);
     }
